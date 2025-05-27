@@ -1,0 +1,56 @@
+---
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+
+site_name: Ktchn8s Homelab
+site_url: http://localhost:8000
+copyright: Copyright &copy; 2025 - present, serpro69
+
+repo_url: https://github.com/serpro69/Ktchn8s
+
+plugins:
+  - search
+  - panzoom:
+      always_show_hint: true
+
+theme:
+  favicon: assets/images/favicon.png
+  name: material
+  palette:
+    primary: black
+  features:
+    - navigation.expand
+    - navigation.instant
+    - navigation.sections
+    - search.highlight
+    - search.share
+
+markdown_extensions:
+  - attr_list
+  - admonition
+  - def_list
+  - pymdownx.details
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.tasklist:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Concepts:
+      - concepts/development-shell.md
+      - concepts/pxe-boot.md
+  - Reference:
+      - Architecture:
+          - reference/architecture/overview.md
+          - reference/architecture/networking.md
+          - reference/architecture/decision-records.md
+      - reference/license.md
+      - reference/changelog.md
+      - reference/roadmap.md
+      - reference/todo.md
