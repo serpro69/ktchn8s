@@ -30,12 +30,62 @@ nix develop
 It will open a shell and install all the dependencies defined in `flake.nix` file at the root of the project:
 
 ```
-sergio@serenity:~/Projects/personal/Ktchn8S$ which kubectl
-/nix/store/1478zvihnhxn27d6mgbkay7bahfcbx86-kubectl-1.30.1/bin/kubectl
+Ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
+➜ which mkdocs
+/nix/store/86p3knkm02c1ix9rfd3y1b53daybl9ag-python3-3.12.10-env/bin/mkdocs
 ```
 
-!!! tip
+#### Entering the nix-shell automatically
 
-    If you have [`direnv`](https://direnv.net) installed, you can run `direnv
-    allow` once and it will automatically enter the Nix shell every time you
-    `cd` into the project.
+If you have [`direnv`](https://direnv.net) installed, you can run `direnv allow` once and it will automatically enter the nix shell every time you `cd` into the project.
+
+
+#### Using your shell environment within nix-shell
+
+One of my outstanding pain points with Nix is that any time I'm in a nix shell, none of my stuff works the way I want it to... I have lots of aliases, [fzf-based autocomplete thingy](https://github.com/Aloxaf/fzf-tab), tmux integrations, ..., and most importantly - strong feelings about how my shell should look like and behave.
+
+So how do I get my shell environment within a `nix-shell`? So far I've simply added the following aliases (which I found in this [post](https://discourse.nixos.org/t/nix-shell-does-not-use-my-users-shell-zsh/5588/13)) to my default (zsh) shell environment:
+
+```bash
+alias nix-shell='nix-shell --run $SHELL'
+
+nix() {
+  if [[ $1 == "develop" ]]; then
+    shift
+    command nix develop -c $SHELL "$@"
+  else
+    command nix "$@"
+  fi
+}
+```
+
+Having just started playing around with nix I don't know if this is an ideal solution, but I like to keep things simple and it does seem to work just fine.
+
+And now, instead of a default PS1 and no configs of my own:
+
+```bash
+➜ nix develop
+razorback:Ktchn8s sergio$ ela
+
+bash: ela: command not found
+```
+
+I have all of my configs within the nix shell environment:
+
+```bash
+➜ nix develop
+
+Ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
+➜ ela
+
+Permissions Size User   Date Modified Name
+drwxr-xr-x@    - sergio 28 May 16:53  .git/
+.rw-r--r--@  456 sergio 28 May 09:16  .yamlfmt.yaml
+.rw-r--r--@  291 sergio 28 May 09:16  .yamllint.yml
+drwxr-xr-x@    - sergio 28 May 09:16  docs/
+.rw-r--r--@ 1.5k sergio 28 May 14:53  flake.lock
+.rw-r--r--@  772 sergio 28 May 16:32  flake.nix
+.rw-r--r--@ 1.1k sergio 28 May 09:16  LICENSE.md
+.rw-r--r--@ 1.3k sergio 28 May 14:43  mkdocs.yml
+.rw-r--r--@  117 sergio 28 May 09:15  README.md
+```
