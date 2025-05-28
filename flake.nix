@@ -23,6 +23,7 @@
             neovim
             openssh
             python3
+            mise
 
             (python3.withPackages (p: with p; [
               pip
