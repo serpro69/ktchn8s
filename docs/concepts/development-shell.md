@@ -39,7 +39,6 @@ Ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default
 
 If you have [`direnv`](https://direnv.net) installed, you can run `direnv allow` once and it will automatically enter the nix shell every time you `cd` into the project.
 
-
 #### Using your shell environment within nix-shell
 
 One of my outstanding pain points with Nix is that any time I'm in a nix shell, none of my stuff works the way I want it to... I have lots of aliases, [fzf-based autocomplete thingy](https://github.com/Aloxaf/fzf-tab), tmux integrations, ..., and most importantly - strong feelings about how my shell should look like and behave.
@@ -88,4 +87,23 @@ drwxr-xr-x@    - sergio 28 May 09:16  docs/
 .rw-r--r--@ 1.1k sergio 28 May 09:16  LICENSE.md
 .rw-r--r--@ 1.3k sergio 28 May 14:43  mkdocs.yml
 .rw-r--r--@  117 sergio 28 May 09:15  README.md
+```
+
+#### Searching for particular commands in nix packages
+
+Sometimes you may find yourself asking: "What nix package provides the `foobar` command?"
+
+Instead of going directly to [search.nixos.org](https://search.nixos.org), you may want to try the [`nix-search`](https://github.com/peterldowns/nix-search-cli) tool, which lets you ask exactly the above question. 
+It's also available as a flake `github:peterldowns/nix-search-cli`.
+
+Let's say we need the `ifconfig` command:
+
+```bash
+➜ nix-search -p ifconfig
+unixtools.nettools @ 1003.1-2008 : ifconfig arp hostname netstat route
+unixtools.ifconfig @ 2.10 : ifconfig
+toybox @ 0.8.12 : ifconfig [ acpi arch ascii ...
+nettools @ 2.10 : ifconfig arp dnsdomainname ...
+inetutils @ 2.6 : ifconfig dnsdomainname ftp ...
+busybox @ 1.36.1 : ifconfig [ [[ acpid add-shell ...
 ```
