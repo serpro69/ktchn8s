@@ -16,7 +16,9 @@
         devShells.default = mkShell {
           packages = [
             # dev tools
+            bat
             diffutils
+            eza
             fzf
             git
             jq
@@ -34,13 +36,14 @@
             # extra python packages
             (python3.withPackages (p: with p; [
               pip
-              mkdocs
-              mkdocs-material
             ]))
           ];
 
           shellHook = ''
-            # NOTE: you can run stuff here
+            # configure python virtual environment with dependencies
+            python -m venv .venv
+            source .venv/bin/activate
+            pip install -r requirements.txt >/dev/null
           '';
         };
       }
