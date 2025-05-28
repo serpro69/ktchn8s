@@ -15,16 +15,23 @@
       {
         devShells.default = mkShell {
           packages = [
+            # dev tools
             diffutils
+            fzf
             git
             jq
-            fzf
-            tmux
-            neovim
-            openssh
-            python3
             mise
+            neovim
+            nix-search-cli
+            tmux
+            # networking tools
+            netcat
+            nettools
+            openssh
+            # lang support
+            python3
 
+            # extra python packages
             (python3.withPackages (p: with p; [
               pip
               mkdocs
@@ -33,7 +40,7 @@
           ];
 
           shellHook = ''
-            # can run stuff here
+            # NOTE: you can run stuff here
           '';
         };
       }
