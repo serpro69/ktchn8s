@@ -1,0 +1,4 @@
+# docs
+mkdocs
+mkdocs-material
+mkdocs-panzoom-plugin
