@@ -1,0 +1,32 @@
+/* Styles for banner images, ensuring they appear above the page title */
+
+/* Apply flexbox to the main content area.
+   The <article class="md-content__inner md-typeset"> is the typical container. */
+article.md-content__inner.md-typeset {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The .banner-image-wrapper DIV is now the flex item we order. */
+.banner-image-wrapper {
+  order: -1; /* This moves the entire wrapper (and its image) to the top */
+  width: 100%; /* Wrapper takes full width */
+  margin-bottom: 1.5em; /* Space between the banner and the content below (e.g., title) */
+  /* Height will be determined by the .banner-image inside */
+}
+
+/* Styles for the actual <img> tag inside the wrapper */
+.banner-image-wrapper .banner-image {
+  width: 100%;
+  height: 250px;
+  object-fit: cover; /* Ensures the image covers the area, might crop */
+  display: block; /* Good practice for images, removes bottom space */
+
+  /* Gradient mask for a fade-out effect at the bottom */
+  mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 30%,
+    transparent 100%
+  ); /* Safari/Chrome compatibility */
+}

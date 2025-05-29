@@ -24,6 +24,9 @@ theme:
     - search.highlight
     - search.share
 
+extra_css:
+  - assets/stylesheets/banner_image.css
+
 markdown_extensions:
   # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
   - attr_list

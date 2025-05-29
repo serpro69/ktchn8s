@@ -4,6 +4,10 @@ icon: material/map-check-outline
 
 # :material-map-check-outline: Roadmap
 
+<div class="banner-image-wrapper">
+  <img class="banner-image" src="https://plus.unsplash.com/premium_photo-1661311950994-d263ea9681a1?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 70%;">
+</div>
+
 !!! info
 
     Current status: **ALPHA**
