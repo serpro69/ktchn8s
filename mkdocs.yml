@@ -26,6 +26,7 @@ theme:
 
 extra_css:
   - assets/stylesheets/banner_image.css
+  - assets/stylesheets/extra.css
 
 markdown_extensions:
   # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
