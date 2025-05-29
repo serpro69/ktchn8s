@@ -34,18 +34,19 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - admonition
   - def_list
+  # https://squidfunk.github.io/mkdocs-material/reference/admonitions/
+  - admonition
   - pymdownx.details
-  - pymdownx.snippets:
-      check_paths: true
-  - pymdownx.tasklist:
   - pymdownx.superfences:
       custom_fences:
         # mermaid support
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.tasklist:
   - pymdownx.tabbed:
       alternate_style: true
 
@@ -54,6 +55,8 @@ nav:
   - Concepts:
       - concepts/development-shell.md
       - concepts/pxe-boot.md
+  - Installation:
+      - installation/network.md
   - Reference:
       - "🏛 Architecture":
           - reference/architecture/overview.md
@@ -63,3 +66,5 @@ nav:
       - reference/changelog.md
       - reference/roadmap.md
       - reference/todo.md
+  - Guides:
+      - guides/how_to_configure_minicom.md
