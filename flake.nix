@@ -23,6 +23,7 @@
             fzf
             git
             jq
+            minicom
             mise
             neovim
             nix-search-cli
