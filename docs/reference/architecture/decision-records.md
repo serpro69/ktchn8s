@@ -14,7 +14,7 @@ We follow a simple template for documenting architecture decisions, which is ins
 
 ??? Template
 
-    ## Title
+    \## Title
 
     > These documents have names that are short noun phrases. For example, "ADR 1: Deployment on Ruby on Rails 3.0.10" or "ADR 9: LDAP for Multitenant Integration"
 
@@ -35,3 +35,42 @@ We follow a simple template for documenting architecture decisions, which is ins
 
     > This section describes the resulting context, after applying the decision. All consequences should be listed here, not just the "positive" ones. A particular decision may have positive, negative, and neutral consequences, but all of them affect the team and project in the future.
 
+
+## Plugging C1111 router directly into ISP modem
+
+**Context**
+
+Before I started home-labbing, our home network was managed via an Eero 6 router connected to the ISP modem.
+
+I initially thought to connect the C1111 router to the Eero:
+
+```mermaid
+flowchart LR
+    I[Internet] o--o A[ISP Modem] o--o B[Eero 6 Router] o--o C[C1111 Router]
+```
+
+This would, however, result in Double-NAT, which is usually not recommended.
+
+I found out that Eero can be used as an Access Point in this [post](https://www.reddit.com/r/eero/comments/uuuvdc/comment/i9hkazz/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button) by first wiring one eero to your existing router and setting it up in Double NAT. Once the setup is complete, you can go to the Settings --> Network Settings --> DHCP & NAT and select Bridge. Eero will restart and then work as an Access Point.
+
+Therefore, I can use C1111 as the main (and only) router, and use the existing Eero 6 router as an AP.
+
+**Decision**
+
+- We will connect the C1111 router directly to the ISP modem, and connect Eero 6 to C1111, using Eero router as an AP.
+
+```mermaid
+flowchart LR
+    I[Internet] o--o A[ISP Modem] o--o B[C1111 Router] o--o C[Eero 6 WiFi AP]
+```
+
+**Status**
+
+- Accepted
+
+**Consequences**
+
+- No Double-NAT
+- Eero 6 will be used as an Access Point, which will allow to use it for WiFi connectivity.
+- Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable security settings anymore)
+    - This is not a big problem because we can do it via router or pfsense or something similar.
