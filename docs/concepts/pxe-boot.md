@@ -1,4 +1,8 @@
-# PXE boot
+---
+icon: material/console-network-outline
+---
+
+# :material-console-network-outline: PXE boot
 
 ## What is PXE Boot?
 

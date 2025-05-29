@@ -1,4 +1,8 @@
-# Overview 🧩
+---
+icon: material/earth
+---
+
+# :material-earth: Overview
 
 ## Components
 

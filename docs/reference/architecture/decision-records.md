@@ -1,4 +1,8 @@
-# Decision Records 📝
+---
+icon: material/file-document-multiple
+---
+
+# :material-file-document-multiple: Decision Records
 
 Architecture decisions play a crucial role in driving the design and development of a software project. They guide the selection of technologies, the design of software components, and the organization of the codebase. However, these decisions are often made in isolation and without proper documentation. This can lead to confusion, inconsistencies, and suboptimal solutions. Moreover, it makes it nearly impossible to answer questions like "why did we decide to do this? 🤔" as the time goes on.
 

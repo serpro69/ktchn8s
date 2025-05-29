@@ -25,7 +25,11 @@ theme:
     - search.share
 
 markdown_extensions:
+  # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
   - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - admonition
   - def_list
   - pymdownx.details
@@ -34,6 +38,7 @@ markdown_extensions:
   - pymdownx.tasklist:
   - pymdownx.superfences:
       custom_fences:
+        # mermaid support
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
@@ -41,14 +46,14 @@ markdown_extensions:
       alternate_style: true
 
 nav:
-  - Home: index.md
+  - "~/": index.md
   - Concepts:
       - concepts/development-shell.md
       - concepts/pxe-boot.md
   - Reference:
-      - Architecture:
+      - "🏛 Architecture":
           - reference/architecture/overview.md
-          - reference/architecture/networking.md
+          - reference/architecture/network.md
           - reference/architecture/decision-records.md
       - reference/license.md
       - reference/changelog.md

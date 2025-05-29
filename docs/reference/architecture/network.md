@@ -1,4 +1,8 @@
-# Networking 🛜
+---
+icon: material/lan
+---
+
+# :material-lan: Network
 
 ```mermaid
 %% mermaid config https://mermaid.js.org/config/schema-docs/config.html#theme

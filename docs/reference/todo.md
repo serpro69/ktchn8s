@@ -1,4 +1,8 @@
-# ToDo 🔨
+---
+icon: material/format-list-checks
+---
+
+# :material-format-list-checks: ToDo
 
 - [ ] Update [architecture/overview](./architecture/overview.md) components
     - Basic diagram of code components and their relations
