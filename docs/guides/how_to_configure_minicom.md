@@ -1,8 +1,8 @@
 ---
-icon: material/file-question
+icon: material/crosshairs-question
 ---
 
-# :material-file-question: HowTo Configure `minicom`
+# :material-crosshairs-question: HowTo configure `minicom`
 
 - Run `sudo minicom -s`, the following screen will appear:
 
