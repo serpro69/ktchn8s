@@ -9,7 +9,6 @@ icon: material/map-check-outline
 </div>
 
 !!! info
-
     Current status: **ALPHA**
 
 ## Alpha requirements
