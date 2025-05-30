@@ -2,6 +2,7 @@
 
 /* Apply flexbox to the main content area.
    The <article class="md-content__inner md-typeset"> is the typical container. */
+/* stylelint-disable-next-line selector-class-pattern */
 article.md-content__inner.md-typeset {
   display: flex;
   flex-direction: column;
@@ -12,6 +13,7 @@ article.md-content__inner.md-typeset {
   order: -1; /* This moves the entire wrapper (and its image) to the top */
   width: 100%; /* Wrapper takes full width */
   margin-bottom: 1.5em; /* Space between the banner and the content below (e.g., title) */
+
   /* Height will be determined by the .banner-image inside */
 }
 
@@ -23,8 +25,7 @@ article.md-content__inner.md-typeset {
   display: block; /* Good practice for images, removes bottom space */
 
   /* Gradient mask for a fade-out effect at the bottom */
-  mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
-  -webkit-mask-image: linear-gradient(
+  mask-image: linear-gradient(
     to bottom,
     black 30%,
     transparent 100%

@@ -12,6 +12,7 @@ This page contains a list of ADRs, both overarching (with cross-cutting concerns
 
 We follow a simple template for documenting architecture decisions, which is inspired by this Michael Nygard's [post](http://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions)
 
+<!-- markdownlint-disable MD046 -->
 ??? Template
 
     \## Title
@@ -34,6 +35,7 @@ We follow a simple template for documenting architecture decisions, which is ins
     **Consequences**
 
     > This section describes the resulting context, after applying the decision. All consequences should be listed here, not just the "positive" ones. A particular decision may have positive, negative, and neutral consequences, but all of them affect the team and project in the future.
+<!-- markdownlint-enable MD046 -->
 
 
 ## Plugging C1111 router directly into ISP modem

@@ -16,7 +16,7 @@ icon: material/lan
 - Cisco C3560-GS-8P Switch
 - Eero 6 Router
 - Serial Console Cable
-- "Controller" PC 
+- "Controller" PC
     - Any OS can be used, but since I work on Linux I won't provide serial console connectivity specifics for other OSes (which can also easily be found online). PRs with docs improvements are always welcome!
 
 ## Serial Console Connection
@@ -195,9 +195,9 @@ References:
 
     * **Note:** The command `ip address dhcp` should work if your ISP modem is providing DHCP. If your ISP requires PPPoE, the configuration here would be very different (involving a Dialer interface).
 
-    * **If `GigabitEthernet0/0/0` is *not* a dedicated WAN port and is actually part of the switch block (unlikely for `0/0/x` naming but possible on some variants):**
-        * You would *not* configure `ip address dhcp` directly. Instead, you'd create a "WAN VLAN" (e.g., VLAN 99), assign this physical port to VLAN 99, create `interface Vlan99`, and put `ip address dhcp` and `ip nat outside` on `interface Vlan99`. 
-        * *This is a crucial distinction based on your router's specific hardware port types.*
+    * **If `GigabitEthernet0/0/0` is _not_ a dedicated WAN port and is actually part of the switch block (unlikely for `0/0/x` naming but possible on some variants):**
+        * You would _not_ configure `ip address dhcp` directly. Instead, you'd create a "WAN VLAN" (e.g., VLAN 99), assign this physical port to VLAN 99, create `interface Vlan99`, and put `ip address dhcp` and `ip nat outside` on `interface Vlan99`.
+        * _This is a crucial distinction based on your router's specific hardware port types._
 
 - **Home Network LAN Configuration (_using integrated switchports_):**
 
@@ -291,27 +291,27 @@ References:
 
 - Physically connect Eero WAN port to `GigabitEthernet0/1/0` on C1111.
 - Factory reset Eero if needed.
-   * Note: I didn't perform a reset or anything, keept using existing configuration and mobile eero app as it was
-   * Follow Eero app setup instructions. 
+    * Note: I didn't perform a reset or anything, keept using existing configuration and mobile eero app as it was
+    * Follow Eero app setup instructions.
 - Configure Eero in Access Point mode:
-   * In order for eeros to be used as Access Points, you will need to wire one eero to your existing router and set it up in Double NAT. Once the setup is complete, you can go to the Settings--Network Settings--DHCP & NAT and select Bridge. Let the system reboot and the eeros will no longer perform DHCP.
-   * tldr: connect the Eero to C1111 g0/1/0 port, open eero app and wait for it to show that it has internet connection, then change it to bridge mode, wait for it to restart and show as online again in the app, profit
-   * ref: https://www.reddit.com/r/eero/comments/uuuvdc/comment/i9hkazz/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+    * In order for eeros to be used as Access Points, you will need to wire one eero to your existing router and set it up in Double NAT. Once the setup is complete, you can go to the Settings--Network Settings--DHCP & NAT and select Bridge. Let the system reboot and the eeros will no longer perform DHCP.
+    * tldr: connect the Eero to C1111 g0/1/0 port, open eero app and wait for it to show that it has internet connection, then change it to bridge mode, wait for it to restart and show as online again in the app, profit
+    * ref: <https://www.reddit.com/r/eero/comments/uuuvdc/comment/i9hkazz/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button>
 - Configure WiFi SSID and password (if wasn't configured previously)
-   * Since I didn't reset the Eero router, I could just keep using the existing SSID w/o any modifications needed
+    * Since I didn't reset the Eero router, I could just keep using the existing SSID w/o any modifications needed
 
 
 #### Verification Steps
 
 - On C1111:
-   * `show ip interface brief`:
-       * `GigabitEthernet0/0/0` should be `up`, `up`, method `DHCP`, status `administratively down` if `no shutdown` was missed. IP should be public.
-       * `Vlan2` should be `up`, `up`, with IP `192.168.1.1`.
-       * `GigabitEthernet0/1/0` should be `up`, `up`.
-   * `show vlan brief`: Should show VLAN 2 "HOME_NETWORK" active with port `Gi0/1/0` assigned.
-   * `show ip route`: Crucially, look for a default route (e.g., `S* 0.0.0.0/0 [1/0] via <ISP_GATEWAY_IP>` or `S* 0.0.0.0/0 is directly connected, GigabitEthernet0/0/0` if DHCP sets it that way).
-   * `show ip nat translations`: Will be empty initially, but will populate as devices NAT out.
-   * `ping 1.1.1.1 source Vlan2` (or `ping 1.1.1.1` if that doesn't work, try pinging from global exec mode).
+    * `show ip interface brief`:
+        * `GigabitEthernet0/0/0` should be `up`, `up`, method `DHCP`, status `administratively down` if `no shutdown` was missed. IP should be public.
+        * `Vlan2` should be `up`, `up`, with IP `192.168.1.1`.
+        * `GigabitEthernet0/1/0` should be `up`, `up`.
+    * `show vlan brief`: Should show VLAN 2 "HOME_NETWORK" active with port `Gi0/1/0` assigned.
+    * `show ip route`: Crucially, look for a default route (e.g., `S* 0.0.0.0/0 [1/0] via <ISP_GATEWAY_IP>` or `S* 0.0.0.0/0 is directly connected, GigabitEthernet0/0/0` if DHCP sets it that way).
+    * `show ip nat translations`: Will be empty initially, but will populate as devices NAT out.
+    * `ping 1.1.1.1 source Vlan2` (or `ping 1.1.1.1` if that doesn't work, try pinging from global exec mode).
 - Connect a laptop/phone to the Eero's WiFi.
 - Verify laptop/phone gets an IP from `192.168.1.x` range, gateway `192.168.1.1`, DNS `1.1.1.1`/`8.8.8.8`.
 - Verify laptop/phone can browse the internet.
@@ -562,7 +562,7 @@ Host 10.10.10.2 bifrost
 - **From a device on your Home Network (e.g., the controller laptop on `192.168.1.x`):**
     * `ping 10.10.10.1`: Ping the C1111's Homelab VLAN gateway.
     * `ping 10.10.10.2`: Ping the C3560 switch's management IP.
-        * *Note:* This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in Stage 4).
+        * _Note:_ This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in Stage 4).
     * Try to SSH to `10.10.10.1` (the C1111 router) using the admin credentials you set up for the router.
     * Try to SSH to `10.10.10.2` (the C3560 switch) using the admin credentials you set up for the switch.
 
@@ -668,9 +668,9 @@ copy running-config startup-config
 #### (Optional) K8s Nodes & NAS Device Network Configuration
 
 !!! info
-    This is an optional step and can usually be skipped. 
+    This is an optional step and can usually be skipped.
     However, if you already have your nodes with some pre-installed OS on them, you can use follow the following steps and test the connectivity.
-
+    <br>
     This part is done on the operating system of each server. The method varies by OS (Linux distribution type, etc.).
 
 - **Physical Connection:**
@@ -691,7 +691,7 @@ copy running-config startup-config
 
     * **Option B: DHCP Client Configuration (Less common for servers, but possible):**
         * Configure the network interface on each device to obtain an IP address automatically via DHCP.
-        * If you use this, the device will get an IP from the `HOMELAB_POOL_VLAN10` range *that is not in the excluded list*.
+        * If you use this, the device will get an IP from the `HOMELAB_POOL_VLAN10` range _that is not in the excluded list_.
         * For consistent IPs with DHCP, you would typically set up DHCP reservations (MAC address to IP mapping) on the C1111. This is more advanced and can be added later if desired. For now, static configuration on the end devices is simpler if you want specific IPs.
 
 #### Verification Steps
@@ -750,12 +750,12 @@ Jan  2 00:14:02.766: %SSH-3-NO_MATCH: No matching kex algorithm found: client cu
 
 This is a classic compatibility issue between modern SSH clients and older network gear like the Cisco Catalyst 3560.
 
-The laptop's SSH client (which is likely using modern, more secure algorithms) is trying to negotiate a Key Exchange (KEX) method with the Cisco 3560. The 3560, running older software, only supports older, less secure KEX methods based on SHA-1 (like `diffie-hellman-group-exchange-sha1`, `diffie-hellman-group14-sha1`, `diffie-hellman-group1-sha1`). Modern SSH clients are configured by default to *reject* these older, potentially vulnerable methods.
+The laptop's SSH client (which is likely using modern, more secure algorithms) is trying to negotiate a Key Exchange (KEX) method with the Cisco 3560. The 3560, running older software, only supports older, less secure KEX methods based on SHA-1 (like `diffie-hellman-group-exchange-sha1`, `diffie-hellman-group14-sha1`, `diffie-hellman-group1-sha1`). Modern SSH clients are configured by default to _reject_ these older, potentially vulnerable methods.
 As a result, Neither side can find a mutually agreeable way to establish the secure channel, so the connection fails immediately.
 
 **The Solution:**
 
-The most practical way to fix this is to configure the SSH client on the laptop to temporarily accept one of the older KEX algorithms that the Cisco 3560 *does* offer.
+The most practical way to fix this is to configure the SSH client on the laptop to temporarily accept one of the older KEX algorithms that the Cisco 3560 _does_ offer.
 
 !!! warning
     Accepting older, SHA-1 based key exchange algorithms is inherently less secure than using modern ones. Use this as a workaround to connect to the device, ideally while planning for a potential IOS upgrade on the 3560 (if available and feasible) or limiting where you use this configuration.
@@ -771,7 +771,7 @@ The most practical way to fix this is to configure the SSH client on the laptop 
           ssh -o KexAlgorithms=diffie-hellman-group14-sha1 user@10.10.10.2
           ```
         * If this connects, the KEX mismatch was indeed the problem.
- 
+
     - **Using the SSH Config File (More Permanent):**
         This is better if you need to connect to this device frequently.
         * Open a terminal or command prompt.
@@ -782,7 +782,7 @@ The most practical way to fix this is to configure the SSH client on the laptop 
           Host 10.10.10.2
               KexAlgorithms +diffie-hellman-group14-sha1
           ```
-          *NB! The `+` sign is important!* It tells the client to *add* `diffie-hellman-group14-sha1` to its list of acceptable algorithms, rather than replacing the entire list. This is safer.
+          _NB! The `+` sign is important!_ It tells the client to _add_ `diffie-hellman-group14-sha1` to its list of acceptable algorithms, rather than replacing the entire list. This is safer.
         * Save the file.
         * Now, try connecting using your regular command:
           ```bash
@@ -791,7 +791,7 @@ The most practical way to fix this is to configure the SSH client on the laptop 
 
     - **On the Cisco 3560 (Verification):**
 
-        You don't usually need to configure the 3560 itself for this specific issue, as the problem is the client *rejecting* what the server offers. However, you can verify the available algorithms on the switch using:
+        You don't usually need to configure the 3560 itself for this specific issue, as the problem is the client _rejecting_ what the server offers. However, you can verify the available algorithms on the switch using:
 
         ```cisco
         show ip ssh server algorithms
@@ -813,12 +813,12 @@ Unable to negotiate with 10.10.10.2 port 22: no matching host key type found. Th
 After key exchange, the server (the Cisco 3560) presents its **host key** to the client. This host key is used by the client to verify the server's identity (to prevent Man-in-the-Middle attacks). The error message tells you:
 
 - The switch is offering a host key of type `ssh-rsa`.
-- Your modern SSH client is *not* configured by default to accept `ssh-rsa` as a valid host key type.
+- Your modern SSH client is _not_ configured by default to accept `ssh-rsa` as a valid host key type.
 
 Why is this happening?
 
 * More recent versions of OpenSSH clients (starting around version 8.2) have started disabling `ssh-rsa` by default when the server uses SHA-1 for signing, because SHA-1 is considered cryptographically weak. Older Cisco IOS versions often rely on SHA-1 for this.
-* While the host key itself might be RSA, the *signature algorithm* used with it might be `rsa-sha2-256` or `rsa-sha2-512` on modern servers. Older servers only support the original `ssh-rsa` signature which implicitly uses SHA-1.
+* While the host key itself might be RSA, the _signature algorithm_ used with it might be `rsa-sha2-256` or `rsa-sha2-512` on modern servers. Older servers only support the original `ssh-rsa` signature which implicitly uses SHA-1.
 
 **The Solution:**
 
@@ -835,7 +835,7 @@ Similar to the KEX issue, you need to configure your SSH client to accept `ssh-r
     ssh -o KexAlgorithms=diffie-hellman-group14-sha1 -o HostKeyAlgorithms=ssh-rsa user@10.10.10.2
     ```
 
-    *Note:* You might need to add the `+` prefix here as well, especially if you have a very recent SSH client, although sometimes `ssh-rsa` alone works for `HostKeyAlgorithms`:
+    _Note:_ You might need to add the `+` prefix here as well, especially if you have a very recent SSH client, although sometimes `ssh-rsa` alone works for `HostKeyAlgorithms`:
 
     ```bash
     # If the above fails, try adding '+'
@@ -844,7 +844,7 @@ Similar to the KEX issue, you need to configure your SSH client to accept `ssh-r
 
 - **Using the SSH Config File (More Permanent):**
 
-    Edit your `~/.ssh/config` file again. Add a line for `HostKeyAlgorithms` under the `Host` block for 10.10.10.2. Use the `+` prefix to *add* `ssh-rsa` without removing other, more secure host key types you might need for other servers.
+    Edit your `~/.ssh/config` file again. Add a line for `HostKeyAlgorithms` under the `Host` block for 10.10.10.2. Use the `+` prefix to _add_ `ssh-rsa` without removing other, more secure host key types you might need for other servers.
 
     ```
     Host 10.10.10.2

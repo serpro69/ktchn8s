@@ -1,3 +1,4 @@
+<!-- markdownlint-disable-next-line MD041 -->
 MIT License
 
 Copyright (c) 2025 - present; Serhii Prodanov
