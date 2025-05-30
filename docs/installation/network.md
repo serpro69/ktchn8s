@@ -323,3 +323,375 @@ References:
 * You create SVIs (`interface Vlan<id>`) to give those VLANs Layer 3 gateway IPs.
 * You assign the integrated physical switchports (`GigabitEthernet0/1/x`) to these VLANs in access mode.
 * The dedicated WAN port (`GigabitEthernet0/0/0`) is typically a routed port, not a switchport.
+
+### Stage 2 - Setup Homelab VLAN and Basic Connectivity to C3560 Switch
+
+* **Goal:** The C3560 switch is connected to the C1111, and the Homelab VLAN (`VLAN 10`) is active on the C1111. The C3560 can be managed via its IP on VLAN 10, and devices in VLAN 10 (including the switch itself) can potentially reach the internet if NAT is updated.
+
+* **Physical Connection:** Connect a network cable from C1111's `GigabitEthernet0/1/1` port to C3560's `GigabitEthernet0/9` port (or your chosen uplink port on the C3560).
+
+#### C1111 Configuration Steps
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- Homelab VLAN Definition ---
+! Create VLAN 10 globally on the router
+vlan 10
+ ! Assign a descriptive name to VLAN 10
+ name HOMELAB_SERVERS
+exit
+
+! --- Homelab Switched Virtual Interface (SVI) for Layer 3 ---
+! Create a virtual interface representing VLAN 10 for routing
+interface Vlan10
+ ! Add a description for this interface
+ description Gateway_for_Homelab_Network_10.10.10.0
+ ! Assign an IP address and subnet mask to this SVI. This will be the gateway for devices in VLAN 10.
+ ip address 10.10.10.1 255.255.255.0
+ ! Include traffic from this interface in NAT (Network Address Translation)
+ ! so devices in VLAN 10 can access the internet via the router's WAN IP.
+ ip nat inside
+ ! Ensure the interface is administratively up
+ no shutdown
+exit
+
+! --- LAN Port Configuration for Connection to C3560 Switch ---
+! Select the physical switchport on the C1111 that connects to the C3560
+interface GigabitEthernet0/1/1
+ ! Add a description for this port
+ description Link_To_C3560_Homelab_Switch
+ ! Set the port to access mode, meaning it will carry traffic for a single VLAN
+ switchport mode access
+ ! Assign this access port to VLAN 10
+ switchport access vlan 10
+ ! Enable PortFast: causes a Layer 2 access port to enter the forwarding state immediately,
+ ! bypassing the listening and learning states. Use only on ports connected to end devices or
+ ! to another switch where no loops are expected through this port.
+ spanning-tree portfast
+ ! Ensure the physical port is administratively up
+ no shutdown
+exit
+
+! --- Update NAT Access Control List (ACL) ---
+! If you want Homelab devices to have internet access immediately.
+! First, remove the old NAT ACL if it was specific to only the Home Network.
+! (Check your running config for the exact name you used in Stage 1, e.g., ACL_NAT_HOME_NETWORK)
+no ip access-list standard ACL_NAT_HOME_NETWORK
+
+! Create a new (or modify existing) standard ACL to permit traffic from BOTH Home and Homelab networks for NAT.
+ip access-list standard ACL_NAT_TRAFFIC_ALL_LANS
+ ! Permit traffic from the Home Network (192.168.1.0/24)
+ permit 192.168.1.0 0.0.0.255
+ ! Permit traffic from the Homelab Network (10.10.10.0/24)
+ permit 10.10.10.0 0.0.0.255
+exit
+
+end
+
+! Clear active NAT translations using older NAT acl rule.
+! You need to clear these active translations before you can remove or modify the NAT rule.
+! `*`: This clears all dynamic NAT translations. You can be more specific if needed, but for a homelab environment during setup, clearing all is usually fine and quickest.
+! NB! This will temporarily drop any active internet sessions for devices being NATted by this rule.
+clear ip nat translation *
+
+configure terminal
+
+! --- Update NAT Rule to use the new/updated ACL ---
+! First, remove the old NAT rule that used the old ACL.
+! (The interface GigabitEthernet0/0/0 is assumed to be your WAN interface)
+no ip nat inside source list ACL_NAT_HOME_NETWORK interface GigabitEthernet0/0/0 overload
+
+! Apply the new NAT rule using the updated ACL that includes both LANs.
+ip nat inside source list ACL_NAT_TRAFFIC_ALL_LANS interface GigabitEthernet0/0/0 overload
+
+! Exit configuration mode
+end
+
+! Save the running configuration to the startup configuration
+copy running-config startup-config
+! or "write memory"
+```
+
+#### C3560 Switch Configuration Steps (Minimal Initial Setup)
+
+* Connect to the C3560 via console cable.
+
+* If it has a previous configuration you want to wipe:
+
+    ```cisco
+    enable
+    write erase
+    reload
+    ```
+
+    (Answer "no" to initial configuration dialog if it appears after reload).
+
+* Configure the switch with the following commands:
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- Basic Device Setup ---
+! Set the hostname for the switch
+hostname bifrost
+
+! Set the enable secret password (for privileged EXEC mode)
+enable secret <your_strong_switch_password>
+
+! Create a local user for login (more secure than just enable password)
+username <your_admin_user> privilege 15 secret <your_admin_password_for_switch>
+
+! Configure console line for local login
+line con 0
+ login local
+ logging synchronous ! Prevents console messages from interrupting typing
+exit
+
+! Configure VTY lines (for Telnet/SSH) for local login
+line vty 0 4 ! For the first 5 VTY lines
+ login local
+ transport input ssh ! Prefer SSH over Telnet. Telnet can be "transport input telnet" or "transport input all"
+exit
+! (To enable SSH, you'll also need to configure a domain name and generate crypto keys, see below)
+
+service password-encryption
+
+! Set the IP domain name (required for generating SSH keys)
+ip domain name midgard.local
+
+! Generate RSA crypto keys for SSH
+crypto key generate rsa modulus 2048 ! 1024 is usually sufficient for lab, 2048 for better security
+
+! --- Homelab VLAN Definition on Switch ---
+! Create VLAN 10 on the switch
+vlan 10
+ ! Assign a descriptive name to VLAN 10 (should match C1111 for clarity)
+ name HOMELAB_SERVERS
+exit
+
+! --- Switch Virtual Interface (SVI) for Management ---
+! Create a virtual interface representing VLAN 10 for switch management
+interface Vlan10
+ ! Add a description for this management interface
+ description Management_IP_for_Switch_VLAN10
+ ! Assign an IP address and subnet mask to this SVI. This IP is used to manage the switch.
+ ip address 10.10.10.2 255.255.255.0
+ ! Ensure the interface is administratively up
+ no shutdown
+exit
+
+! --- Set Default Gateway for Switch Management ---
+! Configure the default gateway for the switch itself (for management traffic, e.g., NTP, AAA, SSH from other networks)
+! This IP should be the SVI IP of VLAN 10 on the C1111 router.
+ip default-gateway 10.10.10.1
+
+! --- Port Configuration for Uplink to C1111 Router ---
+! Select the physical port on the C3560 that connects to the C1111
+interface GigabitEthernet0/9 ! Or your chosen uplink port (e.g., Gi0/1 if it's a different model/slot)
+ ! Add a description for this port
+ description Uplink_To_C1111_Router_VLAN10
+ ! Set the port to access mode
+ switchport mode access
+ ! Assign this access port to VLAN 10
+ switchport access vlan 10
+ ! (PortFast might not be strictly necessary here if this is an uplink to another switch/router,
+ !  but for a simple P2P link in access mode to the router's access port, it's generally safe.
+ !  If you were trunking, you would not use PortFast on a trunk to another switch.)
+ ! spanning-tree portfast
+ ! Ensure the physical port is administratively up
+ no shutdown
+exit
+
+! (Optional: Configure other switchports for future devices in VLAN 10 later in Stage 3)
+! Example:
+! interface range GigabitEthernet0/1 - 8
+!  switchport mode access
+!  switchport access vlan 10
+!  spanning-tree portfast
+!  no shutdown
+! exit
+
+! Exit configuration mode
+end
+
+! Save the running configuration to the startup configuration
+copy running-config startup-config
+! or "write memory"
+```
+
+#### Controller PC ssh configuration (Optional)
+
+- Ensure the following ssh configuration is present in `~/.ssh/config`:
+
+```
+# 'muspell' C1111 router in homelab vlan
+Host 10.10.10.1 muspell
+  User <your_admin_user>
+
+# 'bifrost' C3560 switch in homelab vlan
+Host 10.10.10.2 bifrost
+  User <your_admin_user>
+  KexAlgorithms +diffie-hellman-group14-sha1
+  HostKeyAlgorithms +ssh-rsa
+```
+
+- See ['no matching key exchange method found'](#ssh-error-no-matching-key-exchange-method-found) and ['no matching host key type found'](#ssh-error-no-matching-host-key-type-found) ssh troubleshooting info for more details.
+
+#### Verification Steps
+
+- **Physical Connectivity:** Ensure the cable between C1111 (`Gi0/1/1`) and C3560 (`Gi0/9`) is securely connected.
+- **On C1111 Router:**
+    * `show ip interface brief`:
+        * `Vlan10` should be `up`, `up`, protocol `up`, IP `10.10.10.1`.
+        * `GigabitEthernet0/1/1` should be `up`, `up`, protocol `up`.
+    * `show vlan brief`: Should show VLAN 10 "HOMELAB_SERVERS" active with port `Gi0/1/1` assigned.
+    * `show cdp neighbors`: You should see the C3560-Homelab-Switch listed on `GigabitEthernet0/1/1`.
+    * `ping 10.10.10.2`: Try pinging the C3560's management IP. This tests L3 connectivity from C1111 to C3560 SVI.
+- **On C3560 Switch:**
+    * `show ip interface brief`:
+        * `Vlan10` should be `up`, `up`, protocol `up`, IP `10.10.10.2`.
+        * `GigabitEthernet0/9` (or your uplink port) should be `up`, `up`, protocol `up`.
+    * `show vlan brief`: Should show VLAN 10 "HOMELAB_SERVERS" active with port `Gi0/9` (uplink) assigned.
+    * `show cdp neighbors`: You should see the C1111-Router listed on `GigabitEthernet0/9`.
+    * `ping 10.10.10.1`: Try pinging the C1111's SVI for VLAN 10. This tests L3 connectivity from C3560 to C1111.
+    * `ping 1.1.1.1` (or any public IP): This tests if the C3560 can reach the internet (requires the NAT update on C1111 to be effective).
+- **From a device on your Home Network (e.g., the controller laptop on `192.168.1.x`):**
+    * `ping 10.10.10.1`: Ping the C1111's Homelab VLAN gateway.
+    * `ping 10.10.10.2`: Ping the C3560 switch's management IP.
+        * *Note:* This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in Stage 4).
+    * Try to SSH to `10.10.10.1` (the C1111 router) using the admin credentials you set up for the router.
+    * Try to SSH to `10.10.10.2` (the C3560 switch) using the admin credentials you set up for the switch.
+
+### Troubleshooting
+
+#### SSH error 'no matching key exchange method found'
+
+**Problem:**
+
+After completing stage 2 setup on both C1111 and C3560, the following test was failing from a home network laptop:
+
+```bash
+ssh user@10.10.10.2
+Unable to negotiate with 10.10.10.2 port 22: no matching key exchange method found. Their offer: diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
+```
+
+The following is showed in c3560 console:
+
+```
+Jan  2 00:14:02.766: %SSH-3-NO_MATCH: No matching kex algorithm found: client curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp3841...
+```
+
+**Explanation:**
+
+This is a classic compatibility issue between modern SSH clients and older network gear like the Cisco Catalyst 3560.
+
+The laptop's SSH client (which is likely using modern, more secure algorithms) is trying to negotiate a Key Exchange (KEX) method with the Cisco 3560. The 3560, running older software, only supports older, less secure KEX methods based on SHA-1 (like `diffie-hellman-group-exchange-sha1`, `diffie-hellman-group14-sha1`, `diffie-hellman-group1-sha1`). Modern SSH clients are configured by default to *reject* these older, potentially vulnerable methods.
+As a result, Neither side can find a mutually agreeable way to establish the secure channel, so the connection fails immediately.
+
+**The Solution:**
+
+The most practical way to fix this is to configure the SSH client on the laptop to temporarily accept one of the older KEX algorithms that the Cisco 3560 *does* offer.
+
+!!! warning
+    Accepting older, SHA-1 based key exchange algorithms is inherently less secure than using modern ones. Use this as a workaround to connect to the device, ideally while planning for a potential IOS upgrade on the 3560 (if available and feasible) or limiting where you use this configuration.
+
+- You can either specify the algorithm on the command line or configure your SSH client file.
+
+    - **Using the Command Line (Temporary for Testing):**
+        This is the quickest way to test if this is the issue.
+        * Open your terminal or command prompt.
+        * Use the `-o KexAlgorithms` option to specify an accepted algorithm. Pick one from the C3560's offer list. `diffie-hellman-group14-sha1` is slightly preferred over `group1-sha1`.
+        * Enter the command:
+          ```bash
+          ssh -o KexAlgorithms=diffie-hellman-group14-sha1 user@10.10.10.2
+          ```
+        * If this connects, the KEX mismatch was indeed the problem.
+ 
+    - **Using the SSH Config File (More Permanent):**
+        This is better if you need to connect to this device frequently.
+        * Open a terminal or command prompt.
+        * Navigate to or create the `.ssh` directory in your user's home directory: `cd ~/.ssh` (If it doesn't exist, create it: `mkdir ~/.ssh`).
+        * Open the `config` file in a text editor (e.g., `nano ~/.ssh/config` or `notepad ~/.ssh/config` on Windows).
+        * Add the following block to the file. Replace `10.10.10.2` if you need to connect using a hostname instead.
+          ```
+          Host 10.10.10.2
+              KexAlgorithms +diffie-hellman-group14-sha1
+          ```
+          *NB! The `+` sign is important!* It tells the client to *add* `diffie-hellman-group14-sha1` to its list of acceptable algorithms, rather than replacing the entire list. This is safer.
+        * Save the file.
+        * Now, try connecting using your regular command:
+          ```bash
+          ssh user@10.10.10.2
+          ```
+
+    - **On the Cisco 3560 (Verification):**
+
+        You don't usually need to configure the 3560 itself for this specific issue, as the problem is the client *rejecting* what the server offers. However, you can verify the available algorithms on the switch using:
+
+        ```cisco
+        show ip ssh server algorithms
+        ```
+
+        This command will list the supported KEX, encryption (cipher), and integrity (MAC) algorithms. Confirm that the list includes the `diffie-hellman-group` options.
+
+#### SSH error 'no matching host key type found'
+
+After fixing the above error, I started getting another one when connecting to the same switch:
+
+```bash
+ssh -o KexAlgorithms=diffie-hellman-group14-sha1 user@10.10.10.2
+Unable to negotiate with 10.10.10.2 port 22: no matching host key type found. Their offer: ssh-rsa
+```
+
+**The Problem:**
+
+After key exchange, the server (the Cisco 3560) presents its **host key** to the client. This host key is used by the client to verify the server's identity (to prevent Man-in-the-Middle attacks). The error message tells you:
+
+- The switch is offering a host key of type `ssh-rsa`.
+- Your modern SSH client is *not* configured by default to accept `ssh-rsa` as a valid host key type.
+
+Why is this happening?
+
+* More recent versions of OpenSSH clients (starting around version 8.2) have started disabling `ssh-rsa` by default when the server uses SHA-1 for signing, because SHA-1 is considered cryptographically weak. Older Cisco IOS versions often rely on SHA-1 for this.
+* While the host key itself might be RSA, the *signature algorithm* used with it might be `rsa-sha2-256` or `rsa-sha2-512` on modern servers. Older servers only support the original `ssh-rsa` signature which implicitly uses SHA-1.
+
+**The Solution:**
+
+Similar to the KEX issue, you need to configure your SSH client to accept `ssh-rsa` as a valid host key type for this specific connection.
+
+!!! warning
+    As before, enabling older algorithms carries potential security risks. Only do this when connecting to trusted legacy devices and be aware that you are relying on less robust cryptography for server identity verification.
+
+- **Using the Command Line (Temporary for Testing):**
+
+    Add another `-o` option for `HostKeyAlgorithms`. You can chain multiple `-o` options.
+
+    ```bash
+    ssh -o KexAlgorithms=diffie-hellman-group14-sha1 -o HostKeyAlgorithms=ssh-rsa user@10.10.10.2
+    ```
+
+    *Note:* You might need to add the `+` prefix here as well, especially if you have a very recent SSH client, although sometimes `ssh-rsa` alone works for `HostKeyAlgorithms`:
+
+    ```bash
+    # If the above fails, try adding '+'
+    ssh -o KexAlgorithms=diffie-hellman-group14-sha1 -o HostKeyAlgorithms=+ssh-rsa user@10.10.10.2
+    ```
+
+- **Using the SSH Config File (More Permanent):**
+
+    Edit your `~/.ssh/config` file again. Add a line for `HostKeyAlgorithms` under the `Host` block for 10.10.10.2. Use the `+` prefix to *add* `ssh-rsa` without removing other, more secure host key types you might need for other servers.
+
+    ```
+    Host 10.10.10.2
+        KexAlgorithms +diffie-hellman-group14-sha1
+        HostKeyAlgorithms +ssh-rsa  # Add this line
+    ```
+
+    Save the file. Now try connecting with the regular command:
+
+    ```bash
+    ssh user@10.10.10.2
+    ```
