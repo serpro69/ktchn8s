@@ -1,0 +1,64 @@
+---
+# Default megalinter configuration
+# NB! This file needs to exist in the root of the project!
+#
+# See all available variables at https://megalinter.io/latest/config-file/ and in linters documentation
+
+LINTER_RULES_PATH: .
+# exclude gitignored files from being linted
+IGNORE_GITIGNORED_FILES: true
+
+# Do not suggest other megalinter flavors
+FLAVOR_SUGGESTIONS: false
+
+REPORT_OUTPUT_FOLDER: none # Set due to https://github.com/oxsecurity/megalinter/issues/1975
+
+# all, none, or list of linter keys
+APPLY_FIXES: none
+
+# If you use ENABLE variable, all other languages/formats/tooling-formats will
+# be disabled by default
+# ENABLE:
+
+# If you use ENABLE_LINTERS variable, all other linters will be disabled by
+# default
+ENABLE_LINTERS:
+  - BASH_EXEC
+  - BASH_SHELLCHECK
+  - CSS_STYLELINT
+  - DOCKERFILE_HADOLINT
+  - ENV_DOTENV_LINTER
+  - GO_GOLANGCI_LINT
+  - GO_REVIVE
+  - HTML_HTMLHINT
+  - JSON_JSONLINT
+  - JSON_PRETTIER
+  - MAKEFILE_CHECKMAKE
+  - MARKDOWN_MARKDOWNLINT
+  - TERRAFORM_TERRAFORM_FMT
+  - TERRAFORM_TERRAGRUNT
+  - TERRAFORM_TFLINT
+  - YAML_YAMLLINT
+
+DISABLE_ERRORS_LINTERS:
+  - GO_GOLANGCI_LINT
+
+DISABLE:
+  - COPYPASTE # Comment to enable checks of excessive copy-pastes
+  - SPELL # Comment to enable checks of spelling mistakes
+
+SHOW_ELAPSED_TIME: true
+
+FILEIO_REPORTER: false
+
+# Uncomment if you want MegaLinter to detect errors but not block CI to pass
+# DISABLE_ERRORS: true
+
+# Linters Configs
+
+DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ['Dockerfile(-.+)?', 'dockerfile-.*']
+
+GO_GOLANGCI_LINT_ARGUMENTS: ['run', './...']
+
+# ensure tflint --init can run in CI
+TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES: [GITHUB_TOKEN]
