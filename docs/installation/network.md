@@ -14,6 +14,7 @@ icon: material/lan
 
 - Cisco C1111-8P Router
 - Cisco C3560-GS-8P Switch
+- Eero 6 Router
 - Serial Console Cable
 - "Controller" PC 
     - Any OS can be used, but since I work on Linux I won't provide serial console connectivity specifics for other OSes (which can also easily be found online). PRs with docs improvements are always welcome!
@@ -414,7 +415,7 @@ copy running-config startup-config
 ! or "write memory"
 ```
 
-#### C3560 Switch Configuration Steps (Minimal Initial Setup)
+#### C3560 Configuration Steps (Minimal Initial Setup)
 
 * Connect to the C3560 via console cable.
 
@@ -522,7 +523,7 @@ copy running-config startup-config
 ! or "write memory"
 ```
 
-#### Controller PC ssh configuration (Optional)
+#### (Optional) Controller PC ssh configuration
 
 - Ensure the following ssh configuration is present in `~/.ssh/config`:
 
@@ -564,6 +565,167 @@ Host 10.10.10.2 bifrost
         * *Note:* This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in Stage 4).
     * Try to SSH to `10.10.10.1` (the C1111 router) using the admin credentials you set up for the router.
     * Try to SSH to `10.10.10.2` (the C3560 switch) using the admin credentials you set up for the switch.
+
+### Stage 3 - Connect k8s Nodes and NAS to Homelab VLAN & Enable DHCP
+
+* **Goal:** K8s nodes and NAS are physically connected to the C3560, obtain IPs (or have static IPs configured correctly) in the `10.10.10.0/24` range, and can access the internet (assuming NAT on C1111 from Stage 2 is working).
+
+* **Physical Connection:** Connect your k8s nodes and NAS device to available ports on the C3560 switch (e.g., `GigabitEthernet0/1` through `GigabitEthernet0/8`).
+
+#### C1111 Configuration Steps
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- DHCP Server Configuration for Homelab Network (VLAN 10) ---
+! This pool will serve IP addresses to devices in the Homelab VLAN.
+
+! Define a range of IP addresses to EXCLUDE from being dynamically assigned by DHCP.
+! These are typically for static assignments (router SVI, switch management IP, servers, MetalLB range, etc.)
+ip dhcp excluded-address 10.10.10.1 10.10.10.9      ! Exclude C1111's Vlan10 SVI (10.10.10.1) and C3560's Mgmt IP (10.10.10.2) and reserve a few more addresses for similar purposes (APs etc)
+
+! Exclude IPs you plan to assign to your k8s nodes and NAS.
+! Example:
+!   Control: 10.10.10.1x
+!   Workers: 10.10.10.2x
+!   Storage: 10.10.10.3x
+!   MetalLb: 10.10.10.4x - 10.10.10.6x
+ip dhcp excluded-address 10.10.10.10 10.10.10.19    ! k8s control plane nodes
+ip dhcp excluded-address 10.10.10.20 10.10.10.29    ! k8s worker nodes
+ip dhcp excluded-address 10.10.10.30 10.10.10.39    ! storage nodes
+
+! Exclude the IP range you plan to use for MetalLB (for K8s LoadBalancer services).
+! This range should NOT overlap with any static or DHCP-assigned IPs.
+ip dhcp excluded-address 10.10.10.40 10.10.10.69    ! metal lb range
+
+! Define the DHCP pool for the Homelab network
+ip dhcp pool HOMELAB_POOL_VLAN10
+ ! Specify the network address and subnet mask for this DHCP pool
+ network 10.10.10.0 255.255.255.0
+ ! Specify the default gateway IP address for DHCP clients (C1111's SVI for VLAN 10)
+ default-router 10.10.10.1
+ ! Specify DNS server(s) for DHCP clients.
+ ! Start with public DNS. Later, you might change this to your internal DNS server (e.g., Pi-hole).
+ dns-server 1.1.1.1 8.8.8.8
+ ! Specify the domain name to be provided to DHCP clients (should match global ip domain name for consistency)
+ domain-name midgard.local
+ ! Specify the lease duration for IP addresses (e.g., 1 day)
+ lease 1
+exit
+
+! Exit configuration mode
+end
+
+! Save the running configuration to the startup configuration
+copy running-config startup-config
+! or "write memory"
+```
+
+#### C3560 Configuration Steps
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- Port Configuration for K8s Nodes and NAS ---
+! Configure the switchports that your K8s nodes and NAS will connect to.
+! This example uses ports Gi0/1 through Gi0/8. Adjust the range as needed.
+
+! Use 'interface range' to configure multiple ports simultaneously.
+interface range GigabitEthernet0/1 - 8 ! Assuming these are the ports for your servers/NAS
+ ! Add a generic description for these device ports
+ description Homelab_Server_Device_Port_VLAN10
+ ! Set the ports to access mode, as they will carry traffic for a single VLAN (VLAN 10)
+ switchport mode access
+ ! Assign these access ports to VLAN 10
+ switchport access vlan 10
+ ! Enable PortFast: causes Layer 2 access ports to enter the forwarding state immediately.
+ ! Use only on ports connected to end devices (like servers/NAS) to avoid STP delays.
+ spanning-tree portfast
+ ! Ensure the physical ports are administratively up
+ no shutdown
+exit
+
+! Configure Gi0/10 as an additional port with Vlan 10 access
+! Can be used to e.g. connect a laptop to Vlan 10 directly for PXE-boot provisioning
+interface GigabitEthernet0/10
+  description "Homelab additional device port VLAN10"
+  switchport mode access
+  switchport access vlan 10
+  spanning-tree portfast
+  no shutdown
+exit
+
+! Exit configuration mode
+end
+
+! Save the running configuration to the startup configuration
+copy running-config startup-config
+! or "write memory"
+```
+
+#### (Optional) K8s Nodes & NAS Device Network Configuration
+
+!!! info
+    This is an optional step and can usually be skipped. 
+    However, if you already have your nodes with some pre-installed OS on them, you can use follow the following steps and test the connectivity.
+
+    This part is done on the operating system of each server. The method varies by OS (Linux distribution type, etc.).
+
+- **Physical Connection:**
+
+    * Connect each K8s node (Control 1-3, Worker 1-4) to one of the C3560 switchports you just configured (e.g., `Gi0/1` through `Gi0/8`).
+
+- **IP Configuration on Devices:** You have two main options:
+
+    * **Option A: Static IP Configuration (Recommended for Servers/NAS/K8s Nodes):**
+        * Manually configure the network interface on each device.
+        * **Example for K8s Control 1 (`10.10.10.10`):**
+            * IP Address: `10.10.10.10`
+            * Subnet Mask: `255.255.255.0` (or `/24`)
+            * Gateway: `10.10.10.1` (C1111's SVI for VLAN 10)
+            * DNS Server 1: `1.1.1.1` (or your future internal DNS IP)
+            * DNS Server 2: `8.8.8.8` (optional)
+        * Repeat for all K8s nodes and the NAS, using their designated static IPs (which you excluded from DHCP on the C1111).
+
+    * **Option B: DHCP Client Configuration (Less common for servers, but possible):**
+        * Configure the network interface on each device to obtain an IP address automatically via DHCP.
+        * If you use this, the device will get an IP from the `HOMELAB_POOL_VLAN10` range *that is not in the excluded list*.
+        * For consistent IPs with DHCP, you would typically set up DHCP reservations (MAC address to IP mapping) on the C1111. This is more advanced and can be added later if desired. For now, static configuration on the end devices is simpler if you want specific IPs.
+
+#### Verification Steps
+
+- **On C1111 Router:**
+    * If any of your K8s/NAS devices are configured for DHCP (and not in the excluded list), check bindings:
+        `show ip dhcp binding` - You should see any devices that successfully got an IP via DHCP from the `HOMELAB_POOL_VLAN10`.
+- **On C3560 Switch:**
+    * `show mac address-table vlan 10`: You should see the MAC addresses of your connected K8s nodes and NAS learned on their respective switchports (e.g., `Gi0/1`, `Gi0/2`, etc.).
+    * `show interfaces status`: Verify that the ports connected to your K8s nodes/NAS are `connected` and in `vlan 10`.
+- **On each K8s Node and NAS Device:**
+    * **Verify IP Configuration:**
+        * Linux: `ip addr show <interface_name>` or `ifconfig <interface_name>`
+        * NAS: Check network settings in its web UI.
+        * Confirm the IP, subnet mask, gateway, and DNS servers are correctly set (either statically or received via DHCP).
+    * **Test Gateway Connectivity:**
+        * `ping 10.10.10.1` (Should reply from C1111's Vlan10 SVI).
+    * **Test Internet Connectivity:**
+        * `ping 1.1.1.1` (or any public IP like `8.8.8.8`).
+        * `ping google.com` (Tests both internet and DNS resolution).
+    * **Test DNS Resolution (if using public DNS for now):**
+        * Linux: `nslookup google.com` or `dig google.com`
+        * Confirm it resolves to public IP addresses.
+- **From a device on your Home Network (e.g., laptop on `192.168.1.x`):**
+    * `ping 10.10.10.10` (Ping K8s Control 1).
+    * `ping 10.10.10.20` (Ping K8s Worker 1).
+        * These pings should work because the C1111 routes between VLAN 2 and VLAN 10 by default, and no restrictive ACLs are in place yet.
+- Connect a PC to the `g0/10` port on the C3560 switch
+    * `ifconfig` should show an interface with `10.10.10.x` IP, e.g.
+      ```bash
+      $ ifconfig
+      foobarbaz: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+          inet 10.10.10.71  netmask 255.255.255.0  broadcast 10.10.10.255
+      ```
 
 ### Troubleshooting
 
@@ -695,3 +857,4 @@ Similar to the KEX issue, you need to configure your SSH client to accept `ssh-r
     ```bash
     ssh user@10.10.10.2
     ```
+
