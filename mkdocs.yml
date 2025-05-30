@@ -13,7 +13,7 @@ plugins:
       always_show_hint: true
 
 theme:
-  favicon: assets/images/favicon.png
+  favicon: assets/images/favicon_io/favicon.ico
   name: material
   palette:
     primary: black
