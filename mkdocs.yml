@@ -23,6 +23,9 @@ theme:
     - navigation.sections
     - search.highlight
     - search.share
+  # https://squidfunk.github.io/mkdocs-material/setup/changing-the-logo-and-icons/
+  icon:
+    logo: material/kubernetes
 
 extra_css:
   - assets/stylesheets/banner_image.css
@@ -58,7 +61,7 @@ nav:
   - Installation:
       - installation/network.md
   - Reference:
-      - "🏛 Architecture":
+      - "⚓︎ Architecture":
           - reference/architecture/overview.md
           - reference/architecture/network.md
           - reference/architecture/decision-records.md
