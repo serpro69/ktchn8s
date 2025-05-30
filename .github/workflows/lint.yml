@@ -1,0 +1,53 @@
+---
+name: Lint
+run-name: ${{ github.actor }} is running Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  VALIDATE_ALL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  lint:
+    name: 🔍 lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: 🐙 Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # when validating changed files,
+          # mega-linter needs the full git history to get the
+          # list of files that changed across commits
+          fetch-depth: ${{ env.VALIDATE_ALL && 1 || 0 }}
+
+      - name: 🔬 Lint
+        uses: oxsecurity/megalinter@v8.6.0
+        env:
+          VALIDATE_ALL_CODEBASE: ${{ env.VALIDATE_ALL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  gitleaks:
+    name: 🚰🔧 gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: foobar # https://github.com/gitleaks/gitleaks/issues/1624
