@@ -39,7 +39,7 @@ jobs:
           fetch-depth: ${{ env.VALIDATE_ALL && 1 || 0 }}
 
       - name: 🔬 Lint
-        uses: oxsecurity/megalinter@v8.6.0
+        uses: oxsecurity/megalinter@v8.6.0 # TODO: update to v8 once 8.8.0+ is released
         env:
           VALIDATE_ALL_CODEBASE: ${{ env.VALIDATE_ALL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
