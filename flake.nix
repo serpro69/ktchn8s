@@ -17,6 +17,7 @@
           packages = [
             # dev tools
             bat
+            delta
             diffutils
             eza
             fzf
