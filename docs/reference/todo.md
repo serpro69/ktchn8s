@@ -15,3 +15,8 @@ icon: material/format-list-checks
 
 - [ ] Add up-to-date config files of C1111 and C3560 for reference
     - Can be placed in a separate note (probably don't even need to make it visible in nav menu) and referenced from [installation/network](../installation/network.md)
+
+- [ ] Check that devices on Guest WiFi network (when Eero is in AP/Bridge mode!) are still isolated and cannot see or communicate with each other or the main network.
+    - Eero in Bridge mode looses a lot of security related functionality (it becomes "greyed out" in the app also.) However, it seems that the guest network can still be enabled from the app. Hopefully that guest network is still isolated, but needs double-checking.
+    - Some related links: 
+        - <https://www.reddit.com/r/eero/comments/g0mjqi/guest_network_and_general_routing_questions/>
