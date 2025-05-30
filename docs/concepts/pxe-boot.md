@@ -28,7 +28,7 @@ Purpose: Gives the computer an IP address so it can communicate on the network.
 
 PXE Role: Also tells the computer where to find the boot server (often via a special option like next-server or option 66/67).
 
-### TFTP (Trivial File Transfer Protocol) Server 
+### TFTP (Trivial File Transfer Protocol) Server
 
 Purpose: Transfers small boot files (e.g., `pxelinux.0`, configuration files, kernel, initrd).
 
@@ -48,11 +48,11 @@ PXE Role: After the initial boot file loads, some PXE setups switch to HTTP to d
 
 - Client:
     - Power on.
-    - Initializing network boot sequence. 
+    - Initializing network boot sequence.
     - Requesting PXE boot instructions.
 
 - DHCP:
-    - Assigning IP address to client. 
+    - Assigning IP address to client.
     - Providing boot server details and bootloader path.
 
 - Client:
@@ -62,14 +62,14 @@ PXE Role: After the initial boot file loads, some PXE setups switch to HTTP to d
     - Transferring bootloader binary, configuration files, kernel image, and initrd to client.
 
 - Client:
-    - Bootloader loaded. 
+    - Bootloader loaded.
     - Parsing configuration to locate OS installer and necessary packages via HTTP.
 
 - HTTP:
     - Serving installation files and resources to client on demand.
 
 - Client:
-    - Downloading OS components. 
+    - Downloading OS components.
     - Proceeding with installation and preparing for reboot.
 
 <br>

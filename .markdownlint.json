@@ -4,6 +4,9 @@
     "indent": 4
   },
   "MD013": false,
+  "MD024": {
+    "siblings_only": true
+  },
   "MD026": {
     "punctuation": ".,;:!。，；:"
   },
@@ -11,5 +14,9 @@
   "MD033": false,
   "MD036": false,
   "MD040": false,
+  "MD045": false,
+  "MD046": {
+    "style": "fenced"
+  },
   "blank_lines": false
 }
