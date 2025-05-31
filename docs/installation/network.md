@@ -734,6 +734,164 @@ copy running-config startup-config
       echo -e $(echo $(printf 'f%.0s' {1..12}; printf "$(echo $MAC | sed 's/://g')%.0s" {1..16}) | sed -e 's/../\\x&/g') | nc -w1 -u -b $Broadcast $PortNumber
       ```
 
+### Stage 4 - Implement Basic Firewall Rules (ACLs) on C1111
+
+* **Goal:** Control traffic flow:
+    * From your Home Network to the Homelab Network (allow specific, deny rest).
+    * From your Homelab Network to the Home Network (likely deny most, allow specific if needed).
+    * From the Internet inbound to your router's WAN interface (default deny unsolicited, allow established).
+* **ACL Logic:** ACLs are processed top-down. The first matching rule is applied. There's an implicit `deny any any` at the end of every ACL, so if no permit rule matches, traffic is dropped.
+
+#### C1111 Configuration Steps
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- ACL: Home Network (192.168.1.0/24) to Homelab Network (10.10.10.0/24) ---
+! This ACL will control what devices/services on your Home Network can access in the Homelab.
+ip access-list extended ACL_HOME_TO_HOMELAB
+ ! Add a description to the ACL for clarity
+ description Controls traffic from Home Network to Homelab Network
+
+ ! --- PERMIT RULES (Examples - Adjust to your needs) ---
+ ! Allow SSH (port 22) from any device in Home Network to specific K8s Control Nodes
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.10 eq 22 remark Allow SSH to K8s Control 1
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.11 eq 22 remark Allow SSH to K8s Control 2
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.12 eq 22 remark Allow SSH to K8s Control 3
+
+ ! Allow access to NAS 1 (10.10.10.30) from Home Network (example ports)
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 22  remark Allow SSH to NAS1
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 445 remark Allow SMB/CIFS to NAS1
+ ! permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq <NAS_WEB_UI_HTTP_PORT> remark Allow NAS1 Web UI (HTTP)
+ ! permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq <NAS_WEB_UI_HTTPS_PORT> remark Allow NAS1 Web UI (HTTPS)
+
+ ! Allow access to K8s Ingress Controller (MetalLB IP - e.g., 10.10.10.50) for HTTP/HTTPS
+ ! This will be important in Stage 5/6.
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 80  remark Allow HTTP to K8s Ingress
+ permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 443 remark Allow HTTPS to K8s Ingress
+
+ ! Allow ICMP (ping) from Home Network to any device in Homelab Network for troubleshooting
+ permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo remark Allow Ping from Home to Homelab
+ permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply remark Allow Ping Replies from Home to Homelab
+
+ ! --- DENY RULE (Catch-all for this ACL) ---
+ ! Deny all other IP traffic from Home Network to Homelab Network and log it (optional logging)
+ ! This is good practice to see what else might be trying to cross that is not explicitly permitted.
+ ! The implicit deny any any at the end of all ACLs would do this without logging.
+ deny ip 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 log remark Deny and Log other Home to Homelab traffic
+exit
+
+
+! --- ACL: Homelab Network (10.10.10.0/24) to Home Network (192.168.1.0/24) ---
+! This ACL will control what devices/services in your Homelab can initiate connections to your Home Network.
+! Generally, this should be very restrictive.
+ip access-list extended ACL_HOMELAB_TO_HOME
+ description Controls traffic from Homelab Network to Home Network
+
+ ! --- PERMIT RULES (Examples - Add ONLY if absolutely necessary) ---
+ ! Example: Allow a specific Homelab server to reach a specific service on a Home device.
+ ! (Uncomment and modify if you have such a requirement, otherwise keep it fully deny)
+ ! permit tcp host 10.10.10.X host 192.168.1.Y eq <port_number> remark Allow specific Homelab server to Home service
+
+ ! Allow Homelab devices to respond to pings initiated from the Home network
+ permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply remark Allow Ping Replies from Homelab to Home
+
+ ! --- DENY RULE (Catch-all for this ACL) ---
+ ! Deny all other IP traffic from Homelab Network to Home Network and log it (optional logging)
+ deny ip 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 log remark Deny and Log other Homelab to Home traffic
+exit
+
+
+! --- ACL: Internet Inbound Traffic on WAN Interface ---
+! This ACL controls unsolicited traffic coming from the Internet to your router's WAN interface.
+ip access-list extended ACL_WAN_INBOUND
+ description Controls unsolicited traffic from Internet to WAN interface
+
+ ! --- PERMIT RULES ---
+ ! Allow traffic that is part of an established TCP session (responses to sessions initiated from inside)
+ permit tcp any any established remark Allow established TCP sessions
+
+ ! Allow responses for UDP sessions initiated from inside (requires stateful inspection, often implied or handled by NAT)
+ ! For more robust UDP state tracking, "ip inspect" (Zone-Based Firewall) is better, but for basic ACLs:
+ permit udp any any eq isakmp remark Example: Allow IKE for VPN if C1111 is VPN server
+ permit udp any any eq non500-isakmp remark Example: Allow IKE NAT-T for VPN
+ ! (More generally, for UDP, you might allow specific expected inbound UDP ports if needed,
+ !  or rely on the router's ability to match UDP replies to outbound requests.
+ !  For now, keeping it simple. Cloudflare Tunnels will handle most inbound service needs.)
+
+ ! Allow ICMP (ping) echo-replies to your WAN IP (if you pinged out from the router itself)
+ permit icmp any any echo-reply remark Allow Ping replies to router's WAN IP
+
+ ! (Optional: Allow pings to your router's WAN IP from the internet for troubleshooting - can be a security risk)
+ ! permit icmp any any echo remark Allow external Pings to router's WAN IP
+
+ ! --- DENY RULE (Catch-all for this ACL) ---
+ ! Deny all other IP traffic from the Internet to the router's WAN interface and log it
+ deny ip any any log remark Deny and Log all other unsolicited Internet traffic
+exit
+
+
+! --- Apply ACLs to Interfaces ---
+
+! Apply ACL_HOME_TO_HOMELAB to the SVI of the Homelab Network (Vlan10)
+! 'in' direction: filters traffic entering Vlan10 from other networks (like Vlan2 - Home Network)
+interface Vlan10
+ ip access-group ACL_HOME_TO_HOMELAB in
+exit
+
+! Apply ACL_HOMELAB_TO_HOME to the SVI of the Home Network (Vlan2)
+! 'in' direction: filters traffic entering Vlan2 from other networks (like Vlan10 - Homelab Network)
+interface Vlan2
+ ip access-group ACL_HOMELAB_TO_HOME in
+exit
+
+! Apply ACL_WAN_INBOUND to the physical WAN interface (e.g., GigabitEthernet0/0/0)
+! 'in' direction: filters traffic entering the router from the Internet
+interface GigabitEthernet0/0/0 ! Or your actual WAN interface
+ ip access-group ACL_WAN_INBOUND in
+exit
+
+! Exit configuration mode
+end
+
+! Save the running configuration to the startup configuration
+copy running-config startup-config
+! or "write memory"
+```
+
+**Important Considerations for ACLs:**
+
+* **Order Matters:** Rules are processed from top to bottom. The first match wins. Place more specific rules before more general rules.
+* **Implicit Deny:** There's an invisible `deny ip any any` at the end of every ACL. If you don't explicitly permit something, it will be denied. The explicit `deny ip ... log` rules above are for logging purposes.
+* **`log` Keyword:** Adding `log` to a rule will generate a syslog message when that rule is hit. This is very useful for troubleshooting and seeing what traffic is being permitted or denied. However, it can generate a lot of logs, especially on deny rules, so use it judiciously or be prepared to filter logs.
+* **Source/Destination:**
+    * When applying an ACL **inbound** (`in`) on an interface:
+        * The "source" in the ACL rule refers to where the traffic is coming *from* before it hits that interface.
+        * The "destination" refers to where it's going *after* it passes through that interface.
+* **Refinement:** Start with these basic ACLs. As you deploy services, you might need to refine them. For example, if a Homelab service needs to initiate a connection to a specific cloud service on a non-standard port, you might need to add an outbound ACL or adjust NAT policies (though typically NAT allows all outbound from trusted internal networks).
+* **Stateful Inspection:** The `permit tcp any any established` rule relies on the router's ability to track TCP connections. This is a basic form of stateful inspection. For more advanced stateful firewalling, Cisco routers use Zone-Based Firewall (ZBFW), which is more complex to set up than traditional ACLs. For a homelab, these ACLs are a good starting point.
+
+#### Verification Steps
+
+1. **From a Home Network device (e.g., laptop on `192.168.1.x`):**
+    * **Test Permitted Traffic:**
+        * SSH to K8s Control 1 (`10.10.10.10`). **Should SUCCEED.**
+        * Access NAS 1 (`10.10.10.30`) on permitted ports (e.g., SMB, SSH). **Should SUCCEED.**
+        * Ping any device in the Homelab Network (e.g., `ping 10.10.10.20` - K8s Worker 1). **Should SUCCEED** (due to `permit icmp ... echo`).
+    * **Test Denied Traffic:**
+        * Try to SSH to a K8s Worker node (e.g., `10.10.10.20`, assuming no explicit permit rule for it). **Should FAIL/TIMEOUT.**
+        * Try to access NAS 1 on a non-permitted port. **Should FAIL/TIMEOUT.**
+2. **From a Homelab Network device (e.g., K8s node `10.10.10.10`):**
+    * **Test Denied Traffic (to Home Network):**
+        * Try to ping a device on your Home Network (e.g., `ping 192.168.1.100` - your laptop). **Should FAIL/TIMEOUT** (unless you added a specific permit rule in `ACL_HOMELAB_TO_HOME`).
+    * **Test Internet Access:**
+        * `ping 1.1.1.1`. **Should SUCCEED** (outbound traffic is NATted and not blocked by these ACLs).
+3. **Check C1111 Logs for Denials:**
+    * On the C1111 router: `show logging`
+    * Look for messages related to ACL denials (e.g., `%SEC-6-IPACCESSLOGP: list ACL_HOME_TO_HOMELAB denied tcp 192.168.1.X(port) -> 10.10.10.Y(port)...`). This confirms your deny rules are working.
+4. **Verify Internet Access for Both Networks:** Ensure devices in both Home and Homelab networks can still access the internet as they could before applying ACLs (outbound traffic should generally be unaffected by these inbound ACLs).
+
 ### Troubleshooting
 
 #### SSH error 'no matching key exchange method found'
