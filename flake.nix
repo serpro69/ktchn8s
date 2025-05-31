@@ -22,6 +22,7 @@
             eza
             fzf
             git
+            gnumake
             jq
             minicom
             mise
@@ -39,6 +40,10 @@
             (python3.withPackages (p: with p; [
               pip
             ]))
+          ] ++ lib.optionals pkgs.stdenv.isDarwin [
+            # NOTE: Darwin-only packages for cross-platform compatibility
+          ] ++ lib.optionals pkgs.stdenv.isLinux [
+            # NOTE: Linux-only packages for cross-platform compatibility
           ];
 
           shellHook = ''
