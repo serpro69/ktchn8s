@@ -24,17 +24,24 @@
             git
             gnumake
             jq
-            minicom
             mise
             neovim
             nix-search-cli
+            sops
             tmux
+            yq
+            # provisioning/configuration tools
+            ansible
+            ansible-lint
+            opentofu
+            minicom
+            xorriso
             # networking tools
             netcat
             nettools
             openssh
             # lang support
-            python3
+            python3 # ansible dependency
 
             # extra python packages
             (python3.withPackages (p: with p; [

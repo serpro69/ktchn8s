@@ -1,0 +1,14 @@
+# vim: set ft=yaml.ansible:
+---
+- name: Start PXE server
+  hosts: localhost
+  roles:
+    - role: pxe_server
+      vars:
+        pxe_state: present
+
+- name: Bootstrap bare-metal machines
+  hosts: metal
+  gather_facts: false
+  roles:
+    - role: boot

@@ -60,6 +60,7 @@ nav:
       - concepts/pxe-boot.md
   - Installation:
       - installation/network.md
+      - installation/metal.md
   - Reference:
       - "⚓︎ Architecture":
           - reference/architecture/overview.md
