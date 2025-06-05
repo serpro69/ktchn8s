@@ -5,7 +5,7 @@ run-name: ${{ github.actor }} is running Lint
 on:
   push:
     branches:
-      - master
+      - '*'
   pull_request:
     branches:
       - master
