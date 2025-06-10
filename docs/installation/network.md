@@ -838,6 +838,25 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
  104 remark -> Permit SSH from Homelab to switch's Homelab SVI (local management)
  104 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.2 eq 22
+ ! Allow SSH RESPONSES from k8s control to Home Network
+ 110 remark -> Permit SSH RESPONSES from odin (10.10.10.10) to Home Network
+ 110 permit tcp host 10.10.10.10 192.168.1.0 0.0.0.255 established
+ 111 remark -> Permit SSH RESPONSES from odin (10.10.10.11) to Home Network
+ 111 permit tcp host 10.10.10.11 192.168.1.0 0.0.0.255 established
+ 112 remark -> Permit SSH RESPONSES from heimdall (10.10.10.12) to Home Network
+ 112 permit tcp host 10.10.10.12 192.168.1.0 0.0.0.255 established
+ ! Allow SSH RESPONSES from k8s workers to Home Network
+ 120 remark -> Permit SSH RESPONSES from mjolnir (10.10.10.20) to Home Network
+ 120 permit tcp host 10.10.10.20 192.168.1.0 0.0.0.255 established
+ 121 remark -> Permit SSH RESPONSES from gungnir (10.10.10.21) to Home Network
+ 121 permit tcp host 10.10.10.21 192.168.1.0 0.0.0.255 established
+ 122 remark -> Permit SSH RESPONSES from draupnir (10.10.10.22) to Home Network
+ 122 permit tcp host 10.10.10.22 192.168.1.0 0.0.0.255 established
+ 123 remark -> Permit SSH RESPONSES from megingjord (10.10.10.23) to Home Network
+ 123 permit tcp host 10.10.10.23 192.168.1.0 0.0.0.255 established
+ ! Allow SSH RESPONSES from k8s storage to Home Network
+ 130 remark -> Permit SSH RESPONSES from yggdrasil (10.10.10.30) to Home Network
+ 130 permit tcp host 10.10.10.30 192.168.1.0 0.0.0.255 established
  199 remark --- END ---
 
  ! (Optional: ICMP rules for Homelab, e.g., pinging Home or receiving replies)
