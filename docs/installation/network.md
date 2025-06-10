@@ -130,9 +130,9 @@ References:
 ## Configuration Rollout
 
 !!! info
-    I've broken down the network configuration rollout into several stages which allowed me to to work in small, incremental iterations and test/rollback things easier w/o introducing big updates.
+    I've broken down the network configuration rollout into several stages which allowed me to work in small, incremental iterations and test/rollback things easier w/o introducing big updates.
 
-### Stage 1 - Basic Internet Connectivity via C1111 and Eero
+### Stage 1 - Basic Internet Connectivity via C1111 and Eero {#stage-1}
 
 * **Goal:** Home devices (laptop, phone) can connect to the Eero (in bridge mode) and access the internet. The C1111 handles routing, NAT, and DHCP for the home network.
 
@@ -330,7 +330,7 @@ References:
 * You assign the integrated physical switchports (`GigabitEthernet0/1/x`) to these VLANs in access mode.
 * The dedicated WAN port (`GigabitEthernet0/0/0`) is typically a routed port, not a switchport.
 
-### Stage 2 - Setup Homelab VLAN and Basic Connectivity to C3560 Switch
+### Stage 2 - Setup Homelab VLAN and Basic Connectivity to C3560 Switch {#stage-2}
 
 * **Goal:** The C3560 switch is connected to the C1111, and the Homelab VLAN (`VLAN 10`) is active on the C1111. The C3560 can be managed via its IP on VLAN 10, and devices in VLAN 10 (including the switch itself) can potentially reach the internet if NAT is updated.
 
@@ -567,11 +567,11 @@ Host 10.10.10.2 bifrost
 - **From a device on your Home Network (e.g., the controller laptop on `192.168.1.x`):**
     * `ping 10.10.10.1`: Ping the C1111's Homelab VLAN gateway.
     * `ping 10.10.10.2`: Ping the C3560 switch's management IP.
-        * _Note:_ This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in [stage 4](#stage-4-implement-basic-firewall-rules-acls-on-c1111)).
+        * _Note:_ This inter-VLAN ping will work because the C1111 routes between directly connected networks (`Vlan2` and `Vlan10`). No specific ACLs are blocking it yet (those come in [stage 4](#stage-4)).
     * Try to SSH to `10.10.10.1` (the C1111 router) using the admin credentials you set up for the router.
     * Try to SSH to `10.10.10.2` (the C3560 switch) using the admin credentials you set up for the switch.
 
-### Stage 3 - Connect k8s Nodes and NAS to Homelab VLAN & Enable DHCP
+### Stage 3 - Connect k8s Nodes and NAS to Homelab VLAN & Enable DHCP {#stage-3}
 
 * **Goal:** K8s nodes and NAS are physically connected to the C3560, obtain IPs (or have static IPs configured correctly) in the `10.10.10.0/24` range, and can access the internet (assuming NAT on C1111 from Stage 2 is working).
 
@@ -739,7 +739,7 @@ copy running-config startup-config
       echo -e $(echo $(printf 'f%.0s' {1..12}; printf "$(echo $MAC | sed 's/://g')%.0s" {1..16}) | sed -e 's/../\\x&/g') | nc -w1 -u -b $Broadcast $PortNumber
       ```
 
-### Stage 4 - Implement Basic Firewall Rules (ACLs) on C1111
+### Stage 4 - Implement Basic Firewall Rules (ACLs) on C1111 {#stage-4}
 
 * **Goal:** Control traffic flow:
     * From your Home Network to the Homelab Network (allow specific, deny rest).
@@ -918,8 +918,8 @@ end
 * **`log` Keyword:** Adding `log` to a rule will generate a syslog message when that rule is hit. This is very useful for troubleshooting and seeing what traffic is being permitted or denied. However, it can generate a lot of logs, especially on deny rules, so use it judiciously or be prepared to filter logs.
 * **Source/Destination:**
     * When applying an ACL **inbound** (`in`) on an interface:
-        * The "source" in the ACL rule refers to where the traffic is coming *from* before it hits that interface.
-        * The "destination" refers to where it's going *after* it passes through that interface.
+        * The "source" in the ACL rule refers to where the traffic is coming _from_ before it hits that interface.
+        * The "destination" refers to where it's going _after_ it passes through that interface.
 * **Refinement:** Start with these basic ACLs. As you deploy services, you might need to refine them. For example, if a Homelab service needs to initiate a connection to a specific cloud service on a non-standard port, you might need to add an outbound ACL or adjust NAT policies (though typically NAT allows all outbound from trusted internal networks).
 * **Stateful Inspection:** The `permit tcp any any established` rule relies on the router's ability to track TCP connections. This is a basic form of stateful inspection. For more advanced stateful firewalling, Cisco routers use Zone-Based Firewall (ZBFW), which is more complex to set up than traditional ACLs. For a homelab, these ACLs are a good starting point.
 

@@ -92,9 +92,9 @@ Boot order options (select one, each has their pros and cons):
 
 - [Network Configuration](./network.md) is completed.
 
-- All nodes are connected to switch ports on Vlan 10 (configured during network installation [stage 2](network.md#stage-2-setup-homelab-vlan-and-basic-connectivity-to-c3560-switch) and [stage 3](network.md#stage-3-connect-k8s-nodes-and-nas-to-homelab-vlan-enable-dhcp)).
+- All nodes are connected to switch ports on Vlan 10 (configured during network installation [stage 2](network.md#stage-2) and [stage 3](network.md#stage-3)).
 
-- Local controller must be on the same Vlan 10 (i.e. physically connected to one of the switch ports on this Vlan, e.g. `g0/0/10` on `bifrost`, which was configured as an additional Vlan 10 port in [stage 3](network.md#stage-3-connect-k8s-nodes-and-nas-to-homelab-vlan-enable-dhcp) network configuration).
+- Local controller must be on the same Vlan 10 (i.e. physically connected to one of the switch ports on this Vlan, e.g. `g0/0/10` on `bifrost`, which was configured as an additional Vlan 10 port in [stage 3](network.md#stage-3) network configuration).
 
 ## Installation
 
