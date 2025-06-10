@@ -84,3 +84,22 @@ icon: material/format-list-checks
     - The server prefers to boot from Network when woken up, which will erase all data on the disk and re-install the OS
     - Ask the user for confirmation before proceeding.
         - Mention `make wake` alternative which can be used just to wake up the machines
+
+- [ ] Consider restricting ssh access from homelab to router/switch SVI to specific IPs
+    - [Stage 4 : C1111 Configuration](../installation/network.md#stage-4-implement-basic-firewall-rules-acls-on-c1111)
+
+    ```
+    ! --- Define ACL for traffic FROM Homelab Network ---
+    ip access-list extended ACL_FROM_HOMELAB_NETWORK
+     ! ...
+     ! (Optional: Add permits if Homelab needs to SSH to router's Homelab SVI - local management when e.g. laptop is physically
+     onnected to homelab network)
+     103 remark Permit SSH from Homelab to router's Homelab SVI (local management)
+     103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
+     104 remark Permit SSH from Homelab to switch's Homelab SVI (local management)
+     104 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.2 eq 22
+     199 remark --- END ---
+     ! ...
+    exit
+    ```
+    - [ ] Limit permits to specific IP addresses instead of using `10.10.10.0` so that e.g. k8s servers couldn't ssh to Homelab's router or switch

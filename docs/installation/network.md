@@ -757,16 +757,16 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  10 remark === ACL: FROM HOME NETWORK (192.168.1.x) ===
  10 remark ============================================
 
- 100 remark Specific PERMITS from Home to Management IPs
+ 100 remark --- Specific PERMITS from Home to Management IPs ---
  101 remark -> Permit SSH from Home to Muspell Router's Homelab SVI (10.10.10.1)
  101 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.1 eq 22
  102 remark -> Permit SSH from Home to Router's Home SVI (192.168.1.1)
  102 permit tcp 192.168.1.0 0.0.0.255 host 192.168.1.1 eq 22
  103 remark -> Permit SSH from Home to Bifrost Switch's Homelab SVI (10.10.10.2)
  103 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.2 eq 22
- 199 remark END
+ 199 remark --- END ---
 
- 200 remark Specific PERMITS from Home to Homelab K8s Nodes
+ 200 remark --- Specific PERMITS from Home to Homelab K8s Nodes ---
  201 remark -> Permit SSH from Home to k8s odin control
  201 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.10 eq 22
  202 remark -> Permit SSH from Home to k8s thor control
@@ -781,28 +781,28 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  206 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.22 eq 22
  207 remark -> Permit SSH from Home to k8s megingjord worker
  207 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.23 eq 22
- 299 remark END
+ 299 remark --- END ---
 
- 300 remark Specific PERMITS from Home to Homelab NAS
+ 300 remark --- Specific PERMITS from Home to Homelab NAS ---
  301 remark -> Permit SSH from Home to yggdrasil nas
  301 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 22
  302 remark -> Permit SMB/CIFS from Home to yggdrasil nas
  302 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 445
- 399 remark END
+ 399 remark --- END ---
 
- 400 remark Specific PERMITS from Home to Homelab K8s Ingress
+ 400 remark --- Specific PERMITS from Home to Homelab K8s Ingress ---
  401 remark -> Permit HTTP from Home to k8s ingress
  401 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 80
  402 remark -> Permit HTTPS from Home to k8s ingress
  402 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 443
- 499 remark END
+ 499 remark --- END ---
 
- 500 remark ICMP Rules for Home Network
+ 500 remark --- ICMP Rules for Home Network ---
  501 remark -> Permit Home to ping Homelab
  501 permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo
  502 remark -> Permit Home to receive ping replies from Homelab
  502 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
- 599 remark END
+ 599 remark --- END ---
 
  998 remark Deny any other Home traffic specifically TO Homelab network and log
  998 deny ip 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 log
@@ -816,7 +816,7 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  10 remark === ACL: FROM HOMELAB NETWORK (10.10.10.x) ===
  10 remark ==============================================
 
- 100 remark SSH Specific Permits
+ 100 remark --- SSH Specific Permits ---
  ! Allow SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network (needed for your management session)
  101 remark Permit SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network
  101 permit tcp host 10.10.10.1 192.168.1.0 0.0.0.255 established
@@ -828,15 +828,15 @@ connected to homelab network)
  103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
  104 remark Permit SSH from Homelab to switch's Homelab SVI (local management)
  104 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.2 eq 22
- 199 remark END
+ 199 remark --- END ---
 
  ! (Optional: ICMP rules for Homelab, e.g., pinging Home or receiving replies)
- 200 remark ICMP Rules for Homelab Network
+ 200 remark --- ICMP Rules for Homelab Network ---
  201 remark -> Permit Homelab to ping Home
  201 remark permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo
  202 remark -> Permit Homelab to receive ping replies from Home
  202 remark permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
- 299 remark END
+ 299 remark --- END ---
 
  998 remark Deny and log other Homelab Network traffic specifically TO Home Network
  998 deny ip 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 log
