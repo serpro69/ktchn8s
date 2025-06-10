@@ -48,7 +48,7 @@ I initially thought to connect the C1111 router to the Eero:
 
 ```mermaid
 flowchart LR
-    I[Internet] o--o A[ISP Modem] o--o B[Eero 6 Router] o--o C[C1111 Router]
+    I[Internet] -.- A[ISP Modem] o--o B[Eero 6 Router] o--o C[C1111 Router]
 ```
 
 This would, however, result in Double-NAT, which is usually not recommended.
@@ -63,7 +63,7 @@ Therefore, I can use C1111 as the main (and only) router, and use the existing E
 
 ```mermaid
 flowchart LR
-    I[Internet] o--o A[ISP Modem] o--o B[C1111 Router] o--o C[Eero 6 WiFi AP]
+    I[Internet] -.- A[ISP Modem] o--o B[C1111 Router] o--o C[Eero 6 WiFi AP]
 ```
 
 **Status**
