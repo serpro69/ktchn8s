@@ -1,1 +1,6 @@
+# ansible
+.ansible/
+galaxy/
+
+# python virtualenv
 .venv

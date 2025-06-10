@@ -62,3 +62,5 @@ GO_GOLANGCI_LINT_ARGUMENTS: ['run', './...']
 
 # ensure tflint --init can run in CI
 TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES: [GITHUB_TOKEN]
+
+YAML_YAMLLINT_FILTER_REGEX_EXCLUDE: (metal\/inventory\/metal.yml)

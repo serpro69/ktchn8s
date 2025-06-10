@@ -1,0 +1,11 @@
+---
+- name: Send Wake-on-LAN magic packets
+  wakeonlan:
+    mac: "{{ mac }}"
+  delegate_to: localhost
+  become: false
+
+- name: Wait for the machines to come online
+  wait_for_connection:
+    timeout: 600
+    sleep: 30
