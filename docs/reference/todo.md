@@ -18,7 +18,7 @@ icon: material/format-list-checks
 
 - [ ] Check that devices on Guest WiFi network (when Eero is in AP/Bridge mode!) are still isolated and cannot see or communicate with each other or the main network.
     - Eero in Bridge mode looses a lot of security related functionality (it becomes "greyed out" in the app also.) However, it seems that the guest network can still be enabled from the app. Hopefully that guest network is still isolated, but needs double-checking.
-    - Some related links: 
+    - Some related links:
         - <https://www.reddit.com/r/eero/comments/g0mjqi/guest_network_and_general_routing_questions/>
 
 - [ ] When storing terraform state locally one needs to think about where/how to back it up. An alternative would be to use terraform cloud or opentofu TACOS, which are paid services (Plus your state is stored on someone else's computer, and hence should be [encrypted](https://opentofu.org/docs/language/state/encryption/))
@@ -27,3 +27,60 @@ icon: material/format-list-checks
             - Once the cluster is up and running, we can host [Atlantis](https://www.runatlantis.io/docs/installation-guide.html) and migrate the state to it.
             - As an added benefit, this makes it possible to [run terraform from PRs](https://www.runatlantis.io/guide.html#overview-%E2%80%93-what-is-atlantis)
         - Store/commit [sops](https://github.com/getsops/sops)-encrypted state. Run `terraform` with a script/make wrapper that decrypts the state before running `terraform` commands, and re-encrypts it at the end.
+
+- [ ] Configure `/etc/hosts` on local controller machine as part of `metal` provisioning
+    ```
+    # midgard.local homelab
+    # network devices
+    10.10.10.1      muspell
+    10.10.10.2      bifrost
+    # k8s cluster
+    10.10.10.10     odin
+    10.10.10.11     thor
+    10.10.10.12     heimdall
+    10.10.10.20     mjolinr
+    10.10.10.21     gungnir
+    10.10.10.22     draupnir
+    10.10.10.23     megingjord
+    # storage devices
+    10.10.10.30     yggdrasil
+    ```
+
+- [ ] Configure `~/.ssh/config` on local controller machine as part of `metal` provisioning
+    ```
+    Host 10.10.10.*
+      StrictHostKeyChecking no
+      LogLevel ERROR
+      UserKnownHostsFile /dev/null
+
+    # muspell (C1111 router) in homelab vlan
+    Host 10.10.10.1 muspell
+      User cisco
+
+    # bifrost (C3560 switch) in homelab vlan
+    Host 10.10.10.2 bifrost
+      User cisco
+      KexAlgorithms +diffie-hellman-group14-sha1
+      HostKeyAlgorithms +ssh-rsa
+
+    # k8s cluster nodes in homelab vlan
+    Host 10.10.10.1* 10.10.10.2* odin thor heimdall mjolnir draupnir gungnir megingjord
+      User root
+      StrictHostKeyChecking no
+      LogLevel ERROR
+      UserKnownHostsFile /dev/null
+      GSSAPIAuthentication no # not supported on OS I use today for servers
+    # storage nodes in homelab vlan
+    Host 10.10.10.3* yggdrasil
+      User root
+      StrictHostKeyChecking no
+      LogLevel ERROR
+      UserKnownHostsFile /dev/null
+    ```
+
+- [ ] Check if server is up before sending WoL magic packets
+
+- [ ] Ask before proceeding when running `make bootstrap` in `metal` provisioning
+    - The server prefers to boot from Network when woken up, which will erase all data on the disk and re-install the OS
+    - Ask the user for confirmation before proceeding.
+        - Mention `make wake` alternative which can be used just to wake up the machines

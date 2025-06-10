@@ -1,0 +1,11 @@
+---
+- name: Ensure PXE server prerequisites
+  include_tasks:
+    file: before.yml
+  when: pxe_state == "present"
+
+- name: Start the ephemeral PXE server
+  community.docker.docker_compose_v2:
+    project_src: "{{ role_path }}/files"
+    state: "{{ pxe_state }}"
+    build: always

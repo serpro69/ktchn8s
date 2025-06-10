@@ -726,6 +726,13 @@ copy running-config startup-config
       foobarbaz: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
           inet 10.10.10.71  netmask 255.255.255.0  broadcast 10.10.10.255
       ```
+    * Send a WoL magic packet to a device on homelab network
+      ```bash
+      MAC='11:22:33:44:55:66'       # mac address of the connected target device
+      Broadcast='255.255.255.255'   # default broadcast address
+      PortNumber=9                  # default port for WoL
+      echo -e $(echo $(printf 'f%.0s' {1..12}; printf "$(echo $MAC | sed 's/://g')%.0s" {1..16}) | sed -e 's/../\\x&/g') | nc -w1 -u -b $Broadcast $PortNumber
+      ```
 
 ### Troubleshooting
 

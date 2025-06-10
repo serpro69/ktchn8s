@@ -1,0 +1,45 @@
+---
+- name: Get Docker info
+  community.docker.docker_host_info: {}
+  register: docker_info_result
+
+- name: Ensure Docker is running on a supported operating system
+  fail:
+    msg: |
+      Error: unsupported operating system for Docker host networking driver.
+        Docker host networking driver only works on Linux hosts, and is not supported on Docker Desktop for Mac or Windows.
+        Tip: use a Linux VM with bridged networking.
+  when:
+    - docker_info_result.host_info.OperatingSystem == "Docker Desktop"
+
+- name: Download boot image
+  get_url:
+    url: "{{ iso_url }}"
+    dest: "{{ role_path }}/files/data/iso/{{ iso_url | basename }}"
+    checksum: "{{ iso_checksum }}"
+    mode: "0644"
+  register: iso
+
+- name: Extract boot image
+  command:
+    cmd: "xorriso -osirrox on -indev {{ iso.dest }} -extract / {{ role_path }}/files/data/os"
+    creates: "{{ role_path }}/files/data/os/.treeinfo"
+
+- name: Generate dnsmasq config
+  template:
+    src: dnsmasq.conf.j2
+    dest: "{{ role_path }}/files/data/pxe-config/dnsmasq.conf"
+    mode: "0644"
+
+- name: Generate GRUB config
+  template:
+    src: grub.cfg.j2
+    dest: "{{ role_path }}/files/data/pxe-config/grub.cfg"
+    mode: "0644"
+
+- name: Generate init config for each machine
+  template:
+    src: kickstart.ks.j2
+    dest: "{{ role_path }}/files/data/init-config/{{ hostvars[item]['mac'] }}.ks"
+    mode: "0644"
+  loop: "{{ groups['metal'] }}"
