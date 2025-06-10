@@ -69,7 +69,7 @@ Boot order options (select one, each has their pros and cons):
 - Power -> Automatic Power On
     - Wak on LAN -> Automatic
 - Security -> Secure Boot
-    - Securt Boot -> Disabled
+    - Secure Boot -> Disabled
 - Startup
     - CSM -> Disabled
     - Primary Boot Sequence  # Used for manual power-on
