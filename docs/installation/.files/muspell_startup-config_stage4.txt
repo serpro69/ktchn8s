@@ -1,0 +1,311 @@
+version 17.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+service call-home
+platform qfp utilization monitor load 80
+platform punt-keepalive disable-kernel-core
+platform hardware throughput crypto 50000
+!
+hostname muspell
+!
+boot-start-marker
+boot-end-marker
+!
+!
+enable secret 9 <secret>
+!
+no aaa new-model
+!
+!
+!
+!
+!
+!
+!
+ip domain name midgard.local
+ip dhcp excluded-address 192.168.1.1 192.168.1.9
+ip dhcp excluded-address 10.10.10.1 10.10.10.9
+ip dhcp excluded-address 10.10.10.10 10.10.10.19
+ip dhcp excluded-address 10.10.10.20 10.10.10.29
+ip dhcp excluded-address 10.10.10.30 10.10.10.39
+ip dhcp excluded-address 10.10.10.40 10.10.10.69
+!
+ip dhcp pool HOME_POOL_VLAN2
+ network 192.168.1.0 255.255.255.0
+ default-router 192.168.1.1 
+ dns-server 1.1.1.1 8.8.8.8 
+ domain-name midgard.local
+!
+ip dhcp pool HOMELAB_POOL_VLAN10
+ network 10.10.10.0 255.255.255.0
+ default-router 10.10.10.1 
+ dns-server 1.1.1.1 8.8.8.8 
+ domain-name midgard.local
+!
+!
+!
+login on-success log
+!
+!
+!
+!
+!
+!
+!
+subscriber templating
+vtp domain telenor
+vtp mode transparent
+multilink bundle-name authenticated
+no device-tracking logging theft
+!
+!
+!
+crypto pki trustpoint TP-self-signed-2086352807
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-2086352807
+ revocation-check none
+ rsakeypair TP-self-signed-2086352807
+!
+crypto pki trustpoint SLA-TrustPoint
+ enrollment pkcs12
+ revocation-check crl
+!
+!
+crypto pki certificate chain TP-self-signed-2086352807
+ certificate self-signed 01 nvram:IOS-Self-Sig#3.cer
+crypto pki certificate chain SLA-TrustPoint
+ certificate ca 01 nvram:CiscoLicensi#1CA.cer
+!
+!
+license udi pid C1111-8P sn <...>
+memory free low-watermark processor 71847
+!
+diagnostic bootup level minimal
+!
+spanning-tree extend system-id
+!
+username <username> privilege 15 secret 9 <secret>
+!
+redundancy
+ mode none
+!
+!
+vlan internal allocation policy ascending
+!
+vlan 2
+ name home_network
+!
+vlan 10
+ name HOMELAB_SERVERS
+!
+!
+!
+!
+!
+!
+interface GigabitEthernet0/0/0
+ description "WAN to ISP Modem"
+ ip address dhcp
+ ip nat outside
+ ip access-group ACL_WAN_INBOUND in
+ negotiation auto
+!
+interface GigabitEthernet0/0/1
+ no ip address
+ shutdown
+ negotiation auto
+!
+interface GigabitEthernet0/1/0
+ description "LAN to Eero-AP VLAN_2"
+ switchport access vlan 2
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet0/1/1
+ description "Link to C3560 Homelab Switch"
+ switchport access vlan 10
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet0/1/2
+!
+interface GigabitEthernet0/1/3
+!
+interface GigabitEthernet0/1/4
+!
+interface GigabitEthernet0/1/5
+!
+interface GigabitEthernet0/1/6
+!
+interface GigabitEthernet0/1/7
+!
+interface Vlan1
+ no ip address
+!
+interface Vlan2
+ description "Gateway for home network 192.168.1.0"
+ ip address 192.168.1.1 255.255.255.0
+ ip nat inside
+ ip access-group ACL_FROM_HOME_NETWORK in
+!
+interface Vlan10
+ description "Gateway for Homelab Network 10.10.10.0"
+ ip address 10.10.10.1 255.255.255.0
+ ip nat inside
+ ip access-group ACL_FROM_HOMELAB_NETWORK in
+!
+no ip http server
+ip http authentication local
+no ip http secure-server
+ip forward-protocol nd
+ip nat inside source list ACL_NAT_TRAFFIC_ALL_LANS interface GigabitEthernet0/0/0 overload
+!
+!
+ip access-list standard ACL_NAT_TRAFFIC_ALL_LANS
+ 10 permit 192.168.1.0 0.0.0.255
+ 20 permit 10.10.10.0 0.0.0.255
+!
+ip access-list extended ACL_FROM_HOMELAB_NETWORK
+ 10 remark === ACL: FROM HOMELAB NETWORK (10.10.10.x) ===
+ 10 remark ==============================================
+ 20 remark --- PERMIT DHCP TRAFFIC (MUST BE EARLY) ---
+ 21 remark Permit -> DHCP Discover/Request from clients to broadcast (0.0.0.0 or 10.10.10.x to 255.255.255.255)
+ 21 permit udp any host 255.255.255.255 eq bootps
+ 22 remark Permit -> DHCP Discover/Request from clients to gateway (0.0.0.0 or 10.10.10.x to 10.10.10.1)
+ 22 permit udp any host 10.10.10.1 eq bootps
+ 23 remark Permit -> DHCP Offer/ACK from server to broadcast/client (10.10.10.1 to 255.255.255.255 or 10.10.10.
+ 23 permit udp host 10.10.10.1 eq bootps any eq bootpc
+ 99 remark --- END ---
+ 100 remark --- SSH Specific Permits ---
+ 101 remark Permit SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network
+ 101 permit tcp host 10.10.10.1 192.168.1.0 0.0.0.255 established
+ 102 remark Permit SSH RESPONSES from Switch's Homelab SVI (10.10.10.2) to Home Network
+ 102 permit tcp host 10.10.10.2 192.168.1.0 0.0.0.255 established
+ 103 remark Permit SSH from Homelab to router's Homelab SVI (local management)
+ 103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
+ 104 remark Permit SSH from Homelab to switch's Homelab SVI (local management)
+ 104 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.2 eq 22
+ 110 remark -> Permit SSH RESPONSES from odin (10.10.10.10) to Home Network
+ 110 permit tcp host 10.10.10.10 192.168.1.0 0.0.0.255 established
+ 111 remark -> Permit SSH RESPONSES from odin (10.10.10.11) to Home Network
+ 111 permit tcp host 10.10.10.11 192.168.1.0 0.0.0.255 established
+ 112 remark -> Permit SSH RESPONSES from heimdall (10.10.10.12) to Home Network
+ 112 permit tcp host 10.10.10.12 192.168.1.0 0.0.0.255 established
+ 120 remark -> Permit SSH RESPONSES from mjolnir (10.10.10.20) to Home Network
+ 120 permit tcp host 10.10.10.20 192.168.1.0 0.0.0.255 established
+ 121 remark -> Permit SSH RESPONSES from gungnir (10.10.10.21) to Home Network
+ 121 permit tcp host 10.10.10.21 192.168.1.0 0.0.0.255 established
+ 122 remark -> Permit SSH RESPONSES from draupnir (10.10.10.22) to Home Network
+ 122 permit tcp host 10.10.10.22 192.168.1.0 0.0.0.255 established
+ 123 remark -> Permit SSH RESPONSES from megingjord (10.10.10.23) to Home Network
+ 123 permit tcp host 10.10.10.23 192.168.1.0 0.0.0.255 established
+ 130 remark -> Permit SSH RESPONSES from yggdrasil (10.10.10.30) to Home Network
+ 130 permit tcp host 10.10.10.30 192.168.1.0 0.0.0.255 established
+ 199 remark --- END ---
+ 200 remark --- ICMP Rules for Homelab Network ---
+ 201 remark -> Permit Homelab to ping Home
+ 201 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo
+ 202 remark -> Permit Homelab to receive ping replies from Home
+ 202 permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
+ 203 remark -> Permit Homelab to send ping replies TO Home (in response to pings FROM Home)
+ 203 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
+ 299 remark --- END ---
+ 998 remark Deny and log other Homelab Network traffic specifically TO Home Network
+ 998 deny   ip 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 log
+ 999 remark Permit Homelab Network to ALL other destinations (e.g., Internet)
+ 999 permit ip 10.10.10.0 0.0.0.255 any
+ip access-list extended ACL_FROM_HOME_NETWORK
+ 10 remark === ACL: FROM HOME NETWORK (192.168.1.x) ===
+ 10 remark ============================================
+ 100 remark --- Specific PERMITS from Home to Management IPs ---
+ 101 remark -> Permit SSH from Home to Muspell Router's Homelab SVI (10.10.10.1)
+ 101 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.1 eq 22
+ 102 remark -> Permit SSH from Home to Router's Home SVI (192.168.1.1)
+ 102 permit tcp 192.168.1.0 0.0.0.255 host 192.168.1.1 eq 22
+ 103 remark -> Permit SSH from Home to Bifrost Switch's Homelab SVI (10.10.10.2)
+ 103 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.2 eq 22
+ 199 remark --- END ---
+ 200 remark --- Specific PERMITS from Home to Homelab K8s Nodes ---
+ 201 remark -> Permit SSH from Home to k8s odin control
+ 201 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.10 eq 22
+ 202 remark -> Permit SSH from Home to k8s thor control
+ 202 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.11 eq 22
+ 203 remark -> Permit SSH from Home to k8s heimdall control
+ 203 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.12 eq 22
+ 204 remark -> Permit SSH from Home to k8s mjolnir worker
+ 204 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.20 eq 22
+ 205 remark -> Permit SSH from Home to k8s gungnir worker
+ 205 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.21 eq 22
+ 206 remark -> Permit SSH from Home to k8s draupnir worker
+ 206 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.22 eq 22
+ 207 remark -> Permit SSH from Home to k8s megingjord worker
+ 207 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.23 eq 22
+ 299 remark --- END ---
+ 300 remark --- Specific PERMITS from Home to Homelab NAS ---
+ 301 remark -> Permit SSH from Home to yggdrasil nas
+ 301 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 22
+ 302 remark -> Permit SMB/CIFS from Home to yggdrasil nas
+ 302 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 445
+ 399 remark --- END ---
+ 400 remark --- Specific PERMITS from Home to Homelab K8s Ingress ---
+ 401 remark -> Permit HTTP from Home to k8s ingress
+ 401 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq www
+ 402 remark -> Permit HTTPS from Home to k8s ingress
+ 402 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 443
+ 499 remark --- END ---
+ 500 remark --- ICMP Rules for Home Network ---
+ 501 remark -> Permit Home to ping Homelab
+ 501 permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo
+ 502 remark -> Permit Home to receive ping replies from Homelab
+ 502 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
+ 599 remark --- END ---
+ 998 remark Deny any other Home traffic specifically TO Homelab network and log
+ 998 deny   ip 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 log
+ 999 remark Permit Home Network to ALL other destinations (e.g., Internet)
+ 999 permit ip 192.168.1.0 0.0.0.255 any
+ip access-list extended ACL_WAN_INBOUND
+ 10 remark === ACL: FROM INTERNET (WAN Inbound) ===
+ 10 remark ========================================
+ 101 remark Allow established TCP sessions
+ 101 permit tcp any any established
+ 102 remark Allow DNS UDP responses from any DNS server (source port 53)
+ 102 permit udp any eq domain any gt 1023
+ 103 remark Allow Ping replies to router's WAN IP
+ 103 permit icmp any any echo-reply
+ 104 remark Allow ICMP Time Exceeded (for traceroute)
+ 104 permit icmp any any time-exceeded
+ 105 remark Allow ICMP Unreachable (for Path MTU discovery etc.)
+ 105 permit icmp any any unreachable
+ 998 remark Deny and Log all other unsolicited Internet traffic
+ 998 deny   ip any any log
+!
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+ login local
+ transport input none
+ stopbits 1
+line vty 0 4
+ login local
+ transport input ssh
+!
+call-home
+ ! If contact email address in call-home is configured as sch-smart-licensing@cisco.com
+ ! the email address configured in Cisco Smart License Portal will be used as contact email address to send SCH notifications.
+ contact-email-addr sch-smart-licensing@cisco.com
+ profile "CiscoTAC-1"
+  active
+  destination transport-method http
+!
+!
+!
+!
+!
+!
+end
