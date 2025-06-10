@@ -130,7 +130,7 @@ References:
 ## Configuration Rollout
 
 !!! info
-    I've broken down the network configuration rollout into several stages which allowed me to to work in small, incremental iterations and test things easier w/o introducing big updates.
+    I've broken down the network configuration rollout into several stages which allowed me to to work in small, incremental iterations and test/rollback things easier w/o introducing big updates.
 
 ### Stage 1 - Basic Internet Connectivity via C1111 and Eero
 
