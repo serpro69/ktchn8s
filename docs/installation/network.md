@@ -746,6 +746,8 @@ copy running-config startup-config
     * From your Homelab Network to the Home Network (likely deny most, allow specific if needed).
     * From the Internet inbound to your router's WAN interface (default deny unsolicited, allow established).
 * **ACL Logic:** ACLs are processed top-down. The first matching rule is applied. There's an implicit `deny any any` at the end of every ACL, so if no permit rule matches, traffic is dropped.
+    * Each rule is created with explicit priority number for easier updates and management
+    * Rules are grouped by category in increments of 100, so new rules can be inserted easier with minimal to none renumbering of existing rules.
 
 #### C1111 Configuration Steps
 
