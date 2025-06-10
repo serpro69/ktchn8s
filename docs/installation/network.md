@@ -818,6 +818,15 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  10 remark === ACL: FROM HOMELAB NETWORK (10.10.10.x) ===
  10 remark ==============================================
 
+ 20 remark --- PERMIT DHCP TRAFFIC (MUST BE EARLY) ---
+ 21 remark Permit -> DHCP Discover/Request from clients to broadcast (0.0.0.0 or 10.10.10.x to 255.255.255.255)
+ 21 permit udp any host 255.255.255.255 eq bootps
+ 22 remark Permit -> DHCP Discover/Request from clients to gateway (0.0.0.0 or 10.10.10.x to 10.10.10.1)
+ 22 permit udp any host 10.10.10.1 eq bootps
+ 23 remark Permit -> DHCP Offer/ACK from server to broadcast/client (10.10.10.1 to 255.255.255.255 or 10.10.10.x)
+ 23 permit udp host 10.10.10.1 eq bootps any eq bootpc
+ 99 remark --- END ---
+
  100 remark --- SSH Specific Permits ---
  ! Allow SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network (needed for your management session)
  101 remark -> Permit SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network
@@ -834,9 +843,11 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  ! (Optional: ICMP rules for Homelab, e.g., pinging Home or receiving replies)
  200 remark --- ICMP Rules for Homelab Network ---
  201 remark -> Permit Homelab to ping Home
- 201 remark permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo
+ 201 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo
  202 remark -> Permit Homelab to receive ping replies from Home
- 202 remark permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
+ 202 permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
+ 203 remark -> Permit Homelab to send ping replies TO Home (in response to pings FROM Home)
+ 203 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
  299 remark --- END ---
 
  998 remark -> Deny and log other Homelab Network traffic specifically TO Home Network
