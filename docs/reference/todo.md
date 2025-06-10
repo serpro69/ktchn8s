@@ -86,14 +86,13 @@ icon: material/format-list-checks
         - Mention `make wake` alternative which can be used just to wake up the machines
 
 - [ ] Consider restricting ssh access from homelab to router/switch SVI to specific IPs
-    - [Stage 4 : C1111 Configuration](../installation/network.md#stage-4-implement-basic-firewall-rules-acls-on-c1111)
+    - [Stage 4 : C1111 Configuration](../installation/network.md#stage-4)
 
     ```
     ! --- Define ACL for traffic FROM Homelab Network ---
     ip access-list extended ACL_FROM_HOMELAB_NETWORK
      ! ...
-     ! (Optional: Add permits if Homelab needs to SSH to router's Homelab SVI - local management when e.g. laptop is physically
-     onnected to homelab network)
+     ! (Optional: Add permits if Homelab needs to SSH to router's Homelab SVI - local management when e.g. laptop is physically connected to homelab network)
      103 remark Permit SSH from Homelab to router's Homelab SVI (local management)
      103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
      104 remark Permit SSH from Homelab to switch's Homelab SVI (local management)
