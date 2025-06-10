@@ -806,10 +806,10 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  502 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
  599 remark --- END ---
 
- 998 remark Deny any other Home traffic specifically TO Homelab network and log
+ 998 remark -> Deny any other Home traffic specifically TO Homelab network and log
  998 deny ip 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 log
 
- 999 remark Permit Home Network to ALL other destinations (e.g., Internet)
+ 999 remark -> Permit Home Network to ALL other destinations (e.g., Internet)
  999 permit ip 192.168.1.0 0.0.0.255 any
 exit
 
@@ -820,15 +820,14 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
 
  100 remark --- SSH Specific Permits ---
  ! Allow SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network (needed for your management session)
- 101 remark Permit SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network
+ 101 remark -> Permit SSH RESPONSES from Router's Homelab SVI (10.10.10.1) to Home Network
  101 permit tcp host 10.10.10.1 192.168.1.0 0.0.0.255 established
- 102 remark Permit SSH RESPONSES from Switch's Homelab SVI (10.10.10.2) to Home Network
+ 102 remark -> Permit SSH RESPONSES from Switch's Homelab SVI (10.10.10.2) to Home Network
  102 permit tcp host 10.10.10.2 192.168.1.0 0.0.0.255 established
- ! (Optional: Add permits if Homelab needs to SSH to router's Homelab SVI - local management when e.g. laptop is physically
-connected to homelab network)
- 103 remark Permit SSH from Homelab to router's Homelab SVI (local management)
+ ! (Optional: Add permits if Homelab needs to SSH to router's Homelab SVI - local management when e.g. laptop is physically connected to homelab network)
+ 103 remark -> Permit SSH from Homelab to router's Homelab SVI (local management)
  103 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.1 eq 22
- 104 remark Permit SSH from Homelab to switch's Homelab SVI (local management)
+ 104 remark -> Permit SSH from Homelab to switch's Homelab SVI (local management)
  104 permit tcp 10.10.10.0 0.0.0.255 host 10.10.10.2 eq 22
  199 remark --- END ---
 
@@ -840,10 +839,10 @@ connected to homelab network)
  202 remark permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
  299 remark --- END ---
 
- 998 remark Deny and log other Homelab Network traffic specifically TO Home Network
+ 998 remark -> Deny and log other Homelab Network traffic specifically TO Home Network
  998 deny ip 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 log
 
- 999 remark Permit Homelab Network to ALL other destinations (e.g., Internet)
+ 999 remark -> Permit Homelab Network to ALL other destinations (e.g., Internet)
  999 permit ip 10.10.10.0 0.0.0.255 any
 exit
 
@@ -851,17 +850,17 @@ exit
 ip access-list extended ACL_WAN_INBOUND
  10 remark === ACL: FROM INTERNET (WAN Inbound) ===
  10 remark ========================================
- 101 remark Allow established TCP sessions
+ 101 remark -> Permit established TCP sessions
  101 permit tcp any any established
- 102 remark Allow DNS UDP responses from any DNS server (source port 53)
+ 102 remark -> Permit DNS UDP responses from any DNS server (source port 53)
  102 permit udp any eq 53 any gt 1023
- 103 remark Allow Ping replies to router's WAN IP
+ 103 remark -> Permit Ping replies to router's WAN IP
  103 permit icmp any any echo-reply
- 104 remark Allow ICMP Time Exceeded (for traceroute)
+ 104 remark -> Permit ICMP Time Exceeded (for traceroute)
  104 permit icmp any any time-exceeded
- 105 remark Allow ICMP Unreachable (for Path MTU discovery etc.)
+ 105 remark -> Permit ICMP Unreachable (for Path MTU discovery etc.)
  105 permit icmp any any unreachable
- 998 remark Deny and Log all other unsolicited Internet traffic
+ 998 remark -> Deny and Log all other unsolicited Internet traffic
  998 deny ip any any log
 exit
 
