@@ -14,7 +14,7 @@ icon: material/server
     The local controller is the machine used to bootstrap the cluster.
     We only need it once during initial provisioning, and you can use your laptop or desktop.
 
-- Local controller must be a Linux machine that can run Docker (because the `host` networking driver used for PXE boot only supports Linux. 
+- Local controller must be a Linux machine that can run Docker (because the `host` networking driver used for PXE boot only supports Linux.
     - You can use a Linux virtual machine with bridged networking if you're on MacOS or Windows.
 
 #### Servers
@@ -61,7 +61,7 @@ Boot order options (select one, each has their pros and cons):
     Below is an example of my BIOS setup on Lenovo mini PCs:
 
 - Reset to factory defaults
-- Devices -> Network Setup 
+- Devices -> Network Setup
     - PXE IPV4 Network Stack -> Enabled
     - PXE IPV6 Network Stack -> Disabled
 - Advanced -> CPU Setup
@@ -99,7 +99,7 @@ Boot order options (select one, each has their pros and cons):
 ## Installation
 
 !!! warning
-    This will erase all data on the nodes. 
+    This will erase all data on the nodes.
     Ensure you have backups of any important data before you proceed.
 
 Launch the [dev shell](../concepts/development-shell.md):
