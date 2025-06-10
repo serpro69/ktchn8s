@@ -15,9 +15,10 @@ We follow a simple template for documenting architecture decisions, which is ins
 <!-- markdownlint-disable MD046 -->
 ??? Template
 
-    \## Title
+    \## AD-000X - Title
 
     > These documents have names that are short noun phrases. For example, "ADR 1: Deployment on Ruby on Rails 3.0.10" or "ADR 9: LDAP for Multitenant Integration"
+    > We prefix the title with the ADR number for easier reference.
 
     **Context**
 
@@ -38,7 +39,7 @@ We follow a simple template for documenting architecture decisions, which is ins
 <!-- markdownlint-enable MD046 -->
 
 
-## Plugging C1111 router directly into ISP modem
+## AD-0001 - Plugging C1111 router directly into ISP modem
 
 **Context**
 
@@ -48,7 +49,9 @@ I initially thought to connect the C1111 router to the Eero:
 
 ```mermaid
 flowchart LR
-    I[Internet] -.- A[ISP Modem] o--o B[Eero 6 Router] o--o C[C1111 Router]
+    I[Internet] -.- M[ISP Modem] o--o E[Eero 6 Router] o--o C[C1111 Router]
+    E -.- |wlan| D[Home Devices]
+    C o--o H[Homelab Servers]
 ```
 
 This would, however, result in Double-NAT, which is usually not recommended.
@@ -63,7 +66,9 @@ Therefore, I can use C1111 as the main (and only) router, and use the existing E
 
 ```mermaid
 flowchart LR
-    I[Internet] -.- A[ISP Modem] o--o B[C1111 Router] o--o C[Eero 6 WiFi AP]
+    I[Internet] -.- M[ISP Modem] o--o C[C1111 Router] o--o E[Eero 6 WiFi AP]
+    E -.- |wlan| D[Home Devices]
+    C o--o H[Homelab Servers]
 ```
 
 **Status**
@@ -73,6 +78,6 @@ flowchart LR
 **Consequences**
 
 - No Double-NAT
-- Eero 6 will be used as an Access Point, which will allow to use it for WiFi connectivity.
-- Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable security settings anymore)
-    - This is not a big problem because we can do it via router or pfsense or something similar.
+- Eero 6 will be used as an Access Point, which will allow us to use it for WiFi connectivity.
+- Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable built-in security settings anymore)
+    - This is not a big problem because we can ensure security via router or pfsense or something similar.
