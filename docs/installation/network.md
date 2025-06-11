@@ -759,6 +759,15 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  10 remark === ACL: FROM HOME NETWORK (192.168.1.x) ===
  10 remark ============================================
 
+ 20 remark --- PERMIT DHCP TRAFFIC (MUST BE EARLY) ---
+ 21 remark Permit -> DHCP Discover/Request from clients to broadcast (0.0.0.0 or 192.168.1.x to 255.255.255.255)
+ 21 permit udp any host 255.255.255.255 eq bootps
+ 22 remark Permit -> DHCP Discover/Request from clients to gateway (0.0.0.0 or 192.168.1.x to 192.168.1.1)
+ 22 permit udp any host 192.168.1.1 eq bootps
+ 23 remark Permit -> DHCP Offer/ACK from server to broadcast/client (192.168.1.1 to 255.255.255.255 or 192.168.1.x)
+ 23 permit udp host 192.168.1.1 eq bootps any eq bootpc
+ 99 remark --- END ---
+
  100 remark --- Specific PERMITS from Home to Management IPs ---
  101 remark -> Permit SSH from Home to Muspell Router's Homelab SVI (10.10.10.1)
  101 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.1 eq 22
@@ -880,6 +889,14 @@ exit
 ip access-list extended ACL_WAN_INBOUND
  10 remark === ACL: FROM INTERNET (WAN Inbound) ===
  10 remark ========================================
+
+ 20 remark --- PERMIT DHCP TRAFFIC (MUST BE EARLY) ---
+ 21 remark Permit -> DHCP responses TO the router's WAN interface
+ 21 remark (Source port is 67 - DHCP/BOOTP Server, Destination port is 68 - DHCP/BOOTP Client)
+ 21 permit udp any eq bootps any eq bootpc
+ 99 remark --- END ---
+
+ 100 remark --- Other WAN rules ---
  101 remark -> Permit established TCP sessions
  101 permit tcp any any established
  102 remark -> Permit DNS UDP responses from any DNS server (source port 53)
@@ -890,6 +907,8 @@ ip access-list extended ACL_WAN_INBOUND
  104 permit icmp any any time-exceeded
  105 remark -> Permit ICMP Unreachable (for Path MTU discovery etc.)
  105 permit icmp any any unreachable
+ 199 remark --- END ---
+
  998 remark -> Deny and Log all other unsolicited Internet traffic
  998 deny ip any any log
 exit
