@@ -292,6 +292,24 @@ References:
     ! copy running-config startup-config
     ```
 
+- **(Optional) Verify/cleanup VTP and Vlan configuration leftovers:**
+
+    - If you've bought a used device, then `write erase` might not remove old VLANs.
+    - **Persistence of VLAN/VTP Info:** On devices with integrated switching capabilities (like your C1111-8P) or dedicated switches, VLAN and VTP information can sometimes be more persistent than the rest of the startup configuration. For dedicated Catalyst switches, the `vlan.dat` file in flash memory is the prime example. It's possible the C1111's switch module has a similar mechanism or that `write erase` doesn't touch that specific part of NVRAM as thoroughly as one might expect for these settings.
+    - 2. **Importance of `vtp mode transparent` or `off`:** If you inherit a device or aren't sure of its VTP state, setting it to `transparent` (and ensuring no unwanted domain name) is a crucial first step to prevent it from being adversely affected by or adversely affecting other switches if you were to connect it to a network already using VTP.
+    - 3. **Thorough Reset Procedure:** For a truly "factory fresh" state on a switch or device with switching capabilities, beyond `write erase`, one might also need to:
+        * Delete the `vlan.dat` file from flash (e.g., `delete flash:vlan.dat` on Catalyst switches, then reload). The exact procedure or file name might vary for integrated switch modules on routers.
+        * Ensure the VTP domain is nullified or set to default, and the mode is transparent or off.
+
+- **(Optional) Disable call-home**
+
+    ```cisco
+    no service call-home
+    ! Potentially also remove the call-home profile if you're not using it
+    no call-home
+    no profile "CiscoTAC-1"
+    ```
+
 #### Eero Configuration Steps
 
 - Physically connect Eero WAN port to `GigabitEthernet0/1/0` on C1111.
