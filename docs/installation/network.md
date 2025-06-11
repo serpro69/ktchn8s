@@ -183,7 +183,9 @@ References:
     no ip http secure-server                ! Disable HTTPS management interface
 
     clock timezone UTC 0 0                  ! Or your local timezone
-    ! ntp server <ip_address_of_ntp_server> ! Optional, for accurate time on the router
+    ntp server 0.pool.ntp.org prefer
+    ntp server 1.pool.ntp.org
+    ntp server 2.pool.ntp.org
     ```
 
 - **WAN Interface Configuration (Assuming `GigabitEthernet0/0/0` is a dedicated routed WAN port):**
@@ -323,7 +325,6 @@ References:
 - Configure WiFi SSID and password (if wasn't configured previously)
     * Since I didn't reset the Eero router, I could just keep using the existing SSID w/o any modifications needed
 
-
 #### Verification Steps
 
 - On C1111:
@@ -335,6 +336,30 @@ References:
     * `show ip route`: Crucially, look for a default route (e.g., `S* 0.0.0.0/0 [1/0] via <ISP_GATEWAY_IP>` or `S* 0.0.0.0/0 is directly connected, GigabitEthernet0/0/0` if DHCP sets it that way).
     * `show ip nat translations`: Will be empty initially, but will populate as devices NAT out.
     * `ping 1.1.1.1 source Vlan2` (or `ping 1.1.1.1` if that doesn't work, try pinging from global exec mode).
+    * Verify ntp status on C1111 is synchronized, check ntp associations
+        ```cisco
+        sh clock
+        14:31:38.416 UTC Wed Jun 11 2025
+        ```
+        ```cisco
+        sh ntp status
+        Clock is synchronized, stratum 3, reference is 82.148.168.42
+        nominal freq is 250.0000 Hz, actual freq is 249.9955 Hz, precision is 2**10
+        ntp uptime is 132400 (1/100 of seconds), resolution is 4016
+        reference time is EBF411C2.FB22D398 (14:31:30.981 UTC Wed Jun 11 2025)
+        clock offset is 0.6257 msec, root delay is 10.39 msec
+        root dispersion is 7941.97 msec, peer dispersion is 188.53 msec
+        loopfilter state is 'CTRL' (Normal Controlled Loop), drift is 0.000018037 s/s
+        system poll interval is 64, last update was 13 sec ago.
+        ```
+        ```cisco
+        sh ntp associations
+          address         ref clock       st   when   poll reach  delay  offset   disp
+        *~82.148.168.42   62.92.229.27     2     48     64     1  1.913   0.625 188.53
+        +~192.36.143.130  .PPS.            1     59     64     1 13.999  -1.548 7937.9
+        +~77.104.162.218  .PPS.            1     58     64     1 47.970  -3.393 7937.9
+         * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+        ```
 - Connect a laptop/phone to the Eero's WiFi.
 - Verify laptop/phone gets an IP from `192.168.1.x` range, gateway `192.168.1.1`, DNS `1.1.1.1`/`8.8.8.8`.
 - Verify laptop/phone can browse the internet.
@@ -538,6 +563,20 @@ exit
 !  no shutdown
 ! exit
 
+! dns resolution
+ip name-server 1.1.1.1
+ip name-server 8.8.8.8
+ip domain-lookup source-interface Vlan10
+
+! ntp
+clock timezone UTC 0 0           ! Or your local timezone
+ntp server 0.pool.ntp.org prefer
+ntp server 1.pool.ntp.org
+ntp server 2.pool.ntp.org
+
+! optional, disable VTP if not needed
+vtp mode off
+
 ! Exit configuration mode
 end
 
@@ -582,6 +621,31 @@ Host 10.10.10.2 bifrost
     * `show cdp neighbors`: You should see the C1111-Router listed on `GigabitEthernet0/9`.
     * `ping 10.10.10.1`: Try pinging the C1111's SVI for VLAN 10. This tests L3 connectivity from C3560 to C1111.
     * `ping 1.1.1.1` (or any public IP): This tests if the C3560 can reach the internet (requires the NAT update on C1111 to be effective).
+    * `ping google.com`: Test DNS resolution on the switch.
+    * Verify ntp status is synchronized, check ntp associations
+        ```cisco
+        sh clock
+        14:31:38.416 UTC Wed Jun 11 2025
+        ```
+        ```cisco
+        sh ntp status
+        Clock is synchronized, stratum 3, reference is 82.148.168.42
+        nominal freq is 250.0000 Hz, actual freq is 249.9955 Hz, precision is 2**10
+        ntp uptime is 132400 (1/100 of seconds), resolution is 4016
+        reference time is EBF411C2.FB22D398 (14:31:30.981 UTC Wed Jun 11 2025)
+        clock offset is 0.6257 msec, root delay is 10.39 msec
+        root dispersion is 7941.97 msec, peer dispersion is 188.53 msec
+        loopfilter state is 'CTRL' (Normal Controlled Loop), drift is 0.000018037 s/s
+        system poll interval is 64, last update was 13 sec ago.
+        ```
+        ```cisco
+        sh ntp associations
+          address         ref clock       st   when   poll reach  delay  offset   disp
+        *~82.148.168.42   62.92.229.27     2     48     64     1  1.913   0.625 188.53
+        +~192.36.143.130  .PPS.            1     59     64     1 13.999  -1.548 7937.9
+        +~77.104.162.218  .PPS.            1     58     64     1 47.970  -3.393 7937.9
+         * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+        ```
 - **From a device on your Home Network (e.g., the controller laptop on `192.168.1.x`):**
     * `ping 10.10.10.1`: Ping the C1111's Homelab VLAN gateway.
     * `ping 10.10.10.2`: Ping the C3560 switch's management IP.
@@ -912,6 +976,11 @@ ip access-list extended ACL_WAN_INBOUND
  21 remark Permit -> DHCP responses TO the router's WAN interface
  21 remark (Source port is 67 - DHCP/BOOTP Server, Destination port is 68 - DHCP/BOOTP Client)
  21 permit udp any eq bootps any eq bootpc
+ 30 remark --- PERMIT NTP TRAFFIC ---
+ 31 remark -> Permit NTP UDP responses from any NTP server (source port 123) to any port on router
+ ! it seems like C1111 uses a dynamic port to receive NTP replies, and receiving ports on router seem to be below 1023
+ ! 31 permit udp any eq ntp any gt 1023
+ 31 permit udp any eq ntp any
  99 remark --- END ---
 
  100 remark --- Other WAN rules ---
@@ -979,6 +1048,31 @@ end
     * On the C1111 router: `show logging`
     * Look for messages related to ACL denials (e.g., `%SEC-6-IPACCESSLOGP: list ACL_HOME_TO_HOMELAB denied tcp 192.168.1.X(port) -> 10.10.10.Y(port)...`). This confirms your deny rules are working.
 4. **Verify Internet Access for Both Networks:** Ensure devices in both Home and Homelab networks can still access the internet as they could before applying ACLs (outbound traffic should generally be unaffected by these inbound ACLs).
+5. **Check NTP on C1111 and C3560**
+    * Verify ntp status is synchronized, check ntp associations
+        ```cisco
+        sh clock
+        14:31:38.416 UTC Wed Jun 11 2025
+        ```
+        ```cisco
+        sh ntp status
+        Clock is synchronized, stratum 3, reference is 82.148.168.42
+        nominal freq is 250.0000 Hz, actual freq is 249.9955 Hz, precision is 2**10
+        ntp uptime is 132400 (1/100 of seconds), resolution is 4016
+        reference time is EBF411C2.FB22D398 (14:31:30.981 UTC Wed Jun 11 2025)
+        clock offset is 0.6257 msec, root delay is 10.39 msec
+        root dispersion is 7941.97 msec, peer dispersion is 188.53 msec
+        loopfilter state is 'CTRL' (Normal Controlled Loop), drift is 0.000018037 s/s
+        system poll interval is 64, last update was 13 sec ago.
+        ```
+        ```cisco
+        sh ntp associations
+          address         ref clock       st   when   poll reach  delay  offset   disp
+        *~82.148.168.42   62.92.229.27     2     48     64     1  1.913   0.625 188.53
+        +~192.36.143.130  .PPS.            1     59     64     1 13.999  -1.548 7937.9
+        +~77.104.162.218  .PPS.            1     58     64     1 47.970  -3.393 7937.9
+         * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+        ```
 
 ### Troubleshooting
 
