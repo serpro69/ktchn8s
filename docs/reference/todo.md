@@ -102,3 +102,6 @@ icon: material/format-list-checks
     exit
     ```
     - [ ] Limit permits to specific IP addresses instead of using `10.10.10.0` so that e.g. k8s servers couldn't ssh to Homelab's router or switch
+
+- [ ] Provision cisco devices with Ansible
+    - https://docs.ansible.com/ansible/latest/collections/cisco/ios/index.html
