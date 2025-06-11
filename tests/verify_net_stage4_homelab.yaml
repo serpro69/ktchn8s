@@ -1,0 +1,75 @@
+---
+- name: Stage 4 Verification - From Homelab K8s Nodes
+  hosts: metal
+  gather_facts: false
+
+  vars:
+    router_homelab_ip: "10.10.10.1"
+    router_home_ip: "192.168.1.1"
+    switch_homelab_ip: "10.10.10.2"
+    home_laptop_ip: "192.168.1.14"
+    internet_ip_target: "8.8.8.8"
+    internet_fqdn_target: "google.com"
+
+  tasks:
+    - name: Ping Router Homelab SVI (10.10.10.1) from K8s node
+      ansible.builtin.command: "ping -c 3 {{ router_homelab_ip }}"
+      register: ping_router_homelab
+      changed_when: false
+      failed_when: ping_router_homelab.rc != 0
+      ignore_errors: true # To see all results
+
+    - name: Ping Router Home SVI (192.168.1.1) from K8s node
+      ansible.builtin.command: "ping -c 3 {{ router_home_ip }}"
+      register: ping_router_home
+      changed_when: false
+      # This might fail depending on your ACL_FROM_HOMELAB_NETWORK if not explicitly permitted
+      # For now, let's assume it should fail or isn't a primary success criteria unless you permitted it
+      failed_when: false # Allow to pass to see result, adjust if you expect success
+      ignore_errors: true
+
+    - name: Ping Internet IP ({{ internet_ip_target }}) from K8s node
+      ansible.builtin.command: "ping -c 3 {{ internet_ip_target }}"
+      register: ping_internet_ip_k8s
+      changed_when: false
+      failed_when: ping_internet_ip_k8s.rc != 0
+      ignore_errors: true
+
+    - name: Resolve and Ping Internet FQDN ({{ internet_fqdn_target }}) from K8s node
+      ansible.builtin.command: "ping -c 3 {{ internet_fqdn_target }}"
+      register: ping_internet_fqdn_k8s
+      changed_when: false
+      failed_when: ping_internet_fqdn_k8s.rc != 0
+      ignore_errors: true
+
+    - name: Attempt to Ping Home Laptop ({{ home_laptop_ip }}) from K8s node (SHOULD FAIL)
+      ansible.builtin.command: "ping -c 3 {{ home_laptop_ip }}"
+      register: ping_home_laptop_k8s
+      changed_when: false
+      failed_when: ping_home_laptop_k8s.rc == 0 # Fails if ping SUCCEEDS
+      ignore_errors: true
+
+    - name: Attempt to SSH to Home Laptop ({{ home_laptop_ip }}) from K8s node (SHOULD FAIL)
+      ansible.builtin.command: "ssh -o ConnectTimeout=5 -o BatchMode=yes -o StrictHostKeyChecking=no {{ home_laptop_ip }}
+        exit"
+      register: ssh_home_laptop_k8s
+      changed_when: false
+      failed_when: ssh_home_laptop_k8s.rc == 0 # Fails if SSH SUCCEEDS
+      ignore_errors: true
+
+    - name: Display K8s Node Test Results Summary
+      ansible.builtin.debug:
+        msg:
+          - "Ping Router Homelab SVI ({{ router_homelab_ip }}): {{ 'SUCCESS' if ping_router_homelab.rc == 0 else 'FAILURE
+            (Expected if not permitted in ACL)' }} (RC: {{ ping_router_homelab.rc }})"
+          - "Ping Router Home SVI ({{ router_home_ip }}): {{ 'PASSED - OBSERVE' if ping_router_home.rc != 0 else 'WARNING
+            - UNEXPECTED SUCCESS (RC: ' + ping_router_home.rc|string + ')' }} (Expected to fail or be restricted)"
+          - "Ping Internet IP ({{ internet_ip_target }}): {{ 'SUCCESS' if ping_internet_ip_k8s.rc == 0 else 'FAILURE' }} (RC:
+            {{ ping_internet_ip_k8s.rc }})"
+          - "Ping Internet FQDN ({{ internet_fqdn_target }}): {{ 'SUCCESS' if ping_internet_fqdn_k8s.rc == 0 else 'FAILURE'
+            }} (RC: {{ ping_internet_fqdn_k8s.rc }})"
+          - "Ping Home Laptop ({{ home_laptop_ip }}) (SHOULD FAIL): {{ 'SUCCESS (DENIED AS EXPECTED)' if ping_home_laptop_k8s.rc
+            != 0 else 'FAILURE (UNEXPECTEDLY ALLOWED)' }} (RC: {{ ping_home_laptop_k8s.rc }})"
+          - "SSH Home Laptop ({{ home_laptop_ip }}) (SHOULD FAIL): {{ 'SUCCESS (DENIED AS EXPECTED)' if ssh_home_laptop_k8s.rc
+            != 0 else 'FAILURE (UNEXPECTEDLY ALLOWED)' }} (RC: {{ ssh_home_laptop_k8s.rc }})"
+      when: inventory_hostname == (groups['k8s_nodes'] | first) # Display summary only once
