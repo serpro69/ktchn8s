@@ -53,7 +53,7 @@ All of the listed software is Free and Open Source.
 
 Here is a simplified flowchart I made which should explain this fairly easily:
 
-![](https://zerodya.net/content/images/2022/08/mediastack-1.png)
+![](./assets/mediastack-1.png)
 
 ### Alternatives
 
@@ -244,11 +244,11 @@ docker ps
 
 You should see each service up and running, along with their respective port number.
 
-![](https://zerodya.net/content/images/2022/08/media-docker-ps.png)
+![](./assets/mediastack-docker-ps.png)
 
 To access and manage each service, open your browser and navigate to your server internal IP address followed by the port number of the service like so:
 
-![](https://zerodya.net/content/images/2022/08/addressbar-2.png)
+![](./assets/mediastack-addressbar-2.png)
 
 In my case the server IP address is `192.168.1.120` so to access Jellyfin at port `8096` I will navigate to `192.168.1.120:8096`. If you're working on your server remotely you should already know your server IP address.
 
@@ -292,12 +292,12 @@ It will then ask if you want to import your media library. Skip this and click n
 Once you login, click on the three bars in the top-left corner and go to `Dashboard`; this is where you are able to configure Jellyfin.
 
 1. **Add guest user** - Go to `Users` on the left side panel, click the \[+\] button and create a new guest user which will be the one your family/friends will use.
-![](https://zerodya.net/content/images/2022/08/jellyfin_adduser.png)
+![](./assets/mediastack-jellyfin_adduser.png)
 
 2. **Add media libraries** - Go to `Libraries`, click on `Add Media Library`, choose the content type 'Movies', then choose the folder `/data/movies` and select your preferred language.  
 You can leave the other options as default.
 
-![](https://zerodya.net/content/images/2022/08/jellyfin_library_config.png)
+![](./assets/mediastack-jellyfin_library_config.png)
 
 Now create two more libraries, but instead of 'Movies' choose 'Shows' for both of them.
 
@@ -308,7 +308,7 @@ For the Anime library choose the `/data/anime` folder and Japanese as the prefer
 
 Open Jackett (port 9117) and click on the `Add indexer` button. You will see a list of the indexers available:
 
-![](https://zerodya.net/content/images/2022/08/jackett_indexers-1.png)
+![](./assets/mediastack-jackett_indexers-1.png)
 
 **Choose your indexers** and add them by clicking on the \[+\] button.
 
@@ -324,16 +324,16 @@ While following this, keep in mind that Radarr is for movies and Sonarr is for T
 1. **Add download client** - Go to `Settings > Download Clients` and click on the big \[+\] button.  
 	In the next section choose Transmission and configure it like this.  
 	Click Test and if successful, save.
-![](https://zerodya.net/content/images/2022/08/sonarr_downclient-1.png)
+![](./assets/mediastack-sonarr_downclient-1.png)
 
 2\. **Add indexers** - Go to `Settings > Indexers` and click on the big \[+\] button. In the next section choose Torznab.  
 Go to Jackett and copy-paste both the Jackett API key and the Indexer Torznab feed URL.
 
 Click 'Test' and you should see various tags in the 'Categories' drop-down list; choose shows/anime related tags for Sonarr, and movie related tags for Radarr.
 
-![](https://zerodya.net/content/images/2022/08/sonarr_indexer-3.png)
+![](./assets/mediastack-sonarr_indexer-3.png)
 
-![](https://zerodya.net/content/images/2022/08/jackett_api-1.png)
+![](./assets/mediastack-jackett_api-1.png)
 
 Save and repeat Step 2 for every indexer you added in Jackett.
 
@@ -351,7 +351,7 @@ In the final section you will be asked to add both a Radarr and a Sonarr server.
 
 You will find the API key of each service by going to Sonarr/Radarr, in `Settings > General` under the Security section.
 
-![](https://zerodya.net/content/images/2022/08/jellyseerr_setup.png)
+![](./assets/mediastack-jellyseerr_setup.png)
 
 Once you finish the setup you will be able to freely configure Jellyseerr further.
 
@@ -370,7 +370,7 @@ Open Bazarr (port 6767) and follow these steps.
 
 1. **Add Sonarr and Radarr** - On the left side panel, go to `Settings > Sonarr` and add the Sonarr API key; you will find it by going to Sonarr, in `Settings > General` under the Security section.  
 	Do the same for Radarr in `Settings > Radarr`.
-![](https://zerodya.net/content/images/2022/08/bazarr_sonarr.png)
+![](./assets/mediastack-bazarr_sonarr.png)
 
 2\. **Choose language** - Go to `Settings > Languages` and add the languages you want in the `Languages Filter` input bar.  
 Then click on the `Add New Profile` button, give it a name, click on the `Add Language` button and select your language, finally save.

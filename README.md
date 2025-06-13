@@ -1,16 +1,17 @@
 # Ktchn8s
 
-[![tag](https://img.shields.io/github/v/tag/serpro69/Ktchn8s?style=flat-square&logo=semver&logoColor=white)](https://github.com/serpro69/Ktchn8s/tags)
-[![document](https://img.shields.io/website?label=document&logo=gitbook&logoColor=white&style=flat-square&url=https%3A%2F%2Fserpro69.github.io/ktchn8s)](https://serpro69.github.io/ktchn8s)
-[![license](https://img.shields.io/github/license/serpro69/Ktchn8s?style=flat-square&logo=gnu&logoColor=white)](https://www.gnu.org/licenses/gpl-3.0.html)
-[![stars](https://img.shields.io/github/stars/serpro69/Ktchn8s?logo=github&logoColor=white&color=gold&style=flat-square)](https://github.com/serpro69/Ktchn8s)
+[![github-tag](https://img.shields.io/github/v/tag/serpro69/Ktchn8s?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/serpro69/Ktchn8s/tags)
+[![github-license](https://img.shields.io/github/license/serpro69/Ktchn8s?style=for-the-badge&logo=unlicense&logoColor=white)](https://opensource.org/license/mit)
+[![github-stars](https://img.shields.io/github/stars/serpro69/Ktchn8s?logo=github&logoColor=white&color=gold&style=for-the-badge)](https://github.com/serpro69/Ktchn8s)
+<br>
+[![website](https://img.shields.io/website?label=docs&logo=gitbook&logoColor=white&style=for-the-badge&url=https%3A%2F%2Fserpro69.github.io/ktchn8s)](https://serpro69.github.io/ktchn8s)
 
 > `/ˈkɪtʃ.ən.eɪts/` (“Kitch-en-ates”)
 
 A K8s ☸️ homelab cluster 👾
 <br>...right in your kitchen 🚀💥
 
-**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#get-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/ktchn8s)**
+**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#getting-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/ktchn8s)**
 
 ---
 
@@ -88,11 +89,11 @@ I've used the following references, among other things, while building my homela
 - [Project TinyMiniMicro on servethehome.com](https://www.servethehome.com/introducing-project-tinyminimicro-home-lab-revolution/)
 - [Many examples from khuedoan/homelab](https://github.com/khuedoan/homelab?tab=readme-ov-file#acknowledgements)
     - [Ephemeral PXE server inspired by Minimal First Machine in the DC](https://speakerdeck.com/amcguign/minimal-first-machine-in-the-dc)
-        - [pdf version](./docs/files/external/minimal_first_machine_in_the_dc.pdf)
+        - [pdf version](./reference/external/minimal_first_machine_in_the_dc.pdf)
     - [ArgoCD usage and monitoring configuration in locmai/humble](https://github.com/locmai/humble)
     - [README template](https://github.com/othneildrew/Best-README-Template)
     - [Run the same Cloudflare Tunnel across many `cloudflared` processes](https://developers.cloudflare.com/cloudflare-one/tutorials/many-cfd-one-tunnel)
-        - [markdown version](./docs/files/external/many_cfs_one_tunnel.md)
+        - [markdown version](./reference/external/many_cfs_one_tunnel.md)
     - [MAC address environment variable in GRUB config](https://askubuntu.com/questions/1272400/how-do-i-automate-network-installation-of-many-ubuntu-18-04-systems-with-efi-and)
     - [Official k3s systemd service file](https://github.com/k3s-io/k3s/blob/master/k3s.service)
     - [Official Cloudflare Tunnel examples](https://github.com/cloudflare/argo-tunnel-examples)
@@ -101,7 +102,7 @@ I've used the following references, among other things, while building my homela
     - [Diátaxis technical documentation framework](https://diataxis.fr)
     - [Official Terratest examples](https://github.com/gruntwork-io/terratest/tree/main/test)
     - [Self-host an automated Jellyfin media streaming stack](https://zerodya.net/self-host-jellyfin-media-streaming-stack)
-        - [markdown version](./docs/files/external/self_host_an_automated_jellyfin_media_streaming_stack.md)
+        - [markdown version](./reference/external/self_host_an_automated_jellyfin_media_streaming_stack.md)
     - [App Template Helm chart by bjw-s-labs](https://bjw-s-labs.github.io/helm-charts/docs/)
 - [App configs from onedr0p/home-ops](https://github.com/onedr0p/home-ops)
     - [and the cluster-template](https://github.com/onedr0p/cluster-template)
