@@ -76,6 +76,17 @@ test_curl() {
   fi
 }
 
+echo -e "\n--- A0. Pre-requisites ---"
+WLAN_IP=$(ifconfig "${WLAN_INTERFACE}" | grep inet | grep -v inet6 | cut -d ' ' -f2 | xargs)
+ETH_IP=$(ifconfig "${ETH_HOMELAB_INTERFACE}" | grep inet | grep -v inet6 | cut -d ' ' -f2 | xargs)
+if [ -z "$WLAN_IP" ]; then
+  echo "ERROR: WLAN interface $WLAN_INTERFACE not found or no IPv4 assigned."
+  exit 1
+elif [ -z "$ETH_IP" ]; then
+  echo "ERROR: Ethernet interface $ETH_HOMELAB_INTERFACE not found or no IPv4 assigned."
+  exit 1
+fi
+
 echo -e "\n--- A1. Router Management & Connectivity (from Home Network via WLAN_INTERFACE: $WLAN_INTERFACE) ---"
 test_ping "$ROUTER_HOMELAB_IP" "SSH Target Router Homelab SVI" "-I $WLAN_INTERFACE"
 test_ssh "$ROUTER_HOMELAB_IP" "$SSH_USER" "SSH to Router Homelab SVI"
