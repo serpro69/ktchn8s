@@ -105,3 +105,10 @@ icon: material/format-list-checks
 
 - [ ] Provision cisco devices with Ansible
     - https://docs.ansible.com/ansible/latest/collections/cisco/ios/index.html
+
+- Explore Enchanced Power Saving Mode in BIOS
+    - Newer Lenovo machines support enhanced power saving mode which lowers power consumption during power-off.
+    - [x] Won't do: WoL is not supported!
+
+- [ ] Configure and document BIOS -> Power -> After Power Loss
+    - What option is better for my use-cases? Make sure it's configured everywhere and document it.
