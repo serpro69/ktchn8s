@@ -8,7 +8,7 @@ icon: material/lan
     The following describes my current network components and configurations. Don't blindly copy-paste, but instead use this as a learning point and adjust to your needs, especially if you're using different hardware components.
 
 !!! info
-    For an overview of the network setup refer to [Network Architecture](../reference/architecture/network.md) page.
+    For an overview of the network setup refer to [Network Architecture](../../reference/architecture/network.md) page.
 
 ## Hardware Requirements
 
@@ -41,7 +41,7 @@ icon: material/lan
 - Connect the serial cable to the switch/router and PC
 - Determine the port of the serial cable: `sudo dmesg | grep -i tty`
     - Let's assume the device port was `ttyUSB0`
-- Follow the [minicom configuration guide](../guides/how_to_configure_minicom.md) to configure it
+- Follow the [minicom configuration guide](../../guides/how_to_configure_minicom.md) to configure it
 - Start minicom: `sudo minicom`
     - Alternatively, using screen: `sudo screen /dev/ttyUSB0 9600`
 

@@ -52,17 +52,19 @@ markdown_extensions:
   - pymdownx.tasklist:
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.extra:
 
 nav:
   - "~/": index.md
-  - Concepts:
+  - "☰ Conceps":
       - concepts/development-shell.md
       - concepts/pxe-boot.md
-  - Installation:
-      - installation/network.md
-      - installation/metal.md
-  - Reference:
-      - "⚓︎ Architecture":
+  - "☲ Installation":
+      - "☱ Production":
+          - installation/production/network.md
+          - installation/production/metal.md
+  - "☵ Referece":
+      - "☴ Architecture":
           - reference/architecture/overview.md
           - reference/architecture/network.md
           - reference/architecture/decision-records.md
@@ -70,5 +72,5 @@ nav:
       - reference/changelog.md
       - reference/roadmap.md
       - reference/todo.md
-  - Guides:
+  - "☷ Guides":
       - guides/how_to_configure_minicom.md
