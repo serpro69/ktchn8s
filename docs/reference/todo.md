@@ -14,7 +14,7 @@ icon: material/format-list-checks
 - [ ] Update [concepts/pxe-boot](../concepts/pxe-boot.md) with a visual "in-action" showcase of how it works, once it's in place
 
 - [ ] Add up-to-date config files of C1111 and C3560 for reference
-    - Can be placed in a separate note (probably don't even need to make it visible in nav menu) and referenced from [installation/network](../installation/network.md)
+    - Can be placed in a separate note (probably don't even need to make it visible in nav menu) and referenced from [installation/production/network](../installation/production/network.md)
 
 - [ ] Check that devices on Guest WiFi network (when Eero is in AP/Bridge mode!) are still isolated and cannot see or communicate with each other or the main network.
     - Eero in Bridge mode looses a lot of security related functionality (it becomes "greyed out" in the app also.) However, it seems that the guest network can still be enabled from the app. Hopefully that guest network is still isolated, but needs double-checking.
@@ -86,7 +86,7 @@ icon: material/format-list-checks
         - Mention `make wake` alternative which can be used just to wake up the machines
 
 - [ ] Consider restricting ssh access from homelab to router/switch SVI to specific IPs
-    - [Stage 4 : C1111 Configuration](../installation/network.md#stage-4)
+    - [Stage 4 : C1111 Configuration](../installation/production/network.md#stage-4)
 
     ```
     ! --- Define ACL for traffic FROM Homelab Network ---
