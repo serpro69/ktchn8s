@@ -1089,6 +1089,9 @@ end
          * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
         ```
 
+!!! tip
+    Some of the above tests can be run with this [script](https://github.com/serpro69/Ktchn8s/blob/master/tests/network_stage4.sh).
+
 ### Troubleshooting
 
 #### SSH error 'no matching key exchange method found'
