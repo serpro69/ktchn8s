@@ -53,16 +53,18 @@
     dest: "{{ k3s_token_file }}"
     mode: "0600"
 
-- name: Copy k3s config files
+- name: Copy k3s server config file to control_plane nodes
   ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: config.yaml.j2
+    dest: "{{ k3s_config_file }}"
     mode: "0644"
-  loop:
-    - src: config.yaml.j2
-      dest: "{{ k3s_config_file }}"
-    - src: k3s.service.j2
-      dest: "{{ k3s_service_file }}"
+  when: "'control_plane' in group_names"
+
+- name: Copy k3s systemd service file to all nodes
+  ansible.builtin.template:
+    src: k3s.service.j2
+    dest: "{{ k3s_service_file }}"
+    mode: "0644"
 
 - name: Copy kube-vip manifests
   when: "'control_plane' in group_names"
