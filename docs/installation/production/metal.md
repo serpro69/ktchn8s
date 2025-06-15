@@ -62,12 +62,16 @@ Boot order options (select one, each has their pros and cons):
 
 - Reset to factory defaults
 - Devices -> Network Setup
+    - Wireless LAN -> Disabled
     - PXE IPV4 Network Stack -> Enabled
     - PXE IPV6 Network Stack -> Disabled
+- Devices -> Bluetooth -> Disabled
 - Advanced -> CPU Setup
     - VT-d -> Enabled
 - Power -> Automatic Power On
-    - Wak on LAN -> Automatic
+    - Wake on LAN -> Automatic
+        - (alt): Wake on LAN -> Network
+        - Wake from Serial Port Ring -> Disabled
 - Security -> Secure Boot
     - Secure Boot -> Disabled
 - Startup
@@ -83,6 +87,8 @@ Boot order options (select one, each has their pros and cons):
         - Network 1
         - M.2 Drive 1
         - SATA 1
+- (alt:) Startup
+    - First Boot Device -> M.2 Drive
 
 ### Network
 
