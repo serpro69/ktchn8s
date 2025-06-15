@@ -28,28 +28,36 @@
     - "{{ k3s_data_dir }}/agent/pod-manifests"
 
 - name: Check if k3s token file exists on the first node
-  run_once: true
   ansible.builtin.stat:
     path: "{{ k3s_token_file }}"
+  delegate_to: "{{ groups['control_plane'] | first }}"
+  run_once: true
   register: k3s_token_file_stat
 
-- name: Generate k3s token file on the first node if not exist yet
-  run_once: true
-  when: not k3s_token_file_stat.stat.exists
+- name: Generate the definitive k3s token file on the first node if not exist yet
   ansible.builtin.copy:
     content: "{{ lookup('community.general.random_string', length=32) }}"
     dest: "{{ k3s_token_file }}"
     mode: "0600"
-
-- name: Get k3s token from the first node
+  delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
+  when: not k3s_token_file_stat.stat.exists
+
+- name: Get the definitive k3s token from the first node
   ansible.builtin.slurp:
     src: "{{ k3s_token_file }}"
-  register: k3s_token_base64
+  register: k3s_cluster_token_slurped
+  delegate_to: "{{ groups['control_plane'] | first }}"
+  run_once: true
+
+- name: Set a fact for the definitive cluster token
+  ansible.builtin.set_fact:
+    definitive_k3s_cluster_token: "{{ k3s_cluster_token_slurped.content | b64decode | trim }}"
+  run_once: true
 
 - name: Ensure all nodes has the same token
   ansible.builtin.copy:
-    content: "{{ k3s_token_base64.content | b64decode }}"
+    content: "{{ definitive_k3s_cluster_token }}"
     dest: "{{ k3s_token_file }}"
     mode: "0600"
 
