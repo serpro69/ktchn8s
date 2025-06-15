@@ -4,6 +4,8 @@
 .SHELLFLAGS := -ec
 .PHONY: help requirements bootstrap cluster console wake
 
+export KUBECONFIG = $(shell pwd)/kubeconf.yaml
+
 default: help
 
 help: ## Print this help message
@@ -19,6 +21,12 @@ bootstrap: ~/.ssh/id_ed25519 _requirements ## Wake up and provision the servers
 	@ansible-playbook \
 		--inventory inventory.sh \
 		bootstrap.yml \
+		-v
+
+cluster: ~/.ssh/id_ed25519 _requirements ## Create kubernetes cluster
+	@ansible-playbook \
+		--inventory inventory.sh \
+		cluster.yml \
 		-v
 
 console: ## Start the Ansible console
