@@ -26,5 +26,16 @@ cluster: ## Create kubernetes cluster
 console: ## Start the Ansible console
 	@make console -C metal
 
+run: ## Run a CMD command on all servers via SSH
+	@cmd=$(CMD); \
+	if [ -z "$${cmd}" ]; then \
+		echo "Please set CMD variable to the command you want to run"; \
+		exit 1; \
+	fi; \
+	for host in {thor,odin,heimdall,mjolnir,gungnir,draupnir,megingjord,hofund,gjallarhorn,brisingamen}; do \
+		ssh "$${host}" "$${cmd}" || printf "failed to connect to %s" "${{host}}"; \
+		printf "\ndone %s on %s\n" "$${cmd}" "$${host}"; \
+	done
+
 wake: ## Wake up the servers without re-provisioning them
 	@make wake -C metal
