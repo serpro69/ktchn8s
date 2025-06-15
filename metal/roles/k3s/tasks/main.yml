@@ -74,27 +74,50 @@
     - src: kube-vip.yaml.j2
       dest: "{{ k3s_data_dir }}/agent/pod-manifests/kube-vip.yaml"
 
-- name: Enable k3s service
-  ansible.builtin.systemd:
+- name: Enable k3s service and ensure it is started
+  ansible.builtin.systemd_service: # Changed from just systemd
     name: k3s
     enabled: true
     state: started
-    daemon_reload: true
+    daemon_reload: true # Good to have if the service file might change
   register: k3s_service
-  until: k3s_service is succeeded
+  until: k3s_service is succeeded # Ensure it actually starts
   retries: 5
-  notify: Restart k3s
+  delay: 10 # Wait 10 seconds between retries
+  notify: Restart k3s # Though starting it here might make immediate restart redundant unless failed
 
-- name: Get Kubernetes config file
-  run_once: true
-  ansible.builtin.slurp:
-    src: "{{ k3s_kubeconfig_file }}"
-  register: kubeconfig_base64
+- name: Fetch kubeconfig from control plane
+  when: "'control_plane' in group_names"
+  block:
+    # This task should only run ONCE on the first control plane node
+    - name: Wait for K3s API server to be ready on the first control plane node
+      when: inventory_hostname == (groups['control_plane'] | first)
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[inventory_hostname]['ansible_host'] }}" # Check the local node
+        port: 6443
+        delay: 15 # Initial delay
+        timeout: 300 # 5 minutes timeout
+      run_once: true # Ensures this wait_for runs only once across all control plane nodes
 
-- name: Write Kubernetes config file with the correct cluster address
-  ansible.builtin.copy:
-    content: "{{ kubeconfig_base64.content | b64decode | replace('127.0.0.1', control_plane_endpoint) }}"
-    dest: "{{ playbook_dir }}/kubeconfig.yaml"
-    mode: "0600"
-  delegate_to: localhost
-  run_once: true
+    # This task will now run on each control plane node, but we only care about the result from the first one.
+    # The run_once: true on the copy task will handle using only one fetched result.
+    - name: Get Kubernetes config file from the first control plane node
+      ansible.builtin.slurp:
+        src: "{{ k3s_kubeconfig_file }}" # /etc/rancher/k3s/k3s.yaml
+      register: kubeconfig_base64_fetch
+      when: inventory_hostname == (groups['control_plane'] | first) # Fetch ONLY from the first control plane node
+
+    - name: Set fact for kubeconfig content (to make it available to run_once delegate_to task)
+      ansible.builtin.set_fact:
+        kubeconfig_content_to_write: "{{ kubeconfig_base64_fetch.content | b64decode | replace('127.0.0.1', control_plane_endpoint)
+          }}"
+      when: inventory_hostname == (groups['control_plane'] | first) # Only set fact on the node that fetched it
+
+    - name: Write Kubernetes config file to Ansible controller
+      ansible.builtin.copy:
+        content: "{{ hostvars[groups['control_plane'] | first]['kubeconfig_content_to_write'] }}" # Get content from the first CP node's facts
+        dest: "{{ playbook_dir }}/kubeconfig.yaml" # Your Makefile uses kubeconfig.yaml
+        mode: "0600"
+      delegate_to: localhost
+      run_once: true # CRITICAL: This ensures the file is written only once using data from the first control plane node
+      # End of block for control plane kubeconfig fetching
