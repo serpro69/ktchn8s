@@ -1,3 +1,4 @@
+---
 cilium_repo_url: https://helm.cilium.io
 cilium_version: 1.16.1
 cilium_namespace: kube-system

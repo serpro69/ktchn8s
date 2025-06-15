@@ -1,3 +1,4 @@
+---
 - name: Adjust kernel parameters
   ansible.posix.sysctl:
     name: "{{ item.name }}"

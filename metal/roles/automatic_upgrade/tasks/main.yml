@@ -1,3 +1,4 @@
+---
 - name: Install packages for automatic upgrade
   ansible.builtin.dnf:
     name:
@@ -8,7 +9,7 @@
   ansible.builtin.copy:
     src: automatic.conf
     dest: /etc/dnf/automatic.conf
-    mode: 0644
+    mode: "0644"
 
 - name: Enable automatic upgrade service
   ansible.builtin.systemd:

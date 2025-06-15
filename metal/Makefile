@@ -27,6 +27,7 @@ cluster: ~/.ssh/id_ed25519 _requirements ## Create kubernetes cluster
 	@ansible-playbook \
 		--inventory inventory.sh \
 		cluster.yml \
+		--tags "cilium"
 		-v
 
 console: ## Start the Ansible console

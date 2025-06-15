@@ -2,25 +2,34 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook
 ---
 - name: Create Kubernetes cluster
-  hosts: metal # This will run prerequisites on ALL metal hosts
+  hosts: metal
   roles:
-    - role: prerequisites # Installs necessary packages like curl, conntrack, etc.
-      # - role: k3s # Moved k3s role to specific groups
+    - role: prerequisites
+  tags:
+    - k3s
+    - prerequisites
 
 - name: Install K3s Control Plane
-  hosts: control_plane # Matches your inventory group
-  # gather_facts: yes # Already gathered if prerequisites ran on 'metal'
+  hosts: control_plane
+  # gather_facts: true # Already gathered if prerequisites ran on 'metal'
   roles:
-    - role: k3s # This role will now apply to control_plane hosts
-      # The k3s role tasks need to differentiate between first control_plane and others
+    - role: k3s
+  tags:
+    - k3s
+    - control
 
 - name: Install K3s Worker Nodes
-  hosts: nodes # Matches your inventory group for workers
-  # gather_facts: yes
+  hosts: nodes
+  # gather_facts: true
   roles:
-    - role: k3s # This role will apply to worker nodes, configured as agents
+    - role: k3s
+  tags:
+    - k3s
+    - nodes
 
-- name: Install Kubernetes addons (Cilium)
-  hosts: localhost # Cilium is installed via kubectl/helm from the control node
+- name: Install Kubernetes addons
+  hosts: localhost # Cilium is installed via kubectl/helm from the management node
   roles:
     - role: cilium
+  tags:
+    - cilium
