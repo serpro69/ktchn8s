@@ -23,10 +23,10 @@ server: "https://{{ control_plane_endpoint }}:6443" # Assumes kube-vip brings up
 # and pass it to k3s_server_config.
 # Example dynamic tls_san list:
 # k3s_tls_sans:
-#   - "{{ control_plane_endpoint }}"
-#   {% for cp_host in groups['control_plane'] %}
-#   - "{{ hostvars[cp_host]['ansible_host'] }}"
-#   {% endfor %}
-# Then in defaults: tls-san: "{{ k3s_tls_sans }}"
+#   - "\{\{ control_plane_endpoint }}"
+#   \{\% for cp_host in groups['control_plane'] %}
+#   - "\{\{ hostvars[cp_host]['ansible_host'] }}"
+#   \{\% endfor %}
+# Then in defaults: tls-san: "\{\{ k3s_tls_sans }}"
 
 snapshotter: stargz
