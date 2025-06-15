@@ -51,16 +51,12 @@ More information can be found in [the roadmap](#roadmap) below.
     - Cisco C3560-GS-8P Switch
     - Eero 6 Router (used as access-point for WiFi at home)
 - Servers:
-    - 4 × Lenovo Tiny M70q Gen.3
+    - 3 × Lenovo Tiny M70q Gen.3
         - CPU: `Intel Core i5-12400T`
-        - RAM: `8GB DDR4-3200`
-        - SSD: `256GB`
-    - 3 × Lenovo Tiny M70q Gen.2
-        - CPU: `Intel Core i5-11400T`
-        - RAM: `8GB DDR4-2666`
+        - RAM: `16GB DDR4-3200`
         - SSD: `256GB`
     - 7 × Lenovo Tiny M720q
-        - CPU: `Intel Core i5-8100T @ 2.70GHz`
+        - CPU: `Intel Core i5-8100T`
         - RAM: `16GB`
         - SSD: `512GB`
 
