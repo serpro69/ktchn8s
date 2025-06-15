@@ -79,9 +79,11 @@
     name: k3s
     enabled: true
     state: started
+    daemon_reload: true
   register: k3s_service
   until: k3s_service is succeeded
   retries: 5
+  notify: Restart k3s
 
 - name: Get Kubernetes config file
   run_once: true

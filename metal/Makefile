@@ -4,7 +4,7 @@
 .SHELLFLAGS := -ec
 .PHONY: help requirements bootstrap cluster console wake
 
-export KUBECONFIG = $(shell pwd)/kubeconf.yaml
+export KUBECONFIG = $(shell pwd)/kubeconfig.yaml
 
 default: help
 

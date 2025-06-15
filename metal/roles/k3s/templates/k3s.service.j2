@@ -1,17 +1,21 @@
+# k3s.service.j2
 [Unit]
 Description=Lightweight Kubernetes
 Documentation=https://k3s.io
+Wants=network-online.target
 After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
 
 [Service]
 Type=notify
-ExecStartPre=-/sbin/modprobe br_netfilter
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/local/bin/k3s {{ 'server' if 'control_plane' in group_names else 'agent' }}
+EnvironmentFile=-/etc/default/%N
+EnvironmentFile=-/etc/sysconfig/%N
+EnvironmentFile=-/etc/rancher/k3s/k3s.env
 KillMode=process
 Delegate=yes
-# Having non-zero Limit*s causes performance problems due to accounting overhead
-# in the kernel. We recommend using cgroups to do container-local accounting.
+# HavingDelegate=yes is mandatory on v1.24 or later to use rootless execution (stepdown)
 LimitNOFILE=1048576
 LimitNPROC=infinity
 LimitCORE=infinity
@@ -19,6 +23,17 @@ TasksMax=infinity
 TimeoutStartSec=0
 Restart=always
 RestartSec=5s
+ExecStartPre=-/sbin/modprobe br_netfilter
+ExecStartPre=-/sbin/modprobe overlay
 
-[Install]
-WantedBy=multi-user.target
+ExecStart=/usr/local/bin/k3s \
+    {% if inventory_hostname in groups['control_plane'] %}
+    server \
+    # Arguments for server will be primarily read from {{ k3s_config_file }}
+    # The config.yaml.j2 will handle --cluster-init or --server based on hostname
+    {% elif inventory_hostname in groups['nodes'] %}
+    agent \
+    --server https://{{ control_plane_endpoint }}:6443 \
+    --token-file {{ k3s_token_file }} \
+    --node-ip {{ hostvars[inventory_hostname]['ansible_host'] }}
+    {% endif %}
