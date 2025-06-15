@@ -1,10 +1,32 @@
-{% if inventory_hostname == groups['masters'][0] %}
+# {{ ansible_managed }}
+# k3s_config_file: /etc/rancher/k3s/config.yaml
+
+# Common server config
+{{ k3s_server_config | to_nice_yaml(indent=0) | trim }}
+
+# HA Specifics
+token-file: "{{ k3s_token_file }}"
+node-ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+advertise-address: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+
+{% if inventory_hostname == (groups['control_plane'] | first) %}
 cluster-init: true
 {% else %}
-server: https://{{ control_plane_endpoint }}:6443
+server: "https://{{ control_plane_endpoint }}:6443" # Assumes kube-vip brings up control_plane_endpoint
+# Alternative if VIP isn't ready yet for joining nodes:
+# server: "https://{{ hostvars[groups['control_plane'] | first]['ansible_host'] }}:6443"
 {% endif %}
-token-file: {{ k3s_token_file }}
-{% if 'masters' in group_names %}
-{{ k3s_server_config | to_nice_yaml }}
-{% endif %}
+
+# Ensure all control plane members and the VIP are in tls-san
+# This is already in k3s_server_config, but ensure it includes all members.
+# You might need to dynamically build the tls-san list in your playbook vars
+# and pass it to k3s_server_config.
+# Example dynamic tls_san list:
+# k3s_tls_sans:
+#   - "{{ control_plane_endpoint }}"
+#   {% for cp_host in groups['control_plane'] %}
+#   - "{{ hostvars[cp_host]['ansible_host'] }}"
+#   {% endfor %}
+# Then in defaults: tls-san: "{{ k3s_tls_sans }}"
+
 snapshotter: stargz

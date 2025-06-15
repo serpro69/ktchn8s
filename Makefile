@@ -2,7 +2,12 @@
 .ONESHELL:
 .SHELL := $(shell which bash)
 .SHELLFLAGS := -ec
-.PHONY: help docs requirements bootstrap cluster console wake
+.PHONY: *
+
+.EXPORT_ALL_VARIABLES:
+
+KUBECONFIG = $(shell pwd)/metal/kubeconfig.yaml
+KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 default: help
 
@@ -14,6 +19,9 @@ docs: ## Serve documentation on localhost
 
 bootstrap: ## Wake up and provision the servers
 	@make bootstrap -C metal
+
+cluster: ## Create kubernetes cluster
+	@make cluster -C metal
 
 console: ## Start the Ansible console
 	@make console -C metal
