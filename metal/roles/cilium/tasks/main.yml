@@ -1,3 +1,4 @@
+---
 - name: Install Cilium
   kubernetes.core.helm:
     name: cilium
@@ -23,5 +24,5 @@
   kubernetes.core.k8s:
     template: "{{ item }}"
   loop:
-    - ciliuml2announcementpolicy.yaml
-    - ciliumloadbalancerippool.yaml
+    - ciliuml2announcementpolicy.yaml.j2
+    - ciliumloadbalancerippool.yaml.j2
