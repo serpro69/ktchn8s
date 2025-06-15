@@ -84,3 +84,4 @@ nav:
       - reference/todo.md
   - "☷ Guides":
       - guides/how_to_configure_minicom.md
+      - guides/how_to_add_or_remove_nodes.md
