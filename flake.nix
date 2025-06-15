@@ -37,10 +37,22 @@
             minicom
             xorriso
             # networking tools
+            iproute2
             netcat
             nettools
             openssh
+            wireguard-tools
+            # k8s tools
+            dyff
+            k9s
+            kanidm
+            kube3d
+            kubectl
+            kubernetes-helm
+            kustomize
             # lang support
+            go
+            gotestsum
             python3 # ansible dependency
 
             # extra python packages
