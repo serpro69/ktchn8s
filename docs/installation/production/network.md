@@ -701,6 +701,21 @@ ip dhcp pool HOMELAB_POOL_VLAN10
  lease 1
 exit
 
+! Use 'interface range' to configure multiple ports simultaneously.
+interface range GigabitEthernet0/1/2 - 7 ! configure extra ports on the router for your servers/NAS
+ ! Add a generic description for these device ports
+ description Homelab_Server_Device_Port_VLAN10
+ ! Set the ports to access mode, as they will carry traffic for a single VLAN (VLAN 10)
+ switchport mode access
+ ! Assign these access ports to VLAN 10
+ switchport access vlan 10
+ ! Enable PortFast: causes Layer 2 access ports to enter the forwarding state immediately.
+ ! Use only on ports connected to end devices (like servers/NAS) to avoid STP delays.
+ spanning-tree portfast
+ ! Ensure the physical ports are administratively up
+ no shutdown
+exit
+
 ! Exit configuration mode
 end
 
