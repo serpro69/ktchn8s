@@ -25,15 +25,4 @@ Restart=always
 RestartSec=5s
 ExecStartPre=-/sbin/modprobe br_netfilter
 ExecStartPre=-/sbin/modprobe overlay
-
-ExecStart=/usr/local/bin/k3s \
-    {% if inventory_hostname in groups['control_plane'] %}
-    server \
-    # Arguments for server will be primarily read from {{ k3s_config_file }}
-    # The config.yaml.j2 will handle --cluster-init or --server based on hostname
-    {% elif inventory_hostname in groups['nodes'] %}
-    agent \
-    --server https://{{ control_plane_endpoint }}:6443 \
-    --token-file {{ k3s_token_file }} \
-    --node-ip {{ hostvars[inventory_hostname]['ansible_host'] }}
-    {% endif %}
+ExecStart=/usr/local/bin/k3s {% if inventory_hostname in groups['control_plane'] %} server {% else %} agent --server https://{{ control_plane_endpoint }}:6443 --token-file {{ k3s_token_file }} --node-ip {{ hostvars[inventory_hostname]['ansible_host'] }} {% endif %}
