@@ -44,7 +44,7 @@ K8S_CONTROL3_IP="10.10.10.12"
 K8S_WORKER1_IP="10.10.10.20"
 K8S_WORKER2_IP="10.10.10.21"
 K8S_WORKER3_IP="10.10.10.22"
-K8S_WORKER4_IP="10.10.10.22" # FIX: this should actually end with 23, but the server is used to simulate the nas
+K8S_WORKER4_IP="10.10.10.23"
 K8S_WORKER5_IP="10.10.10.24"
 K8S_WORKER6_IP="10.10.10.25"
 K8S_WORKER7_IP="10.10.10.26"
@@ -66,7 +66,7 @@ K8S_NODES=(
   "$K8S_WORKER5_IP"
   "$K8S_WORKER6_IP"
   "$K8S_WORKER7_IP"
-  "$NAS_IP"
+  # "$NAS_IP" TODO: enable once it's provisioned
 )
 
 INTERFACES=(
