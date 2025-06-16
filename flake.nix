@@ -9,7 +9,57 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+           inherit system;
+           config.allowUnfree = true;
+
+           overlays = [
+               (import (
+                 fetchTarball {
+                   url = "https://github.com/oxalica/rust-overlay/archive/master.tar.gz";
+                   # TODO: better way to ensure sha matches master branch, especially if it's updated quite frequently
+                   sha256 = "sha256:1z9kly96d8dbhf2h73vss6dkjy11aqdzi2rysiqz3hzxlhppvhgz";
+                 })
+               )
+             ];
+           };
+
+           rustPlatform = pkgs.makeRustPlatform {
+             cargo = pkgs.rust-bin.stable.latest.minimal;
+             rustc = pkgs.rust-bin.stable.latest.minimal;
+           };
+
+           kanidmFromSource = rustPlatform.buildRustPackage rec {
+             pname = "kanidm";
+             version = "1.6.4";
+
+             src = pkgs.fetchzip {
+               url = "https://github.com/kanidm/kanidm/archive/refs/tags/v${version}.tar.gz";
+               hash = "sha256-zI+IPwpkkF67/JSl3Uu+Q1giUN49r/hjvY+/QLqB5eM=";
+             };
+
+             nativeBuildInputs = [ pkgs.openssl pkgs.pam ];
+
+             cargoHash = "sha256-l4UNdVvPteqs46Fm7yVgkgplANvkAmb4fooLigXRqZM=";
+
+             cargoRoot = "tools/cli";
+             cargoLock = {
+               lockFile = "${src}/Cargo.lock";
+             };
+
+             cargoBuildFlags = [ "--bin" "kanidm" ];
+
+             postPatch = ''
+               ln -s ${src}/Cargo.lock tools/cli/Cargo.lock
+             '';
+
+             meta = {
+               description = "A simple, secure, and fast identity management platform";
+               homepage = "https://github.com/kanidm/kanidm";
+               license = pkgs.lib.licenses.mpl20;
+               maintainers = [ ];
+             };
+           };
       in
       with pkgs;
       {
@@ -37,7 +87,6 @@
             minicom
             xorriso
             # networking tools
-            iproute2
             netcat
             nettools
             openssh
@@ -68,8 +117,14 @@
             ]))
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # NOTE: Darwin-only packages for cross-platform compatibility
+            # k8s tools
+            kanidmFromSource
           ] ++ lib.optionals pkgs.stdenv.isLinux [
             # NOTE: Linux-only packages for cross-platform compatibility
+            # networking tools
+            iproute2
+            # k8s tools
+            kanidm
           ];
 
           shellHook = ''
