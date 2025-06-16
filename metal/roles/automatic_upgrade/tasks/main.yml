@@ -1,18 +1,18 @@
 ---
 - name: Install packages for automatic upgrade
-  ansible.builtin.dnf:
+  dnf:
     name:
       - dnf-automatic
       - dnf-utils
 
 - name: Copy automatic upgrade config file
-  ansible.builtin.copy:
+  copy:
     src: automatic.conf
     dest: /etc/dnf/automatic.conf
     mode: "0644"
 
 - name: Enable automatic upgrade service
-  ansible.builtin.systemd:
+  systemd:
     name: dnf-automatic.timer
     state: started
     enabled: true
