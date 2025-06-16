@@ -1,6 +1,6 @@
 ---
 - name: Download k3s binary
-  ansible.builtin.get_url:
+  get_url:
     url: https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s
     checksum: sha256:https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/sha256sum-amd64.txt
     dest: "{{ role_path }}/files/bin/k3s"
@@ -10,7 +10,7 @@
   register: k3s_binary
 
 - name: Copy k3s binary to nodes
-  ansible.builtin.copy:
+  copy:
     src: bin/k3s
     dest: /usr/local/bin/k3s
     owner: root
@@ -18,7 +18,7 @@
     mode: "0755"
 
 - name: Ensure config directories exist
-  ansible.builtin.file:
+  file:
     path: "{{ item }}"
     state: directory
     mode: "0755"
@@ -28,14 +28,14 @@
     - "{{ k3s_data_dir }}/agent/pod-manifests"
 
 - name: Check if k3s token file exists on the first node
-  ansible.builtin.stat:
+  stat:
     path: "{{ k3s_token_file }}"
   delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
   register: k3s_token_file_stat
 
 - name: Generate the definitive k3s token file on the first node if not exist yet
-  ansible.builtin.copy:
+  copy:
     content: "{{ lookup('community.general.random_string', length=32) }}"
     dest: "{{ k3s_token_file }}"
     mode: "0600"
@@ -44,39 +44,39 @@
   when: not k3s_token_file_stat.stat.exists
 
 - name: Get the definitive k3s token from the first node
-  ansible.builtin.slurp:
+  slurp:
     src: "{{ k3s_token_file }}"
   register: k3s_cluster_token_slurped
   delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
 
 - name: Set a fact for the definitive cluster token
-  ansible.builtin.set_fact:
+  set_fact:
     definitive_k3s_cluster_token: "{{ k3s_cluster_token_slurped.content | b64decode | trim }}"
   run_once: true
 
 - name: Ensure all nodes has the same token
-  ansible.builtin.copy:
+  copy:
     content: "{{ definitive_k3s_cluster_token }}"
     dest: "{{ k3s_token_file }}"
     mode: "0600"
 
 - name: Copy k3s server config file to control_plane nodes
-  ansible.builtin.template:
+  template:
     src: config.yaml.j2
     dest: "{{ k3s_config_file }}"
     mode: "0644"
   when: "'control_plane' in group_names"
 
 - name: Copy k3s systemd service file to all nodes
-  ansible.builtin.template:
+  template:
     src: k3s.service.j2
     dest: "{{ k3s_service_file }}"
     mode: "0644"
 
 - name: Copy kube-vip manifests
   when: "'control_plane' in group_names"
-  ansible.builtin.template:
+  template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
     mode: "0644"
@@ -85,7 +85,7 @@
       dest: "{{ k3s_data_dir }}/agent/pod-manifests/kube-vip.yaml"
 
 - name: Enable k3s service and ensure it is started
-  ansible.builtin.systemd_service: # Changed from just systemd
+  systemd_service: # Changed from just systemd
     name: k3s
     enabled: true
     state: started
@@ -102,7 +102,7 @@
     # This task should only run ONCE on the first control plane node
     - name: Wait for K3s API server to be ready on the first control plane node
       when: inventory_hostname == (groups['control_plane'] | first)
-      ansible.builtin.wait_for:
+      wait_for:
         host: "{{ hostvars[inventory_hostname]['ansible_host'] }}" # Check the local node
         port: 6443
         delay: 15 # Initial delay
@@ -112,19 +112,19 @@
     # This task will now run on each control plane node, but we only care about the result from the first one.
     # The run_once: true on the copy task will handle using only one fetched result.
     - name: Get Kubernetes config file from the first control plane node
-      ansible.builtin.slurp:
+      slurp:
         src: "{{ k3s_kubeconfig_file }}" # /etc/rancher/k3s/k3s.yaml
       register: kubeconfig_base64_fetch
       when: inventory_hostname == (groups['control_plane'] | first) # Fetch ONLY from the first control plane node
 
     - name: Set fact for kubeconfig content (to make it available to run_once delegate_to task)
-      ansible.builtin.set_fact:
+      set_fact:
         kubeconfig_content_to_write: "{{ kubeconfig_base64_fetch.content | b64decode | replace('127.0.0.1', control_plane_endpoint)
           }}"
       when: inventory_hostname == (groups['control_plane'] | first) # Only set fact on the node that fetched it
 
     - name: Write Kubernetes config file to Ansible controller
-      ansible.builtin.copy:
+      copy:
         content: "{{ hostvars[groups['control_plane'] | first]['kubeconfig_content_to_write'] }}" # Get content from the first CP node's facts
         dest: "{{ playbook_dir }}/kubeconfig.yaml" # Your Makefile uses kubeconfig.yaml
         mode: "0600"
