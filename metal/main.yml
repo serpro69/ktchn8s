@@ -1,3 +1,10 @@
 ---
 - name: Bootstrap
   import_playbook: bootstrap.yml
+  tags:
+    - metal
+
+- name: Cluster
+  import_playbook: cluster.yml
+  tags:
+    - cluster

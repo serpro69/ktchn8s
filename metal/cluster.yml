@@ -1,7 +1,7 @@
 # vim: set ft=yaml.ansible:
 # yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook
 ---
-- name: Create Kubernetes cluster
+- name: Ensure K3s Prerequisites
   hosts: metal
   roles:
     - role: prerequisites
@@ -9,7 +9,7 @@
     - k3s
     - prerequisites
 
-- name: Install K3s Control Plane
+- name: Configure K3s Control Plane
   hosts: control_plane
   # gather_facts: true # Already gathered if prerequisites ran on 'metal'
   roles:
@@ -18,7 +18,7 @@
     - k3s
     - control
 
-- name: Install K3s Worker Nodes
+- name: Configure K3s Worker Nodes
   hosts: nodes
   # gather_facts: true
   roles:
