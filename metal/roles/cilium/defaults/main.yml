@@ -1,6 +1,6 @@
 ---
 cilium_repo_url: https://helm.cilium.io
-cilium_version: 1.16.1
+cilium_version: 1.16.1 # TODO: upgrade to latest
 cilium_namespace: kube-system
 cilium_values:
   operator:
@@ -8,7 +8,9 @@ cilium_values:
   kubeProxyReplacement: true
   l2announcements:
     enabled: true
-  # TODO the host and port are k3s-specific, generic solution is in progress
+  # TODO: use k8s.apiServerUrls https://github.com/cilium/cilium/blob/c847f21e75799ac695210118eea6a21ad8bb30ce/install/kubernetes/cilium/values.yaml.tmpl#L2089
+  # references:
+  # https://github.com/cilium/cilium/pull/37601/files#diff-aa0cf5fa6e9857c22d4fa74fb53d84cd302757b5ed8889c1111c32e0525230e2
   # https://github.com/cilium/cilium/issues/19038
   # https://github.com/cilium/cilium/pull/28741
   k8sServiceHost: 127.0.0.1
