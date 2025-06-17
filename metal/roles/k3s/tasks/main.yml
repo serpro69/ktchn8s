@@ -1,5 +1,5 @@
 ---
-- name: Download k3s binary
+- name: Get k3s binary
   get_url:
     url: https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s
     checksum: sha256:https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/sha256sum-amd64.txt
@@ -32,30 +32,32 @@
     path: "{{ k3s_token_file }}"
   delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
-  register: k3s_token_file_stat
+  register: _token_file
 
-- name: Generate the definitive k3s token file on the first node if not exist yet
+- name: Generate the definitive k3s token file
   copy:
-    content: "{{ lookup('community.general.random_string', length=32) }}"
+    # Uses random.SystemRandom, so should be strong enough for cryptographic purposes.
+    # ref: https://docs.ansible.com/ansible/latest/collections/community/general/random_string_lookup.html#synopsis
+    content: "{{ lookup('community.general.random_string', length=32) }}" # TODO: longer password length?
     dest: "{{ k3s_token_file }}"
     mode: "0600"
   delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
-  when: not k3s_token_file_stat.stat.exists
+  when: not _token_file.stat.exists
 
-- name: Get the definitive k3s token from the first node
+- name: Get the definitive k3s token
   slurp:
     src: "{{ k3s_token_file }}"
-  register: k3s_cluster_token_slurped
+  register: _token_slurped
   delegate_to: "{{ groups['control_plane'] | first }}"
   run_once: true
 
-- name: Set a fact for the definitive cluster token
+- name: Set fact for the definitive cluster token
   set_fact:
-    definitive_k3s_cluster_token: "{{ k3s_cluster_token_slurped.content | b64decode | trim }}"
+    definitive_k3s_cluster_token: "{{ _token_slurped.content | b64decode | trim }}"
   run_once: true
 
-- name: Ensure all nodes has the same token
+- name: Ensure token on all nodes
   copy:
     content: "{{ definitive_k3s_cluster_token }}"
     dest: "{{ k3s_token_file }}"
@@ -85,7 +87,7 @@
       dest: "{{ k3s_data_dir }}/agent/pod-manifests/kube-vip.yaml"
 
 - name: Enable k3s service and ensure it is started
-  systemd_service: # Changed from just systemd
+  systemd_service:
     name: k3s
     enabled: true
     state: started
@@ -93,7 +95,7 @@
   register: k3s_service
   until: k3s_service is succeeded # Ensure it actually starts
   retries: 5
-  delay: 10 # Wait 10 seconds between retries
+  delay: 10
   notify: Restart k3s # Though starting it here might make immediate restart redundant unless failed
 
 - name: Fetch kubeconfig from control plane
@@ -114,18 +116,17 @@
     - name: Get Kubernetes config file from the first control plane node
       slurp:
         src: "{{ k3s_kubeconfig_file }}" # /etc/rancher/k3s/k3s.yaml
-      register: kubeconfig_base64_fetch
+      register: _kubeconfig_slurped
       when: inventory_hostname == (groups['control_plane'] | first) # Fetch ONLY from the first control plane node
 
     - name: Set fact for kubeconfig content (to make it available to run_once delegate_to task)
       set_fact:
-        kubeconfig_content_to_write: "{{ kubeconfig_base64_fetch.content | b64decode | replace('127.0.0.1', control_plane_endpoint)
-          }}"
+        kubeconfig_content: "{{ _kubeconfig_slurped.content | b64decode | replace('127.0.0.1', control_plane_endpoint) }}"
       when: inventory_hostname == (groups['control_plane'] | first) # Only set fact on the node that fetched it
 
-    - name: Write Kubernetes config file to Ansible controller
+    - name: Write kubeconfig file to Ansible controller
       copy:
-        content: "{{ hostvars[groups['control_plane'] | first]['kubeconfig_content_to_write'] }}" # Get content from the first CP node's facts
+        content: "{{ hostvars[groups['control_plane'] | first]['kubeconfig_content'] }}" # Get content from the first CP node's facts
         dest: "{{ playbook_dir }}/kubeconfig.yaml" # Your Makefile uses kubeconfig.yaml
         mode: "0600"
       delegate_to: localhost
