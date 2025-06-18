@@ -1,17 +1,15 @@
 # Ktchn8s
 
-<img src="./docs/assets/images/logo/image_6.png" alt="logo"/>
-
 <div markdown="1" style="text-align: center; font-size: 1.2em;">
 
 <b>🚧 Fork in progress, expect some dust 🚧</b>
-
-</div>
 
 [![github-tag](https://img.shields.io/github/v/tag/serpro69/Ktchn8s?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/serpro69/Ktchn8s/tags)
 [![github-license](https://img.shields.io/github/license/serpro69/Ktchn8s?style=for-the-badge&logo=unlicense&logoColor=white)](https://opensource.org/license/mit)
 [![github-stars](https://img.shields.io/github/stars/serpro69/Ktchn8s?logo=github&logoColor=white&color=gold&style=for-the-badge)](https://github.com/serpro69/Ktchn8s)
 [![website](https://img.shields.io/website?label=docs&logo=gitbook&logoColor=white&style=for-the-badge&url=https%3A%2F%2Fserpro69.github.io/ktchn8s)](https://serpro69.github.io/ktchn8s)
+
+</div>
 
 > `/ˈkɪtʃ.ən.eɪts/` (“Kitch-en-ates”)
 
