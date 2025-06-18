@@ -1,5 +1,7 @@
 # Ktchn8s
 
+<img src="./docs/assets/images/logo/image_6.png" alt="logo"/>
+
 <div markdown="1" style="text-align: center; font-size: 1.2em;">
 
 <b>🚧 Fork in progress, expect some dust 🚧</b>
