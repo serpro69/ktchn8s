@@ -13,7 +13,7 @@ plugins:
       always_show_hint: true
 
 theme:
-  favicon: assets/images/favicon_io/favicon.ico
+  favicon: assets/images/favicon_io_logo_6/favicon.ico
   name: material
   palette:
     - media: "(prefers-color-scheme: light)"
