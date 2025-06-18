@@ -1,7 +1,7 @@
 ---
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
-site_name: Ktchn8s Homelab
+site_name: Ktchn8s - Kubernetes Homelab Cluster
 site_url: http://localhost:8000
 copyright: Copyright &copy; 2025 - present, serpro69
 
@@ -37,13 +37,16 @@ theme:
     logo: material/kubernetes
 
 extra_css:
-  - assets/stylesheets/banner_image.css
+  - assets/stylesheets/image.css
   - assets/stylesheets/extra.css
   - assets/stylesheets/nord.css
 
 markdown_extensions:
   # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
+  # https://squidfunk.github.io/mkdocs-material/reference/images/
   - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -59,6 +62,10 @@ markdown_extensions:
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.snippets:
+      base_path:
+        # https://www.mkdocs.org/user-guide/configuration/#paths-relative-to-the-current-file-or-site
+        - !relative $config_dir
+        - !relative $docs_dir
       check_paths: true
   - pymdownx.tasklist:
   - pymdownx.tabbed:
