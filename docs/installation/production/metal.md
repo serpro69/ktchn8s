@@ -38,8 +38,8 @@ Required Capabilities:
 ### BIOS Configuration
 
 !!! info
-    You need to do it once per machine if the default config is not sufficent,
-    usually for consumer hardware this can not be automated
+    You need to do it once per machine if the default config is not sufficent.
+    Usually for consumer hardware this can not be automated
     (it requires something like [IPMI](https://en.wikipedia.org/wiki/Intelligent_Platform_Management_Interface) to automate).
 
 Common settings:
@@ -60,6 +60,11 @@ Boot order options (select one, each has their pros and cons):
 !!! example
     Below is an example of my BIOS setup on Lenovo mini PCs:
 
+!!! tip
+    I always reset the BIOS to factory defaults before making any changes, so that I don't have to worry about any custom settings, and only need to worry about modifying a subset of settings w/o worrying about everything else.
+
+#### Leveno M70q Gen. 2/3
+
 - Reset to factory defaults
 - Devices -> Network Setup
     - Wireless LAN -> Disabled
@@ -67,11 +72,31 @@ Boot order options (select one, each has their pros and cons):
     - PXE IPV6 Network Stack -> Disabled
 - Devices -> Bluetooth -> Disabled
 - Advanced -> CPU Setup
-    - VT-d -> Enabled
+    - VT-d -> Enabled (should be enabled by default, along with most other CPU options)
+- Power -> Automatic Power On
+    - Wake on LAN -> Enabled (or Network)
+    - Wake from Serial Port Ring -> Disabled
+- Security -> Secure Boot
+    - Secure Boot -> Disabled
+- Startup
+    - Boot Sequence:
+        - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence_)
+        - SATA 1 (_NB! same as above_)
+        - Network 1
+    - First Boot Device -> Network
+
+#### Leveno M720q
+
+- Reset to factory defaults
+- Devices -> Network Setup
+    - Wireless LAN -> Disabled
+    - PXE IPV4 Network Stack -> Enabled
+    - PXE IPV6 Network Stack -> Disabled
+- Devices -> Bluetooth -> Disabled
+- Advanced -> CPU Setup
+    - VT-d -> Enabled (should be enabled by default, along with most other CPU options)
 - Power -> Automatic Power On
     - Wake on LAN -> Automatic
-        - (alt): Wake on LAN -> Network
-        - Wake from Serial Port Ring -> Disabled
 - Security -> Secure Boot
     - Secure Boot -> Disabled
 - Startup
@@ -87,8 +112,6 @@ Boot order options (select one, each has their pros and cons):
         - Network 1
         - M.2 Drive 1
         - SATA 1
-- (alt:) Startup
-    - First Boot Device -> M.2 Drive
 
 ### Network
 
