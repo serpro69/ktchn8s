@@ -18,7 +18,7 @@
                  fetchTarball {
                    url = "https://github.com/oxalica/rust-overlay/archive/master.tar.gz";
                    # TODO: better way to ensure sha matches master branch, especially if it's updated quite frequently
-                   sha256 = "sha256:1z9kly96d8dbhf2h73vss6dkjy11aqdzi2rysiqz3hzxlhppvhgz";
+                   sha256 = "sha256:1gr3gi9zgfqjqjzng80gbsm933vwsyrkkchwhy7sxyqgrjhwywg1";
                  })
                )
              ];
