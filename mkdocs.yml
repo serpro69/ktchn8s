@@ -16,7 +16,16 @@ theme:
   favicon: assets/images/favicon_io/favicon.ico
   name: material
   palette:
-    primary: black
+    - media: "(prefers-color-scheme: light)"
+      scheme: nord:light
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: nord:dark
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.expand
     - navigation.instant
@@ -30,6 +39,7 @@ theme:
 extra_css:
   - assets/stylesheets/banner_image.css
   - assets/stylesheets/extra.css
+  - assets/stylesheets/nord.css
 
 markdown_extensions:
   # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
