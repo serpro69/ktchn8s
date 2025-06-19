@@ -26,7 +26,7 @@
 /* Define Nord palette as global CSS variables for easier referencing */
 :root {
   /* Hex colors */
-  --color-nord-dark0: #090909; /* match the logo instead of using original nord0 */
+  --color-nord-dark0: #070707; /* match the logo instead of using original nord0 */
   --color-nord-dark1: #3b4252;
   --color-nord-dark2: #434c5e;
   --color-nord-dark3: #4c566a;
