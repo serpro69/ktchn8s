@@ -80,10 +80,10 @@ Boot order options (select one, each has their pros and cons):
     - Secure Boot -> Disabled
 - Startup
     - Boot Sequence:
-        - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence_)
-        - SATA 1 (_NB! same as above_)
+        - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence one an OS is installed_)
+        - SATA 1 (_same as above if you use a sata drive_)
         - Network 1
-    - First Boot Device -> Network
+    - First Boot Device -> Boot Order
 
 #### Leveno M720q
 
