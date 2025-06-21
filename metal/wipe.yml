@@ -1,8 +1,11 @@
+# vim: set ft=yaml.ansible:
 ---
-- name: Automate Disk Partition Removal for OS Reinstallation
-  hosts: test # Replace with your target host or group
-  become: yes # Required for disk operations
-  gather_facts: no # No need to gather all facts initially, we'll get what we need
+- name: Remove all partitions and wipe the disk
+  hosts:
+    - metal
+    - :&{{ wipe_target }}
+  become: true # redundant since we're running as root, but good practice
+  gather_facts: no # no need to gather all facts initially, we'll get what we need
 
   vars:
     # !!! CRITICAL: Replace with the EXACT path to the disk you want to wipe !!!
@@ -11,47 +14,46 @@
     target_disk: "/dev/nvme0n1"
 
   tasks:
+    - debug:
+        msg: running on {{ inventory_hostname }}
+    - fail:
+
     - name: Check if target_disk variable is defined
-      ansible.builtin.assert:
+      assert:
         that:
           - target_disk is defined
           - target_disk | length > 0
-        fail_msg: "ERROR: 'target_disk' variable is not defined or is empty. This is crucial for safety."
-      tags: safety_check
+        fail_msg: "ERROR: 'target_disk' variable is undefined or empty."
 
     - name: Verify target disk exists on the remote host
-      ansible.builtin.stat:
+      stat:
         path: "{{ target_disk }}"
       register: disk_stat
       failed_when: not disk_stat.stat.exists or not disk_stat.stat.isblk
       changed_when: false
-      tags: safety_check
 
     - name: Get current disk and partition information
-      ansible.builtin.command: "lsblk -J -o NAME,PATH,SIZE,FSTYPE,MOUNTPOINT,PARTTYPE,UUID"
+      command: "lsblk -J -o NAME,PATH,SIZE,FSTYPE,MOUNTPOINT,PARTTYPE,UUID"
       register: lsblk_output
       changed_when: false
-      tags: safety_check
 
     - name: Display current disk information (CRITICAL REVIEW STEP)
-      ansible.builtin.debug:
+      debug:
         msg: |
-          "ATTENTION: You are about to perform a destructive operation on {{ target_disk }}.
+          ATTENTION: You are about to perform a destructive operation on {{ target_disk }}.
           Current disk info:
-          {{ lsblk_output.stdout | from_json | to_nice_yaml }}"
-      tags: safety_check
+          {{ lsblk_output.stdout | from_json | to_nice_yaml }}
 
     - name: Get root filesystem device (for additional safety check)
-      ansible.builtin.command: "findmnt -n -o SOURCE /"
+      command: "findmnt -n -o SOURCE /"
       register: root_fs_source
       changed_when: false
-      failed_when: false # Allow to proceed if findmnt isn't available or fails
-      tags: safety_check
+      failed_when: false # allow to proceed if findmnt isn't available or fails
 
     - name: Perform a final safety confirmation before wipe
-      ansible.builtin.pause:
+      pause:
         prompt: |
-          "******************************************************************
+          ******************************************************************
           *                                                                *
           *    WARNING: YOU ARE ABOUT TO WIPE ALL DATA ON {{ target_disk }}  *
           *                                                                *
@@ -60,115 +62,101 @@
           *                                                                *
           *    Type 'YES' (case-sensitive) to proceed, or anything else to abort. *
           *                                                                *
-          ******************************************************************"
-        echo: no # Don't echo user input
+          ******************************************************************
+        echo: true
       register: confirmation_raw
       when: target_disk is defined
-      tags: safety_check
 
     - name: Store confirmation input for later use
-      ansible.builtin.set_fact:
+      set_fact:
         proceed_with_wipe: "{{ confirmation_raw.user_input | default('') == 'YES' }}" # Use 'YES' as per prompt
       when: confirmation_raw is defined # Only set if pause task ran
-      tags: safety_check
 
     - name: Abort if user did not confirm 'YES'
-      ansible.builtin.fail:
+      fail:
         msg: "Disk wipe operation aborted by user confirmation."
       when: not proceed_with_wipe
-      tags: safety_check
 
     # --- START OF DESTRUCTIVE ACTIONS ---
     # These tasks will only run if 'proceed_with_wipe' is true
 
     - name: Ensure gdisk is installed (for sgdisk)
-      package: # Use 'package' module for distro-agnostic installation
-        name: gdisk
+      package:
+        name: gdisk # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
         state: present
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Stop all swap activity on the system
-      ansible.builtin.command: "swapoff -a"
+      command: "swapoff -a"
       changed_when: true
-      failed_when: false # Don't fail if no swap is active or already stopped
+      failed_when: false # don't fail if no swap is active or already stopped
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Disconnect any mounted non-root partitions on the target disk
-      ansible.builtin.command: "umount -f {{ item.mountpoint }}"
+      command: "umount -f {{ item.mountpoint }}"
       loop: "{{ lsblk_output.stdout | from_json | json_query('blockdevices[?starts_with(path, `' + target_disk + '`) && mountpoint
         != null && mountpoint != `` && mountpoint != `/`]') }}"
       loop_control:
         label: "Unmounting {{ item.mountpoint }}"
       changed_when: true
-      failed_when: false # Don't fail if already unmounted or not present
-      ignore_errors: true # Try to unmount, but don't stop if it fails for some reason
+      failed_when: false # don't fail if already unmounted or not present
+      ignore_errors: true # try to unmount, but don't stop if it fails for some reason
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Forcefully clear all GPT/MBR partition tables and data with sgdisk
       # sgdisk --zap-all clears all partition table entries, MBR, GPT, and protective MBR.
       # This effectively "removes all existing partitions" and "creates a new partition table" in one brutal step.
       # This is the most reliable way to wipe a live boot disk for reinstallation.
-      ansible.builtin.command: "sgdisk --zap-all {{ target_disk }}"
+      command: "sgdisk --zap-all {{ target_disk }}"
       changed_when: true
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Sync disk after partition table wipe
-      ansible.builtin.command: "sync"
+      command: "sync"
       changed_when: false
       when: proceed_with_wipe
-      tags: wipe
 
-    # Moved this task UP, so it runs BEFORE wipefs
     - name: Zero out the first 2MB of the disk to clear residual bootloaders/headers
-      ansible.builtin.command: "dd if=/dev/zero of={{ target_disk }} bs=1M count=2"
+      command: "dd if=/dev/zero of={{ target_disk }} bs=1M count=2"
       changed_when: true
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Wipe filesystem, RAID, and LVM signatures from the entire disk
-      ansible.builtin.command: "wipefs -a {{ target_disk }}"
+      command: "wipefs -a {{ target_disk }}"
       changed_when: true
+      when: proceed_with_wipe
       # This task might still fail occasionally due to stubborn kernel references
       # on extremely busy root disks. If it does, a reboot is the final solution.
-      when: proceed_with_wipe
       failed_when: false
-      tags: wipe
 
     - name: Get disk size in 512-byte sectors for dd operation
-      ansible.builtin.command: "blockdev --getsz {{ target_disk }}"
+      command: "blockdev --getsz {{ target_disk }}"
       register: disk_sectors
       changed_when: false
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Zero out the last 2MB of the disk to clear backup GPT header (if GPT)
-      ansible.builtin.shell: | # Use 'shell' module instead of 'command'
+      shell: |
         dd if=/dev/zero of={{ target_disk }} bs=1M seek=$(( ({{ disk_sectors.stdout | int }} * 512 / (1024*1024)) - 2 )) count=2 conv=notrunc
       changed_when: true
       when: proceed_with_wipe and disk_sectors.stdout is defined
-      tags: wipe
 
     - name: Sync disk to ensure all changes are written
-      ansible.builtin.command: "sync"
+      command: "sync"
       changed_when: false
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Notify successful disk wipe
-      ansible.builtin.debug:
-        msg: "Disk {{ target_disk }} has been successfully wiped and prepared for reinstallation. The server is now ready
-          for a fresh OS install."
+      debug:
+        msg: >-
+          Disk {{ target_disk }} has been successfully wiped and prepared for reinstallation.
+          The {{ inventory_hostname }} server is now ready for a fresh OS install.
       when: proceed_with_wipe
-      tags: wipe
 
     - name: Reboot the server (if desired for reinstallation)
-      ansible.builtin.reboot:
-        reboot_timeout: 600 # Wait up to 10 minutes for reboot
-      # This step will only run if the target disk IS the OS disk and you need to boot into installation media.
-      # For re-installing on the *same* disk, this reboot should be into PXE/ISO/etc.
+      reboot:
+        reboot_command: poweroff # poweroff and forget, we're installing the OS via bootstrap play later
+        reboot_timeout: 10 # wait up to 10 minutes for poweroff
+      failed_when: false
       when: proceed_with_wipe
-      tags: reboot
+
