@@ -32,8 +32,8 @@ run: ## Run a CMD command on all servers via SSH
 		echo "Please set CMD variable to the command you want to run"; \
 		exit 1; \
 	fi; \
-	for host in {thor,odin,heimdall,mjolnir,gungnir,draupnir,megingjord,hofund,gjallarhorn,brisingamen}; do \
-		ssh "$${host}" "$${cmd}" || printf "failed to connect to %s" "${{host}}"; \
+	ansible-inventory -i metal/inventory.sh --list | jq -r '._meta.hostvars | keys[]' | while IFS= read -r host; do \
+		ssh "$${host}" "$${cmd}" || printf "failed to connect to %s" "${host}"; \
 		printf "\ndone %s on %s\n" "$${cmd}" "$${host}"; \
 	done
 
