@@ -4,6 +4,13 @@
     file: before.yml
   when: pxe_state == "present"
 
+- name: Clean up old PXE server containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ role_path }}/files"
+    state: absent
+    build: always
+  when: pxe_state != "absent"
+
 - name: Start the ephemeral PXE server
   community.docker.docker_compose_v2:
     project_src: "{{ role_path }}/files"
