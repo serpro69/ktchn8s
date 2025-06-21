@@ -36,7 +36,7 @@ icon: material/format-list-checks
     10.10.10.2      bifrost
     # k8s cluster
     10.10.10.10     odin
-    10.10.10.11     thor
+    10.10.10.11     freyja
     10.10.10.12     heimdall
     10.10.10.20     mjolinr
     10.10.10.21     gungnir
@@ -67,7 +67,7 @@ icon: material/format-list-checks
       HostKeyAlgorithms +ssh-rsa
 
     # k8s cluster nodes in homelab vlan
-    Host 10.10.10.1* 10.10.10.2* odin thor heimdall mjolnir draupnir gungnir megingjord hofund brisingamen gjallarhorn
+    Host 10.10.10.1* 10.10.10.2* odin freyja heimdall mjolnir draupnir gungnir megingjord hofund brisingamen gjallarhorn
       User root
       StrictHostKeyChecking no
       LogLevel ERROR
