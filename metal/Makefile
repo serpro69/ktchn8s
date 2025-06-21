@@ -197,7 +197,7 @@ main: ~/.ssh/homelab_id_ed25519 _requirements ## Provision kubernetes cluster
 
 wake: SHELL:=$(shell which bash)
 wake: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up the servers without re-provisioning them
-	@$(call play,cluster.yml,$(ANSIBLE_TAGS),--extra-vars 'pxe_state=absent')
+	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),--extra-vars "pxe_state=absent")
 
 DISK ?= /dev/nvme0n1
 
