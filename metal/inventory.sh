@@ -3,9 +3,11 @@
 set -eE
 set -o pipefail
 
+script_dir=$(dirname "$(readlink -f "$0")")
+
 INVENTORY=$(mktemp -t ktchn8s_inventoryXXXXXX.yaml)
 
-sops decrypt ./inventory/metal.yml | yq -y > "${INVENTORY}"
+sops decrypt "${script_dir}/inventory/metal.yml" | yq -y >"${INVENTORY}"
 
 if [ "$1" == "--list" ]; then
   ansible-inventory -i "${INVENTORY}" --list
