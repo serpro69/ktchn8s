@@ -4,10 +4,20 @@
 .SHELLFLAGS := -ec
 .PHONY: *
 
-.EXPORT_ALL_VARIABLES:
+export KUBECONFIG = $(shell pwd)/metal/kubeconfig.yaml
+export KUBE_CONFIG_PATH = $(KUBECONFIG)
 
-KUBECONFIG = $(shell pwd)/metal/kubeconfig.yaml
-KUBE_CONFIG_PATH = $(KUBECONFIG)
+### Ansible
+
+# List of coma-separated ansible-playbook tags
+ANSIBLE_TAGS      ?=
+# Ansible verbosity level
+ANSIBLE_VERBOSITY ?= 1
+
+### Terminal
+
+# Set to 'true' to disable some options like colors in environments where $TERM is not set
+NO_TERM ?=
 
 default: help
 
@@ -18,10 +28,16 @@ docs: ## Serve documentation on localhost
 	@mkdocs serve
 
 bootstrap: ## Wake up and provision the servers
-	@make bootstrap -C metal
+	@make bootstrap -C metal \
+		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
+		NO_TERM=$(NO_TERM)
 
 cluster: ## Create kubernetes cluster
-	@make cluster -C metal
+	@make cluster -C metal \
+		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
+		NO_TERM=$(NO_TERM)
 
 console: ## Start the Ansible console
 	@make console -C metal
@@ -38,4 +54,7 @@ run: ## Run a CMD command on all servers via SSH
 	done
 
 wake: ## Wake up the servers without re-provisioning them
-	@make wake -C metal
+	@make wake -C metal \
+		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
+		NO_TERM=$(NO_TERM)
