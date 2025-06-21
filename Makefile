@@ -45,12 +45,13 @@ console: ## Start the Ansible console
 run: ## Run a CMD command on all servers via SSH
 	@cmd=$(CMD); \
 	if [ -z "$${cmd}" ]; then \
-		echo "Please set CMD variable to the command you want to run"; \
+		echo "Set CMD variable to the command you want to run on each host"; \
 		exit 1; \
 	fi; \
-	ansible-inventory -i metal/inventory.sh --list | jq -r '._meta.hostvars | keys[]' | while IFS= read -r host; do \
-		ssh "$${host}" "$${cmd}" || printf "failed to connect to %s" "${host}"; \
-		printf "\ndone %s on %s\n" "$${cmd}" "$${host}"; \
+	hosts=$$(ansible-inventory -i metal/inventory.sh --list | jq -r '._meta.hostvars | keys[]'); \
+	for host in $${hosts}[@]; do \
+		ssh "$${host}" "$${cmd}" || continue; \
+		printf "done %s on %s\n" "$${cmd}" "$${host}"; \
 	done
 
 wake: ## Wake up the servers without re-provisioning them
