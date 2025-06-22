@@ -898,11 +898,13 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  302 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.30 eq 445
  399 remark --- END ---
 
- 400 remark --- Specific PERMITS from Home to Homelab K8s Ingress ---
+ 400 remark --- Specific PERMITS from Home to Homelab K8s ports ---
  401 remark -> Permit HTTP from Home to k8s ingress
  401 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 80
  402 remark -> Permit HTTPS from Home to k8s ingress
  402 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 443
+ 403 remark -> Permit Home to k8s control plane endpoint
+ 403 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.100 eq 6443
  499 remark --- END ---
 
  500 remark --- ICMP Rules for Home Network ---
@@ -974,6 +976,11 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  203 remark -> Permit Homelab to send ping replies TO Home (in response to pings FROM Home)
  203 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
  299 remark --- END ---
+
+ 400 remark --- K8s specific permits ---
+ 403 remark -> Permit k8s control plane responses to Home Network
+ 403 permit tcp host 10.10.10.100 192.168.1.0 0.0.0.255 established
+ 499 remark --- END ---
 
  998 remark -> Deny and log other Homelab Network traffic specifically TO Home Network
  998 deny ip 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 log
