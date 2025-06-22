@@ -59,23 +59,28 @@ icon: material/format-list-checks
     # muspell (C1111 router) in homelab vlan
     Host 10.10.10.1 muspell
       User cisco
+      PasswordAuthentication yes
 
     # bifrost (C3560 switch) in homelab vlan
     Host 10.10.10.2 bifrost
       User cisco
+      PasswordAuthentication yes
       KexAlgorithms +diffie-hellman-group14-sha1
       HostKeyAlgorithms +ssh-rsa
 
     # k8s cluster nodes in homelab vlan
     Host 10.10.10.1* 10.10.10.2* odin freyja heimdall mjolnir draupnir gungnir megingjord hofund brisingamen gjallarhorn
       User root
+      IdentityFile ~/.ssh/homelab_id_ed25519
       StrictHostKeyChecking no
       LogLevel ERROR
       UserKnownHostsFile /dev/null
       GSSAPIAuthentication no # not supported on OS I use today for servers
+
     # storage nodes in homelab vlan
     Host 10.10.10.3* yggdrasil
       User root
+      IdentityFile ~/.ssh/homelab_id_ed25519
       StrictHostKeyChecking no
       LogLevel ERROR
       UserKnownHostsFile /dev/null
