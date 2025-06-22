@@ -75,16 +75,17 @@ Boot order options (select one, each has their pros and cons):
 - Advanced -> CPU Setup
     - VT-d -> Enabled (should be enabled by default, along with most other CPU options)
 - Power -> Automatic Power On
-    - Wake on LAN -> Enabled (or Network)
+    - Wake on LAN -> Network (or Enabled)
     - Wake from Serial Port Ring -> Disabled
 - Security -> Secure Boot
     - Secure Boot -> Disabled
 - Startup
     - Boot Sequence:
-        - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence one an OS is installed_)
+        - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence once an OS is installed_)
         - SATA 1 (_same as above if you use a sata drive_)
         - Network 1
-    - First Boot Device -> Boot Order
+    - First Boot Device -> Boot Sequence
+    - Fast Boot -> Disabled # can cause a loop boot via WoL/PXE even after OS is installed
 
 #### Leveno M720q
 
