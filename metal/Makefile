@@ -31,3 +31,14 @@ wake: ~/.ssh/id_ed25519 _requirements ## Wake up the servers without re-provisio
 		boot.yml \
 		--extra-vars "pxe_state=absent" \
 		-v
+
+DISK ?= /dev/nvme0n1
+
+wipe: SHELL:=$(shell which bash)
+wipe: ~/.ssh/homelab_id_ed25519 _requirements ## Wipe the DISK disk on the SERVER
+	@ansible-playbook \
+		--inventory inventory.sh \
+		wipe.yml \
+		--extra-vars "wipe_target=$(SERVER)" \
+		--extra-vars "target_disk=$(DISK)" \
+		-v
