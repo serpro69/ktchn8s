@@ -3,17 +3,14 @@
 .SHELL := $(shell which bash)
 .SHELLFLAGS := -ec
 .PHONY: *
+.EXPORT_ALL_VARIABLES:
 
-export KUBECONFIG = $(shell pwd)/metal/kubeconfig.yaml
-export KUBE_CONFIG_PATH = $(KUBECONFIG)
+KUBECONFIG = $(shell pwd)/metal/kubeconfig.yaml
+KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 default: help
 
-help: ## Print this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
-docs: ## Serve documentation on localhost
-	@mkdocs serve
+# metal
 
 bootstrap: ## Wake up and provision the servers
 	@make -C metal bootstrap
@@ -27,6 +24,22 @@ console: ## Start the Ansible console
 inventory: ## List hosts from the ansible inventory
 	@make -C metal inventory
 
+wake: ## Wake up the servers without re-provisioning them
+	@make -C metal wake
+
+# system
+
+system:
+	@make -C system bootstrap
+
+# misc
+
+docs: ## Serve documentation on localhost
+	@mkdocs serve
+
+help: ## Print this help message
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
 run: ## Run a CMD command on all servers via SSH
 	@cmd=$(CMD); \
 	if [ -z "$${cmd}" ]; then \
@@ -38,6 +51,3 @@ run: ## Run a CMD command on all servers via SSH
 		ssh "$${host}" "$${cmd}" || continue; \
 		printf "done %s on %s\n" "$${cmd}" "$${host}"; \
 	done
-
-wake: ## Wake up the servers without re-provisioning them
-	@make -C metal wake
