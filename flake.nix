@@ -93,6 +93,7 @@
             wireguard-tools
             # k8s tools
             dyff
+            helm
             k9s
             kanidm
             kube3d
