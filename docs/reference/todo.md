@@ -115,3 +115,9 @@ icon: material/format-list-checks
 
 - [ ] Configure and document BIOS -> Power -> After Power Loss
     - What option is better for my use-cases? Make sure it's configured everywhere and document it.
+
+- [ ] Figure out why dnf is very slow
+    - References:
+        - <https://unix.stackexchange.com/questions/496775/extremely-slow-dnf>
+        - <https://ostechnix.com/how-to-speed-up-dnf-package-manager-in-fedora>
+    - Seems like adding `fastestmirror=True` to `/etc/dnf/dnf.conf` helps at least to some degree

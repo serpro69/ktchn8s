@@ -185,6 +185,7 @@ define play
 	fi; \
 	\
 	cmd+=("$${play_file_val}"); \
+	echo "Running: $${cmd[@]}"; \
 	"$${cmd[@]}"
 endef
 
