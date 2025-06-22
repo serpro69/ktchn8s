@@ -56,6 +56,7 @@ Boot order options (select one, each has their pros and cons):
     - My servers will try to boot from network and if they find a PXE server, they will boot from it, otherwise they will reboot, and then boot using the Primary Boot Sequence
         - During `bootstrap`, the PXE server is started on the local controller, so the servers will boot from this PXE on WoL
         - Then I have a separate make `wake` target for just waking up the servers which ensures that the local PXE server on the controller is down before sending WoL magic packets
+    - For servers that don't support it (strangely enough, my M70q gen.2 servers do not...), I've written a separate [`wipe` playbook](https://github.com/serpro69/Ktchn8s/blob/master/metal/wipe.yml) that allows me to wipe a target server remotely via a single command: `make wipe SERVER=megingjord DISK=/dev/nvme0n1`
 
 !!! example
     Below is an example of my BIOS setup on Lenovo mini PCs:
