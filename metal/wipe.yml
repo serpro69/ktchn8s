@@ -14,10 +14,6 @@
     target_disk: "/dev/nvme0n1"
 
   tasks:
-    - debug:
-        msg: running on {{ inventory_hostname }}
-    - fail:
-
     - name: Check if target_disk variable is defined
       assert:
         that:
@@ -53,24 +49,24 @@
     - name: Perform a final safety confirmation before wipe
       pause:
         prompt: |
-          ******************************************************************
-          *                                                                *
-          *    WARNING: YOU ARE ABOUT TO WIPE ALL DATA ON {{ target_disk }}  *
-          *                                                                *
-          *    The root filesystem is currently on: {{ root_fs_source.stdout | default('UNKNOWN') }}   *
-          *    Ensure {{ target_disk }} is NOT the OS disk you want to preserve. *
-          *                                                                *
-          *    Type 'YES' (case-sensitive) to proceed, or anything else to abort. *
-          *                                                                *
-          ******************************************************************
+          ****************************************************************************
+          *
+          *   !!! WARNING: YOU ARE ABOUT TO WIPE ALL DATA ON {{ target_disk }} !!!
+          *
+          *   The root filesystem is currently on: {{ root_fs_source.stdout | default('UNKNOWN') }}
+          *   Ensure {{ target_disk }} is NOT the disk you want to preserve.
+          *
+          *   Type 'YES' (case-sensitive) to proceed, or anything else to abort.
+          *
+          ****************************************************************************
         echo: true
       register: confirmation_raw
       when: target_disk is defined
 
     - name: Store confirmation input for later use
       set_fact:
-        proceed_with_wipe: "{{ confirmation_raw.user_input | default('') == 'YES' }}" # Use 'YES' as per prompt
-      when: confirmation_raw is defined # Only set if pause task ran
+        proceed_with_wipe: "{{ confirmation_raw.user_input | default('') == 'YES' }}"
+      when: confirmation_raw is defined # only set if pause task ran
 
     - name: Abort if user did not confirm 'YES'
       fail:
@@ -80,9 +76,10 @@
     # --- START OF DESTRUCTIVE ACTIONS ---
     # These tasks will only run if 'proceed_with_wipe' is true
 
+    # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
     - name: Ensure gdisk is installed (for sgdisk)
-      package:
-        name: gdisk # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
+      dnf:
+        name: gdisk
         state: present
       when: proceed_with_wipe
 
