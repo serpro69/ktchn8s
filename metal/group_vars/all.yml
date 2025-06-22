@@ -1,9 +1,9 @@
 ---
-ansible_ssh_private_key_file: ~/.ssh/id_ed25519
-ssh_public_key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+ansible_ssh_private_key_file: ~/.ssh/homelab_id_ed25519
+ssh_public_key: "{{ lookup('file', '~/.ssh/homelab_id_ed25519.pub') }}"
 dns_server: "8.8.8.8"
 
-# TODO: exclude from DHCP and allow access via ACL on muspell
+# TODO: exclude from DHCP
 control_plane_endpoint: 10.10.10.100
 
 load_balancer_ip_pool:
