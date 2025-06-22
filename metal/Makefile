@@ -31,7 +31,7 @@
 .ONESHELL:
 .SHELL 			:= $(shell which bash)
 .SHELLFLAGS := -ec
-.PHONY: _requirements bootstrap cluster console help main wake wipe
+.PHONY: _requirements bootstrap cluster console help inventory main wake wipe
 # https://stackoverflow.com/a/63771055
 __MAKE_DIR=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
@@ -44,6 +44,8 @@ export KUBECONFIG = $(shell pwd)/kubeconfig.yaml
 
 # List of coma-separated ansible-playbook tags
 ANSIBLE_TAGS      ?=
+# A coma-separated list of target hosts to limit the playbook execution to
+ANSIBLE_TARGETS   ?=
 # Ansible verbosity level
 ANSIBLE_VERBOSITY ?= 1
 
@@ -76,6 +78,21 @@ __CYAN           = $(shell tput setaf 6)
 __WHITE          = $(shell tput setaf 7)
 # set to 'true' to disable colors
 __NO_COLORS      = false
+
+# https://stackoverflow.com/a/10858332
+# Check that given variables are set and all have non-empty values,
+# die with an error otherwise.
+#
+# Params:
+#   1. Variable name(s) to test.
+#   2. (optional) Error message to print.
+check_defined = \
+    $(strip $(foreach 1,$1, \
+        $(call __check_defined,$1,$(strip $(value 2)))))
+
+__check_defined = \
+    $(if $(value $1),, \
+      $(error Undefined $1$(if $2, ($2))))
 
 ################################################################################################
 #                                             RULES
@@ -112,7 +129,13 @@ ifneq ($(filter help,$(MAKECMDGOALS)),)
   # Skip checks for help target
 else
   ifeq (, $(shell which ansible-playbook))
-    $(error "No ansible in $(PATH), go to https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html and follow the instructions")
+    $(error "No ansible in '$(PATH)', go to https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html and follow the instructions")
+  endif
+  ifeq (, $(shell which jq))
+    $(error "No jq in '$(PATH)', go to https://github.com/jqlang/jq?tab=readme-ov-file#installation and follow the instructions")
+  endif
+  ifeq (, $(shell which yq))
+    $(error "No yq in '$(PATH)', go to https://github.com/mikefarah/yq/#install and follow the instructions")
   endif
 endif
 
@@ -122,11 +145,13 @@ endif
 define play
 	$(eval $@_PLAY_FILE = $(1))
 	$(eval $@_TAGS_ARG = $(strip $(2)))
-	$(eval $@_EXTRA_ARGS_ARG = $(strip $(3)))
+	$(eval $@_TARGETS_ARG = $(strip $(3)))
+	$(eval $@_EXTRA_ARGS_ARG = $(strip $(4)))
 
 	@ansible_verbosity="$(ANSIBLE_VERBOSITY)"; \
 	play_file_val="$($@_PLAY_FILE)"; \
 	tags_val="$($@_TAGS_ARG)"; \
+	targets_val="$($@_TARGETS_ARG)"; \
 	extra_args_val="$($@_EXTRA_ARGS_ARG)"; \
 	\
 	verbosity="1"; \
@@ -151,6 +176,9 @@ define play
 	if [ ! "$${tags_val}" = "" ]; then \
 		cmd+=("--tags" "'$${tags_val}'"); \
 	fi; \
+	if [ ! "$${targets_val}" = "" ]; then \
+		cmd+=("--limit" "$${targets_val}"); \
+	fi; \
 	\
 	if [ ! "$${extra_args_val}" = "" ]; then \
 		cmd+=($${extra_args_val}); \
@@ -174,33 +202,39 @@ help: ## Print this help message
 	@ssh-keygen -t ed25519 -P '' -f "$@"
 
 _requirements:
-	@ansible-galaxy install -f -r requirements.yml
+	@ansible-galaxy install -r requirements.yml
 
 ### Main
 
 bootstrap: SHELL:=$(shell which bash)
 bootstrap: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
-	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),)
+	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
 
 cluster: SHELL:=$(shell which bash)
 cluster: ~/.ssh/homelab_id_ed25519 _requirements ## Create kubernetes cluster on provisioned servers
-	@$(call play,cluster.yml,$(ANSIBLE_TAGS),)
+	@$(call play,cluster.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
 
 console: SHELL:=$(shell which bash)
 console: ## Start the Ansible console
 	@ansible-console \
 		--inventory inventory.sh
 
+inventory: SHELL:=$(shell which bash)
+inventory: ## List hosts from the ansible inventory
+	@ansible-inventory -i inventory.sh --list | jq -r '._meta.hostvars | keys[]'
+
 main: SHELL:=$(shell which bash)
 main: ~/.ssh/homelab_id_ed25519 _requirements ## Provision kubernetes cluster
-	@$(call play,main.yml,$(ANSIBLE_TAGS),)
+	@$(call play,main.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
 
 wake: SHELL:=$(shell which bash)
 wake: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up the servers without re-provisioning them
-	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),--extra-vars "pxe_state=absent")
+	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),--extra-vars "pxe_state=absent")
 
 DISK ?= /dev/nvme0n1
 
 wipe: SHELL:=$(shell which bash)
 wipe: ~/.ssh/homelab_id_ed25519 _requirements ## Wipe the DISK disk on the SERVER
-	@$(call play,wipe.yml,$(ANSIBLE_TAGS),-e "wipe_target=$(SERVER)" -e "target_disk=$(DISK)")
+	@$(call check_defined, SERVER, missing or empty variable; run 'make inventory' for a list of hosts)
+	@$(call check_defined, DISK, missing or empty variable; run 'make inventory' for a list of hosts)
+	@$(call play,wipe.yml,$(ANSIBLE_TAGS),,-e "wipe_target=$(SERVER)" -e "target_disk=$(DISK)")
