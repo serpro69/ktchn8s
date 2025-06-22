@@ -1,9 +1,7 @@
 # vim: set ft=yaml.ansible:
 ---
 - name: Remove all partitions and wipe the disk
-  hosts:
-    - metal
-    - :&{{ wipe_target }}
+  hosts: test
   become: true # redundant since we're running as root, but good practice
   gather_facts: no # no need to gather all facts initially, we'll get what we need
 
@@ -155,5 +153,5 @@
         reboot_command: poweroff # poweroff and forget, we're installing the OS via bootstrap play later
         reboot_timeout: 10 # wait up to 10 minutes for poweroff
       failed_when: false
+      ignore_unreachable: true
       when: proceed_with_wipe
-
