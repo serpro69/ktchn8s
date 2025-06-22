@@ -46,6 +46,13 @@
             # extra python packages
             (python3.withPackages (p: with p; [
               pip
+              # ansible dependencies
+              jinja2
+              jmespath
+              kubernetes
+              netaddr
+              pexpect
+              rich
             ]))
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # NOTE: Darwin-only packages for cross-platform compatibility

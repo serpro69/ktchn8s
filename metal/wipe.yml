@@ -1,0 +1,157 @@
+# vim: set ft=yaml.ansible:
+---
+- name: Remove all partitions and wipe the disk
+  hosts: test
+  become: true # redundant since we're running as root, but good practice
+  gather_facts: no # no need to gather all facts initially, we'll get what we need
+
+  vars:
+    # !!! CRITICAL: Replace with the EXACT path to the disk you want to wipe !!!
+    # Based on your lsblk output, this is your primary OS disk.
+    # e.g., "/dev/sda", "/dev/sdb", "/dev/nvme0n1"
+    target_disk: "/dev/nvme0n1"
+
+  tasks:
+    - name: Check if target_disk variable is defined
+      assert:
+        that:
+          - target_disk is defined
+          - target_disk | length > 0
+        fail_msg: "ERROR: 'target_disk' variable is undefined or empty."
+
+    - name: Verify target disk exists on the remote host
+      stat:
+        path: "{{ target_disk }}"
+      register: disk_stat
+      failed_when: not disk_stat.stat.exists or not disk_stat.stat.isblk
+      changed_when: false
+
+    - name: Get current disk and partition information
+      command: "lsblk -J -o NAME,PATH,SIZE,FSTYPE,MOUNTPOINT,PARTTYPE,UUID"
+      register: lsblk_output
+      changed_when: false
+
+    - name: Display current disk information (CRITICAL REVIEW STEP)
+      debug:
+        msg: |
+          ATTENTION: You are about to perform a destructive operation on {{ target_disk }}.
+          Current disk info:
+          {{ lsblk_output.stdout | from_json | to_nice_yaml }}
+
+    - name: Get root filesystem device (for additional safety check)
+      command: "findmnt -n -o SOURCE /"
+      register: root_fs_source
+      changed_when: false
+      failed_when: false # allow to proceed if findmnt isn't available or fails
+
+    - name: Perform a final safety confirmation before wipe
+      pause:
+        prompt: |
+          ****************************************************************************
+          *
+          *   !!! WARNING: YOU ARE ABOUT TO WIPE ALL DATA ON {{ target_disk }} !!!
+          *
+          *   The root filesystem is currently on: {{ root_fs_source.stdout | default('UNKNOWN') }}
+          *   Ensure {{ target_disk }} is NOT the disk you want to preserve.
+          *
+          *   Type 'YES' (case-sensitive) to proceed, or anything else to abort.
+          *
+          ****************************************************************************
+        echo: true
+      register: confirmation_raw
+      when: target_disk is defined
+
+    - name: Store confirmation input for later use
+      set_fact:
+        proceed_with_wipe: "{{ confirmation_raw.user_input | default('') == 'YES' }}"
+      when: confirmation_raw is defined # only set if pause task ran
+
+    - name: Abort if user did not confirm 'YES'
+      fail:
+        msg: "Disk wipe operation aborted by user confirmation."
+      when: not proceed_with_wipe
+
+    # --- START OF DESTRUCTIVE ACTIONS ---
+    # These tasks will only run if 'proceed_with_wipe' is true
+
+    # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
+    - name: Ensure gdisk is installed (for sgdisk)
+      dnf:
+        name: gdisk
+        state: present
+      when: proceed_with_wipe
+
+    - name: Stop all swap activity on the system
+      command: "swapoff -a"
+      changed_when: true
+      failed_when: false # don't fail if no swap is active or already stopped
+      when: proceed_with_wipe
+
+    - name: Disconnect any mounted non-root partitions on the target disk
+      command: "umount -f {{ item.mountpoint }}"
+      loop: "{{ lsblk_output.stdout | from_json | json_query('blockdevices[?starts_with(path, `' + target_disk + '`) && mountpoint
+        != null && mountpoint != `` && mountpoint != `/`]') }}"
+      loop_control:
+        label: "Unmounting {{ item.mountpoint }}"
+      changed_when: true
+      failed_when: false # don't fail if already unmounted or not present
+      ignore_errors: true # try to unmount, but don't stop if it fails for some reason
+      when: proceed_with_wipe
+
+    - name: Forcefully clear all GPT/MBR partition tables and data with sgdisk
+      # sgdisk --zap-all clears all partition table entries, MBR, GPT, and protective MBR.
+      # This effectively "removes all existing partitions" and "creates a new partition table" in one brutal step.
+      # This is the most reliable way to wipe a live boot disk for reinstallation.
+      command: "sgdisk --zap-all {{ target_disk }}"
+      changed_when: true
+      when: proceed_with_wipe
+
+    - name: Sync disk after partition table wipe
+      command: "sync"
+      changed_when: false
+      when: proceed_with_wipe
+
+    - name: Zero out the first 2MB of the disk to clear residual bootloaders/headers
+      command: "dd if=/dev/zero of={{ target_disk }} bs=1M count=2"
+      changed_when: true
+      when: proceed_with_wipe
+
+    - name: Wipe filesystem, RAID, and LVM signatures from the entire disk
+      command: "wipefs -a {{ target_disk }}"
+      changed_when: true
+      when: proceed_with_wipe
+      # This task might still fail occasionally due to stubborn kernel references
+      # on extremely busy root disks. If it does, a reboot is the final solution.
+      failed_when: false
+
+    - name: Get disk size in 512-byte sectors for dd operation
+      command: "blockdev --getsz {{ target_disk }}"
+      register: disk_sectors
+      changed_when: false
+      when: proceed_with_wipe
+
+    - name: Zero out the last 2MB of the disk to clear backup GPT header (if GPT)
+      shell: |
+        dd if=/dev/zero of={{ target_disk }} bs=1M seek=$(( ({{ disk_sectors.stdout | int }} * 512 / (1024*1024)) - 2 )) count=2 conv=notrunc
+      changed_when: true
+      when: proceed_with_wipe and disk_sectors.stdout is defined
+
+    - name: Sync disk to ensure all changes are written
+      command: "sync"
+      changed_when: false
+      when: proceed_with_wipe
+
+    - name: Notify successful disk wipe
+      debug:
+        msg: >-
+          Disk {{ target_disk }} has been successfully wiped and prepared for reinstallation.
+          The {{ inventory_hostname }} server is now ready for a fresh OS install.
+      when: proceed_with_wipe
+
+    - name: Reboot the server (if desired for reinstallation)
+      reboot:
+        reboot_command: poweroff # poweroff and forget, we're installing the OS via bootstrap play later
+        reboot_timeout: 10 # wait up to 10 minutes for poweroff
+      failed_when: false
+      ignore_unreachable: true
+      when: proceed_with_wipe

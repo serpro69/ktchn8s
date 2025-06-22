@@ -1,0 +1,4 @@
+- Update bios on new machines
+  - Make sure WoL re-installs the OS from poweroff state
+
+- Re-run `bootstrap` (wipe all nodes) then `cluster`
