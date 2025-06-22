@@ -80,12 +80,12 @@ Boot order options (select one, each has their pros and cons):
 - Security -> Secure Boot
     - Secure Boot -> Disabled
 - Startup
-    - Boot Sequence:
+    - Boot Order:
         - M.2 Drive 1 (_NB! you won't see this option if the drive is wiped, but it should default to this sequence once an OS is installed_)
         - SATA 1 (_same as above if you use a sata drive_)
         - Network 1
-    - First Boot Device -> Boot Sequence
-    - Fast Boot -> Disabled # can cause a loop boot via WoL/PXE even after OS is installed
+    - First Boot Device -> Boot Order
+    - Fast Boot -> Enabled # can cause a loop boot via WoL/PXE even after OS is installed
 
 #### Leveno M720q
 
