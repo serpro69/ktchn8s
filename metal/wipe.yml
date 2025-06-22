@@ -1,7 +1,9 @@
 # vim: set ft=yaml.ansible:
 ---
 - name: Remove all partitions and wipe the disk
-  hosts: test
+  hosts:
+    - metal
+    - :&{{ wipe_target }}
   become: true # redundant since we're running as root, but good practice
   gather_facts: no # no need to gather all facts initially, we'll get what we need
 

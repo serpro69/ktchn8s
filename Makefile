@@ -11,6 +11,8 @@ export KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 # List of coma-separated ansible-playbook tags
 ANSIBLE_TAGS      ?=
+# A coma-separated list of target hosts to limit the playbook execution to
+ANSIBLE_TARGETS   ?=
 # Ansible verbosity level
 ANSIBLE_VERBOSITY ?= 1
 
@@ -30,17 +32,22 @@ docs: ## Serve documentation on localhost
 bootstrap: ## Wake up and provision the servers
 	@make bootstrap -C metal \
 		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_TARGETS="$(ANSIBLE_TARGETS)" \
 		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
 		NO_TERM=$(NO_TERM)
 
 cluster: ## Create kubernetes cluster
 	@make cluster -C metal \
 		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_TARGETS="$(ANSIBLE_TARGETS)" \
 		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
 		NO_TERM=$(NO_TERM)
 
 console: ## Start the Ansible console
 	@make console -C metal
+
+inventory: ## List hosts from the ansible inventory
+	@make inventory -C metal
 
 run: ## Run a CMD command on all servers via SSH
 	@cmd=$(CMD); \
@@ -57,5 +64,16 @@ run: ## Run a CMD command on all servers via SSH
 wake: ## Wake up the servers without re-provisioning them
 	@make wake -C metal \
 		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_TARGETS="$(ANSIBLE_TARGETS)" \
 		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
+		NO_TERM=$(NO_TERM)
+
+DISK ?= /dev/nvme0n1
+
+wipe: ## Wipe the DISK disk on the SERVER
+	@make wipe -C metal \
+		ANSIBLE_TAGS="$(ANSIBLE_TAGS)" \
+		ANSIBLE_VERBOSITY=$(ANSIBLE_VERBOSITY) \
+		DISK=$(DISK) \
+		SERVER=$(SERVER) \
 		NO_TERM=$(NO_TERM)
