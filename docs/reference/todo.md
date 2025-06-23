@@ -126,3 +126,5 @@ icon: material/format-list-checks
         - <https://unix.stackexchange.com/questions/496775/extremely-slow-dnf>
         - <https://ostechnix.com/how-to-speed-up-dnf-package-manager-in-fedora>
     - Seems like adding `fastestmirror=True` to `/etc/dnf/dnf.conf` helps at least to some degree
+
+- [ ] Setup pi-hole on the cluster
