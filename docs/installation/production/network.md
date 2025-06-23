@@ -851,6 +851,13 @@ copy running-config startup-config
 ```cisco
 conf t
 
+object-group network K8S_LB_POOL_NETS
+ 10.10.10.40 255.255.255.248  ! /29
+ 10.10.10.48 255.255.255.240  ! /28
+ 10.10.10.64 255.255.255.252  ! /30
+ 10.10.10.68 255.255.255.254  ! /31
+exit
+
 ! --- Define ACL for traffic FROM Home Network ---
 ip access-list extended ACL_FROM_HOME_NETWORK
  10 remark === ACL: FROM HOME NETWORK (192.168.1.x) ===
@@ -900,9 +907,10 @@ ip access-list extended ACL_FROM_HOME_NETWORK
 
  400 remark --- Specific PERMITS from Home to Homelab K8s ports ---
  401 remark -> Permit HTTP from Home to k8s ingress
- 401 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 80
- 402 remark -> Permit HTTPS from Home to k8s ingress
- 402 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.50 eq 443
+ 401 remark -> Permit HTTP from Home to K8s LoadBalancer Pool
+ 401 permit tcp 192.168.1.0 0.0.0.255 object-group K8S_LB_POOL_NETS eq 80
+ 402 remark -> Permit HTTPS from Home to K8s LoadBalancer Pool
+ 402 permit tcp 192.168.1.0 0.0.0.255 object-group K8S_LB_POOL_NETS eq 443
  403 remark -> Permit Home to k8s control plane endpoint
  403 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.100 eq 6443
  499 remark --- END ---
@@ -912,6 +920,8 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  501 permit icmp 192.168.1.0 0.0.0.255 10.10.10.0 0.0.0.255 echo
  502 remark -> Permit Home to receive ping replies from Homelab
  502 permit icmp 10.10.10.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
+ 503 remark -> Permit Ping from Home to K8s LoadBalancer Pool
+ 503 permit icmp 192.168.1.0 0.0.0.255 object-group K8S_LB_POOL_NETS echo
  599 remark --- END ---
 
  998 remark -> Deny any other Home traffic specifically TO Homelab network and log
@@ -978,6 +988,8 @@ ip access-list extended ACL_FROM_HOMELAB_NETWORK
  299 remark --- END ---
 
  400 remark --- K8s specific permits ---
+ 401 remark -> Permit ESTABLISHED TCP from K8s LoadBalancer Pool TO Home Network
+ 401 permit tcp object-group K8S_LB_POOL_NETS 192.168.1.0 0.0.0.255 established
  403 remark -> Permit k8s control plane responses to Home Network
  403 permit tcp host 10.10.10.100 192.168.1.0 0.0.0.255 established
  499 remark --- END ---
