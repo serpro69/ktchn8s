@@ -10,19 +10,36 @@ Main:
 
 ```mermaid
 architecture-beta
-    group home(logos:kubernetes)[Ktchn8s]
+    group home(si:kubernetes)[Ktchn8s]
 
-    group control(logos:control)[control] in home
-    group worker(logos:worker)[worker] in home
+    group control(mdi:account-tie-hat) in home
+    group worker(mdi:worker) in home
+    group storage(mdi:network-attached-storage) in home
 
     service odin(server)[Odin] in control
-    service thor(server)[Thor] in control
+    service freyja(server)[Freyja] in control
     service heimdall(server)[Heimdall] in control
 
-    service mjolnir(server)[Mjolnir] in worker
+    service draupnir(server)[Draupnir] in worker
     service megingjord(server)[Megingjord] in worker
 
-    odin{group}:R -- L:mjolnir{group}
+    service yggdrasil(server)[Yggdrasil] in storage
+    service disks(disk) in storage
+
+    yggdrasil:B -- T:disks
+
+    odin{group}:R <--> L:draupnir{group}
+    odin{group}:B <--> T:yggdrasil{group}
+    megingjord{group}:L <--> R:yggdrasil{group}
+
+    %% External Services
+
+    group external(mdi:cloud)[External]
+
+    service cloudflare(si:cloudflare)[Cloudflare] in external
+    service github(si:github)[Github] in external
+
+    cloudflare{group}:B <--> T:heimdall{group}
 
     %% service db(database)[Database] in api
     %% service disk1(disk)[Storage] in api
