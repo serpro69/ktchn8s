@@ -4,3 +4,8 @@ galaxy/
 
 # python virtualenv
 .venv
+
+# k8s stuff that shouldn't be exposed
+ca.crt
+client.crt
+client.key
