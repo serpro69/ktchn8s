@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: cert-manager
 version: 0.0.0

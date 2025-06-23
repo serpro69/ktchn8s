@@ -1,3 +1,4 @@
+---
 kube-prometheus-stack:
   grafana:
     enabled: false

@@ -1,3 +1,4 @@
+---
 rook-ceph:
   monitoring:
     enabled: true

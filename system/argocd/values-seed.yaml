@@ -1,3 +1,4 @@
+---
 argo-cd:
   server:
     metrics: &metrics
@@ -5,11 +6,11 @@ argo-cd:
       serviceMonitor:
         enabled: false
   controller:
-    metrics: *metrics
+    metrics: *metrics 
   repoServer:
-    metrics: *metrics
+    metrics: *metrics 
   redis:
-    metrics: *metrics
+    metrics: *metrics 
 argocd-apps:
   applicationsets:
     root:
@@ -19,10 +20,8 @@ argocd-apps:
             revision: &revision master
             directories:
               - path: system/*
-              - path: platform/*
-              - path: apps/*
       template:
         spec:
           source:
-            repoURL: *repoURL
-            targetRevision: *revision
+            repoURL: *repoURL 
+            targetRevision: *revision 

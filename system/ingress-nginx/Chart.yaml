@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: ingress-nginx
 version: 0.0.0

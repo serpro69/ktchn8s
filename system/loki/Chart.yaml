@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: loki
 version: 0.0.0

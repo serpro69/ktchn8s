@@ -1,3 +1,4 @@
+---
 kured:
   configuration:
     annotateNodes: true

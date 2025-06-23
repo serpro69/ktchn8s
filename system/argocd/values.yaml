@@ -1,3 +1,4 @@
+---
 argo-cd:
   global:
     domain: argocd.0xbad.cloud
@@ -24,11 +25,11 @@ argo-cd:
   dex:
     enabled: false
   controller:
-    metrics: *metrics
+    metrics: *metrics 
   repoServer:
-    metrics: *metrics
+    metrics: *metrics 
   redis:
-    metrics: *metrics
+    metrics: *metrics 
 argocd-apps:
   applicationsets:
     root:
@@ -39,8 +40,6 @@ argocd-apps:
             revision: &revision master
             directories:
               - path: system/*
-              - path: platform/*
-              - path: apps/*
       template:
         metadata:
           name: '{{path.basename}}'
@@ -48,11 +47,11 @@ argocd-apps:
           destination:
             name: in-cluster
             namespace: '{{path.basename}}'
-          project: default  # TODO
+          project: default # TODO
           source:
-            repoURL: *repoURL
+            repoURL: *repoURL 
             path: '{{path}}'
-            targetRevision: *revision
+            targetRevision: *revision 
           syncPolicy:
             automated:
               prune: true
