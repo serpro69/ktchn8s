@@ -18,7 +18,7 @@
                  fetchTarball {
                    url = "https://github.com/oxalica/rust-overlay/archive/master.tar.gz";
                    # TODO: better way to ensure sha matches master branch, especially if it's updated quite frequently
-                   sha256 = "sha256:11sphrrppm38i11cl6vqzkp1pc3zc5p1gl98r8r69j6cmn7vc9f2";
+                   sha256 = "sha256:05di19x4h0w4gdd47qbmi9zch5l60h550447msdm72yc910kly40";
                  })
                )
              ];
@@ -93,7 +93,6 @@
             wireguard-tools
             # k8s tools
             dyff
-            helm
             k9s
             kanidm
             kube3d
@@ -125,6 +124,7 @@
             # networking tools
             iproute2
             # k8s tools
+            helm
             kanidm
           ];
 
