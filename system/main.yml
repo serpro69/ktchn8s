@@ -1,0 +1,5 @@
+---
+- name: ArgoCD
+  import_playbook: argocd.yml
+  tags:
+    - argocd
