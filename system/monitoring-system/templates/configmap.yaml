@@ -1,5 +1,4 @@
 ---
-# yamllint disable
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,4 +6,3 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
 {{ (.Files.Glob "files/webhook-transformer/*").AsConfig | indent 2 }}
-# yamllint enable
