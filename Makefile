@@ -24,13 +24,16 @@ console: ## Start the Ansible console
 inventory: ## List hosts from the ansible inventory
 	@make -C metal inventory
 
+metal: ## Provision baremetal servers and create a kubernetes cluster
+	@make -C metal main
+
 wake: ## Wake up the servers without re-provisioning them
 	@make -C metal wake
 
 # system
 
 system:
-	@make -C system bootstrap
+	@make -C system main
 
 # misc
 
