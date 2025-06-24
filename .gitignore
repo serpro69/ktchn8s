@@ -9,3 +9,11 @@ galaxy/
 ca.crt
 client.crt
 client.key
+*kubeconfig.yaml
+Chart.lock
+
+# binary files
+*.iso
+*.log
+*.png
+*.tgz
