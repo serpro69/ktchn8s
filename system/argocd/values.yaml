@@ -25,11 +25,11 @@ argo-cd:
   dex:
     enabled: false
   controller:
-    metrics: *metrics 
+    metrics: *metrics
   repoServer:
-    metrics: *metrics 
+    metrics: *metrics
   redis:
-    metrics: *metrics 
+    metrics: *metrics
 argocd-apps:
   applicationsets:
     root:
@@ -49,9 +49,9 @@ argocd-apps:
             namespace: '{{path.basename}}'
           project: default # TODO
           source:
-            repoURL: *repoURL 
+            repoURL: *repoURL
             path: '{{path}}'
-            targetRevision: *revision 
+            targetRevision: *revision
           syncPolicy:
             automated:
               prune: true
