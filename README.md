@@ -50,7 +50,7 @@ More information can be found in [the roadmap](#roadmap) below.
 
 ### Hardware
 
-![Hardware](TODO)
+![image](https://github.com/user-attachments/assets/b5f2e7cb-51bd-44f7-beb4-646403142ad5)
 
 - Network:
     - Cisco C1111-8P Router
@@ -59,7 +59,11 @@ More information can be found in [the roadmap](#roadmap) below.
 - Servers:
     - 3 × Lenovo Tiny M70q Gen.3
         - CPU: `Intel Core i5-12400T`
-        - RAM: `16GB DDR4-3200`
+        - RAM: `16GB DDR4`
+        - SSD: `256GB`
+    - 2 × Lenovo Tiny M70q Gen.2
+        - CPU: `Intel Core i5-11400T`
+        - RAM: `16GB DDR4`
         - SSD: `256GB`
     - 7 × Lenovo Tiny M720q
         - CPU: `Intel Core i5-8100T`
