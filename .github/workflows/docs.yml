@@ -26,12 +26,15 @@ jobs:
         with:
           filters: |
             docs:
+              - 'github/workflows/docs.yml'
               - 'docs/**'
               - 'mkdocs.yml'
               - 'LICENSE.md'
               - 'README.md'
 
   deploy:
+    needs: changes
+    if: ${{ needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
