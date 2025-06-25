@@ -58,7 +58,7 @@ graph TB
 
         %% k8s devices
         A@{ shape: rect, label: "Ctrl-1<br>(odin)<br>(10.10.10.10)" }
-        B@{ shape: rect, label: "Ctrl-2<br>(thor)<br>(10.10.10.11)" }
+        B@{ shape: rect, label: "Ctrl-2<br>(freyja)<br>(10.10.10.11)" }
         C@{ shape: rect, label: "Ctrl-3<br>(heimdall)<br>(10.10.10.12)" }
         D@{ shape: rect, label: "Wrkr-1<br>(mjolnir)<br>(10.10.10.20)" }
         E@{ shape: rect, label: "Wrkr-2<br>(gungnir)<br>(10.10.10.21)" }
@@ -78,9 +78,9 @@ graph TB
         C3560 o--o |g0/8::eno1| S1
 
         subgraph GrKC["K8S Cluster"]
-            IC@{ shape: subproc, label: "Ingress Controller<br>(10.10.10.50)" }
+            IC@{ shape: subproc, label: "Ingress Controller" }
             CFD@{ shape: subproc, label: "cloudflared pod(s)" }
-            LB@{ shape: subproc, label: "MetalLB" }
+            LB@{ shape: subproc, label: "Cilium" }
             PD@{ shape: subproc, label: "Pod" }
             SVC@{ shape: rect, label: "Service" }
 
