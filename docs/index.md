@@ -8,7 +8,7 @@ README.md
 </div>
 
 <div class="logo-image-wrapper">
-  <a class="logo-image" href="https://github.com/serpro69/Ktchn8s">
+  <a class="logo-image" href="https://github.com/serpro69/ktchn8s">
     <img class="logo-image" src="assets/images/logo/image_6.png"/>
   </a>
 </div>

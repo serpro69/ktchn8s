@@ -1,13 +1,13 @@
 ---
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
-site_name: Ktchn8s
+site_name: ktchn8s
 # ref: https://www.mkdocs.org/user-guide/configuration/#site_url
 # ref: https://www.mkdocs.org/user-guide/configuration/#environment-variables
 site_url: !ENV [MKDOCS_SITE_URL, 'http://localhost:8000']
 copyright: Copyright &copy; 2025 - present, serpro69
 
-repo_url: https://github.com/serpro69/Ktchn8s
+repo_url: https://github.com/serpro69/ktchn8s
 
 plugins:
   - search

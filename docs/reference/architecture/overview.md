@@ -10,7 +10,7 @@ icon: material/earth
 
 ```mermaid
 architecture-beta
-    group home(si:kubernetes)[Ktchn8s]
+    group home(si:kubernetes)[ktchn8s]
 
     group control(mdi:account-tie-hat) in home
     group worker(mdi:worker) in home

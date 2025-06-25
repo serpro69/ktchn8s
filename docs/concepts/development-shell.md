@@ -33,7 +33,7 @@ nix develop
 It will open a shell and install all the dependencies defined in `flake.nix` file at the root of the project:
 
 ```
-Ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
+ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
 ➜ which mkdocs
 /nix/store/86p3knkm02c1ix9rfd3y1b53daybl9ag-python3-3.12.10-env/bin/mkdocs
 ```
@@ -67,7 +67,7 @@ And now, instead of a default PS1 and no configs of my own:
 
 ```bash
 ➜ nix develop
-razorback:Ktchn8s sergio$ ela
+razorback:ktchn8s sergio$ ela
 
 bash: ela: command not found
 ```
@@ -77,7 +77,7 @@ I have all of my configs within the nix shell environment:
 ```bash
 ➜ nix develop
 
-Ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
+ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default via ❄ impure (nix-shell-env)
 ➜ ela
 
 Permissions Size User   Date Modified Name

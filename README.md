@@ -1,13 +1,13 @@
-# Ktchn8s
+# ktchn8s
 
 <div markdown="1" style="text-align: center; font-size: 1.2em;">
 
 <b>🚧 Fork in progress, expect some dust 🚧</b>
 
-[![github-tag](https://img.shields.io/github/v/tag/serpro69/Ktchn8s?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/serpro69/Ktchn8s/tags)
-[![github-license](https://img.shields.io/github/license/serpro69/Ktchn8s?style=for-the-badge&logo=unlicense&logoColor=white)](https://opensource.org/license/mit)
-[![github-stars](https://img.shields.io/github/stars/serpro69/Ktchn8s?logo=github&logoColor=white&color=gold&style=for-the-badge)](https://github.com/serpro69/Ktchn8s)
-[![website](https://img.shields.io/website?label=docs&logo=gitbook&logoColor=white&style=for-the-badge&url=https%3A%2F%2Fserpro69.github.io/Ktchn8s)](https://serpro69.github.io/Ktchn8s)
+[![github-tag](https://img.shields.io/github/v/tag/serpro69/ktchn8s?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/serpro69/ktchn8s/tags)
+[![github-license](https://img.shields.io/github/license/serpro69/ktchn8s?style=for-the-badge&logo=unlicense&logoColor=white)](https://opensource.org/license/mit)
+[![github-stars](https://img.shields.io/github/stars/serpro69/ktchn8s?logo=github&logoColor=white&color=gold&style=for-the-badge)](https://github.com/serpro69/ktchn8s)
+[![website](https://img.shields.io/website?label=docs&logo=gitbook&logoColor=white&style=for-the-badge&url=https%3A%2F%2Fserpro69.github.io/ktchn8s)](https://serpro69.github.io/ktchn8s)
 
 </div>
 
@@ -18,7 +18,7 @@ A K8s ☸️ homelab cluster 👾
 
 <div markdown="1" style="text-align: center; font-size: 2em;">
 
-**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#getting-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/Ktchn8s)**
+**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#getting-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/ktchn8s)**
 
 </div>
 
@@ -36,8 +36,8 @@ It can also be used as a framework to build your own homelab.
 >
 > See the [r/homelab introduction](https://www.reddit.com/r/homelab/wiki/introduction) for more information.
 
-If you encounter an issue or want to contribute a fix or an improvement, please create [a bug issue](https://github.com/serpro69/Ktchn8s/issues/new?template=bug.md).
-<br>If you have a question or want to chat about this project, please create [a new discussion](https://github.com/serpro69/Ktchn8s/discussions/new/choose).
+If you encounter an issue or want to contribute a fix or an improvement, please create [a bug issue](https://github.com/serpro69/ktchn8s/issues/new?template=bug.md).
+<br>If you have a question or want to chat about this project, please create [a new discussion](https://github.com/serpro69/ktchn8s/discussions/new/choose).
 
 ## Overview
 
@@ -72,7 +72,7 @@ More information can be found in [the roadmap](#roadmap) below.
 
 ## Getting Started
 
-[Deploy on real hardware](https://serpro69.github.io/Ktchn8s/installation/production) for production workload.
+[Deploy on real hardware](https://serpro69.github.io/ktchn8s/installation/production) for production workload.
 
 ## Roadmap
 
@@ -82,14 +82,14 @@ See [roadmap](https://serpro69.github.io/reference/roadmap) and [open issues](ht
 
 Any contributions you make are greatly appreciated.
 
-Please see [contributing guide](https://serpro69.github.io/Ktchn8s/reference/contributing) for more information.
+Please see [contributing guide](https://serpro69.github.io/ktchn8s/reference/contributing) for more information.
 
 ## License
 
 Copyright &copy; 2025 - present, [serpro69](https://github.com/serpro69)
 
 Distributed under the MIT License.
-See [license page](https://serpro69.github.io/Ktchn8s/reference/license) or [`LICENSE.md`](https://github.com/serpro69/Ktchn8s/blob/master/LICENSE.md) file for more information.
+See [license page](https://serpro69.github.io/ktchn8s/reference/license) or [`LICENSE.md`](https://github.com/serpro69/ktchn8s/blob/master/LICENSE.md) file for more information.
 
 ## Ack
 

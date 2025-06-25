@@ -49,10 +49,10 @@ icon: material/lan
 
 - [Troubleshoot and Apply Correct Terminal Emulator Settings for Console Connections](https://www.cisco.com/c/en/us/support/docs/storage-networking/management/217970-troubleshoot-and-apply-correct-terminal.html)
 - C1111 startup-config files
-    - [stage 3](https://github.com/serpro69/Ktchn8s/blob/master/docs/installation/.files/muspell_startup-config_stage3.txt)
-    - [stage 4](https://github.com/serpro69/Ktchn8s/blob/master/docs/installation/.files/muspell_startup-config_stage4.txt)
+    - [stage 3](https://github.com/serpro69/ktchn8s/blob/master/docs/installation/.files/muspell_startup-config_stage3.txt)
+    - [stage 4](https://github.com/serpro69/ktchn8s/blob/master/docs/installation/.files/muspell_startup-config_stage4.txt)
 - C3560 startup-config files
-    - [stage 3](https://github.com/serpro69/Ktchn8s/blob/master/docs/installation/.files/bifrost_startup-config_stage3.txt)
+    - [stage 3](https://github.com/serpro69/ktchn8s/blob/master/docs/installation/.files/bifrost_startup-config_stage3.txt)
 
 ### Troubleshooting
 
@@ -1109,7 +1109,7 @@ end
         ```
 
 !!! tip
-    Some of the above tests can be run with this [script](https://github.com/serpro69/Ktchn8s/blob/master/tests/network_stage4.sh).
+    Some of the above tests can be run with this [script](https://github.com/serpro69/ktchn8s/blob/master/tests/network_stage4.sh).
 
 ### Troubleshooting
 

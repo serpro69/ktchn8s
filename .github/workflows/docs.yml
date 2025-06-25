@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  MKDOCS_SITE_URL: "https://serpro69.github.io/Ktchn8s/"
+  MKDOCS_SITE_URL: "https://serpro69.github.io/ktchn8s/"
 
 jobs:
   changes:
