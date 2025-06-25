@@ -132,6 +132,11 @@ References:
 !!! info
     I've broken down the network configuration rollout into several stages which allowed me to work in small, incremental iterations and test/rollback things easier w/o introducing big updates.
 
+!!! tip
+    Before saving the `running-config`, run `show running-config` to verify the current running configuration matches your expectations.
+    You can, and should, also test things before saving the running configuration to avoid issues and unnecessary roll-backs.
+    After verifying that everything works as expected and saving the running configuration, I also back up the updated `startup-config` (e.g. `copy startup-config bootflash:/startup-config_stage3.bak`) for any future reference and to be able to easily revert to a particular roll-out stage in case of issues.
+
 ### Stage 1 - Basic Internet Connectivity via C1111 and Eero {#stage-1}
 
 * **Goal:** Home devices (laptop, phone) can connect to the Eero (in bridge mode) and access the internet. The C1111 handles routing, NAT, and DHCP for the home network.
@@ -149,6 +154,35 @@ References:
         ```
 
         (After reload, when prompted `Would you like to enter the initial configuration dialog? [yes/no]:`, enter `no`.)
+
+    * **(Optional) Verify/cleanup VTP and Vlan configuration leftovers:**
+        - If you've bought a used device, then `write erase` might not remove old VLANs.
+        - **Persistence of VLAN/VTP:** On devices with integrated switching capabilities (like your C1111-8P) or dedicated switches, VLAN and VTP information can sometimes be more persistent than the rest of the startup configuration. For dedicated Catalyst switches, the `vlan.dat` file in flash memory is the prime example. For example, my C1111's switch module seems to have a similar mechanism or `write erase` doesn't touch that specific part of NVRAM as thoroughly as one might expect for these settings.
+        - **Importance of `vtp mode transparent` or `off`:** If you inherit a device or aren't sure of its VTP state, setting it to `transparent` (and ensuring no unwanted domain name) is a crucial first step to prevent it from being adversely affected by or adversely affecting other switches if you were to connect it to a network already using VTP.
+            * **To clean up the VTP domain name specifically:**
+                ```cisco
+                configure terminal
+
+                ! Ensure mode is transparent
+                vtp mode transparent
+
+                ! Try to remove the domain name
+                no vtp domain <current_vtp_domain_name>
+
+                ! If "no vtp domain" doesn't work or if you want to explicitly set it to null:
+                ! vtp domain ""
+                ! (Some IOS versions accept a null string. Test this. If it errors, use a custom name.)
+
+                ! Or set it to a custom, non-conflicting name:
+                ! vtp domain MYVTPDOMAIN_UNUSED
+
+                exit
+                write memory
+                ```
+        - **Thorough Reset Procedure:** For a truly "factory fresh" state on a switch or device with switching capabilities, beyond `write erase`, one might also need to:
+            * Delete the `vlan.dat` file from flash (e.g., `delete flash:vlan.dat` on Catalyst switches, then reload). The exact procedure or file name might vary for integrated switch modules on routers.
+            * Ensure the VTP domain is nullified or set to default, and the mode is transparent or off.
+
 
 - **Basic Device Setup:**
 
@@ -293,15 +327,6 @@ References:
     ! or
     ! copy running-config startup-config
     ```
-
-- **(Optional) Verify/cleanup VTP and Vlan configuration leftovers:**
-
-    - If you've bought a used device, then `write erase` might not remove old VLANs.
-    - **Persistence of VLAN/VTP Info:** On devices with integrated switching capabilities (like your C1111-8P) or dedicated switches, VLAN and VTP information can sometimes be more persistent than the rest of the startup configuration. For dedicated Catalyst switches, the `vlan.dat` file in flash memory is the prime example. It's possible the C1111's switch module has a similar mechanism or that `write erase` doesn't touch that specific part of NVRAM as thoroughly as one might expect for these settings.
-    - 2. **Importance of `vtp mode transparent` or `off`:** If you inherit a device or aren't sure of its VTP state, setting it to `transparent` (and ensuring no unwanted domain name) is a crucial first step to prevent it from being adversely affected by or adversely affecting other switches if you were to connect it to a network already using VTP.
-    - 3. **Thorough Reset Procedure:** For a truly "factory fresh" state on a switch or device with switching capabilities, beyond `write erase`, one might also need to:
-        * Delete the `vlan.dat` file from flash (e.g., `delete flash:vlan.dat` on Catalyst switches, then reload). The exact procedure or file name might vary for integrated switch modules on routers.
-        * Ensure the VTP domain is nullified or set to default, and the mode is transparent or off.
 
 - **(Optional) Disable call-home**
 
