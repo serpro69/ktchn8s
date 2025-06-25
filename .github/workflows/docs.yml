@@ -3,6 +3,7 @@ name: Docs
 run-name: ${{ github.actor }} is running Docs
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
@@ -14,6 +15,22 @@ env:
   MKDOCS_SITE_URL: "https://serpro69.github.io/Ktchn8s/"
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+              - 'LICENSE.md'
+              - 'README.md'
+
   deploy:
     runs-on: ubuntu-latest
     steps:
