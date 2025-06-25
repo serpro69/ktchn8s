@@ -8,7 +8,7 @@ Architecture decisions play a crucial role in driving the design and development
 
 Therefore, it is important to keep a record of architecture decisions, including the context, the decision itself, and the consequences. This practice, known as Architecture Decision Records (ADRs), fosters transparency, improves communication, and provides a historical context to help future decision-making.
 
-This page contains a list of ADRs, both overarching (with cross-cutting concerns across the entirety of Ktchn8s), as well as those specific to a given component.
+This page contains a list of ADRs, both overarching (with cross-cutting concerns across the entirety of ktchn8s), as well as those specific to a given component.
 
 We follow a simple template for documenting architecture decisions, which is inspired by this Michael Nygard's [post](http://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions)
 

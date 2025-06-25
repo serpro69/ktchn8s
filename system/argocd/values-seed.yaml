@@ -16,7 +16,7 @@ argocd-apps:
     root:
       generators:
         - git:
-            repoURL: &repoURL https://github.com/serpro69/Ktchn8s
+            repoURL: &repoURL https://github.com/serpro69/ktchn8s
             revision: &revision master
             directories:
               - path: system/*

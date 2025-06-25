@@ -1,5 +1,5 @@
 {
-  description = "Ktchn8s Lab Shell";
+  description = "ktchn8s Lab Shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
