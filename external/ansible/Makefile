@@ -29,7 +29,7 @@
 
 .POSIX:
 .ONESHELL:
-.PHONY: bootstrap
+.PHONY: main
 
 .SHELL 			:= $(shell which bash)
 .SHELLFLAGS := -ec
@@ -37,7 +37,7 @@
 ################################################################################################
 #                                             VARIABLES
 
-export KUBECONFIG = $(shell pwd)/../metal/kubeconfig.yaml
+export KUBECONFIG = $(shell pwd)/../../metal/kubeconfig.yaml
 
 ################################################################################################
 #                                             TARGETS
