@@ -6,3 +6,5 @@ dhcp_proxy: true
 
 # PXE server state: present|absent
 pxe_state: present
+
+homelab_cidr: '10.10.10.1/24'
