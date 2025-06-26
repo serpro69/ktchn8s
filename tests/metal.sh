@@ -12,9 +12,9 @@ NGINX_DEPLOYMENT_NAME="nginx-deployment"
 NGINX_CLUSTERIP_SERVICE_NAME="nginx-clusterip-service"
 NGINX_LOADBALANCER_SERVICE_NAME="nginx-loadbalancer"
 EXPECTED_NGINX_LB_IP="10.10.10.40" # The IP you saw assigned
-PIHOLE_DNS_LB_IP="10.10.10.41"     # For later, if Pi-hole is up
+#PIHOLE_DNS_LB_IP="10.10.10.41"     # For later, if Pi-hole is up
 
-TEST_DOMAIN_FOR_DNS_FROM_HOME="google.com"     # External domain to test DNS resolution
+#TEST_DOMAIN_FOR_DNS_FROM_HOME="google.com"     # External domain to test DNS resolution
 HOME_NETWORK_SOURCE_IP_FOR_CURL="192.168.1.15" # Your laptop's IP on Home network
 
 # Colors for output
@@ -230,7 +230,7 @@ check_success || echo -e "${RED}Failed to apply Nginx LoadBalancer service manif
 
 echo "Waiting for Nginx LoadBalancer service to get an External IP (max 1 minute)..."
 NGINX_LB_EXTERNAL_IP=""
-for i in {1..12}; do
+for _ in {1..12}; do
   NGINX_LB_EXTERNAL_IP=$(kubectl get svc $NGINX_LOADBALANCER_SERVICE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
   if [ -n "$NGINX_LB_EXTERNAL_IP" ] && [ "$NGINX_LB_EXTERNAL_IP" != "<pending>" ]; then
     echo -e "${GREEN}Nginx LoadBalancer External IP: $NGINX_LB_EXTERNAL_IP${NC}"
