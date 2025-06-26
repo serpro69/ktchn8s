@@ -1,4 +1,12 @@
 ---
+- name: Check that we're on the correct network
+  assert:
+    that: hostvars['localhost']['ansible_all_ipv4_addresses'] | ansible.utils.ipaddr(homelab_cidr)
+    fail_msg: |
+      No ipv4 addresses found within {{ homelab_cidr }}
+      Available ipv4 addresses on {{ ansible_hostname }} are:
+        {{ hostvars['localhost']['ansible_all_ipv4_addresses'] }}
+
 - name: Ensure PXE server prerequisites
   include_tasks:
     file: before.yml

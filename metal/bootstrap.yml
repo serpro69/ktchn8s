@@ -6,6 +6,7 @@
     - role: pxe_server
       vars:
         pxe_state: present
+        homelab_cidr: "{{ homelab_net_cidr }}"
 
 - name: Bootstrap bare-metal machines
   hosts: metal
