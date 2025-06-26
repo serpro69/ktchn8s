@@ -29,6 +29,11 @@ wake: ## Wake up the servers without re-provisioning them
 system: ## Provision system resources on the kubernetes cluster
 	@make -C system main
 
+# external
+
+external: ## Provision external resources
+	@make -C external main
+
 # misc
 
 docs: ## Serve documentation on localhost

@@ -1,0 +1,3 @@
+[submodule "devex-makefile"]
+	path = devex-makefile
+	url = https://github.com/serpro69/devex-makefile.git
