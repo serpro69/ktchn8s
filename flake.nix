@@ -85,6 +85,8 @@
             ansible-lint
             opentofu
             minicom
+            tflint
+            trivy
             xorriso
             # networking tools
             netcat

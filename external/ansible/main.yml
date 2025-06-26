@@ -1,0 +1,5 @@
+---
+- name: K8s Namespaces
+  import_playbook: ns.yml
+  tags:
+    - ns
