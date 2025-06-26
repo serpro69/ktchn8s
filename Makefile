@@ -12,12 +12,6 @@ default: help
 
 # metal
 
-bootstrap: ## Wake up and provision the servers
-	@make -C metal bootstrap
-
-cluster: ## Create kubernetes cluster
-	@make -C metal cluster
-
 console: ## Start the Ansible console
 	@make -C metal console
 
@@ -32,7 +26,7 @@ wake: ## Wake up the servers without re-provisioning them
 
 # system
 
-system:
+system: ## Provision system resources on the kubernetes cluster
 	@make -C system main
 
 # misc
