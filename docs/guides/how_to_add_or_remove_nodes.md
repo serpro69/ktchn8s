@@ -2,7 +2,7 @@
 icon: material/crosshairs-question
 ---
 
-# :material-crosshairs-question: HowTo add, move (rename), or remove nodes
+# :material-crosshairs-question: Add, move (rename), or remove nodes
 
 ...or how to scale vertically. To replace the same node with a clean OS, remove it and add it again.
 

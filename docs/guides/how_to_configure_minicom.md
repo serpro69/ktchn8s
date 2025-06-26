@@ -2,7 +2,7 @@
 icon: material/crosshairs-question
 ---
 
-# :material-crosshairs-question: HowTo configure `minicom`
+# :material-crosshairs-question: Configure `minicom`
 
 - Run `sudo minicom -s`, the following screen will appear:
 

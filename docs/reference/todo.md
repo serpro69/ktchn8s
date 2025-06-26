@@ -11,7 +11,7 @@ icon: material/format-list-checks
 - [ ] Update [architecture/overview](./architecture/overview.md) components
     - Basic diagram of code components and their relations
     - Description of components and their purpose
-- [ ] Update [concepts/pxe-boot](../concepts/pxe-boot.md) with a visual "in-action" showcase of how it works, once it's in place
+- [ ] Update [concepts/pxe_boot](../concepts/pxe_boot.md) with a visual "in-action" showcase of how it works, once it's in place
 
 - [ ] Add up-to-date config files of C1111 and C3560 for reference
     - Can be placed in a separate note (probably don't even need to make it visible in nav menu) and referenced from [installation/production/network](../installation/production/network.md)

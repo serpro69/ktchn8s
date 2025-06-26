@@ -133,7 +133,7 @@ Boot order options (select one, each has their pros and cons):
     This will erase all data on the nodes.
     Ensure you have backups of any important data before you proceed.
 
-Launch the [dev shell](../../concepts/development-shell.md):
+Launch the [dev shell](../../concepts/development_shell.md):
 
 ```sh
 nix develop

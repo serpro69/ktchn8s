@@ -2,4 +2,4 @@
 
 - [Overview](./overview.md)
 - [Network](./network.md)
-- [Decisions](./decision-records.md)
+- [Decisions](./decision_records.md)
