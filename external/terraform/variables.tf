@@ -7,7 +7,6 @@ variable "cloudflare" {
   sensitive = true
 }
 
-
 variable "ntfy" {
   type = object({
     url   = string

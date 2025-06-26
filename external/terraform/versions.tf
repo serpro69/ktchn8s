@@ -32,4 +32,5 @@ provider "cloudflare" {
 provider "kubernetes" {
   # Use KUBE_CONFIG_PATH environment variables
   # Or in cluster service account
+  config_path = "${path.root}/../../metal/kubeconfig.yaml"
 }
