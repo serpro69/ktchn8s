@@ -81,3 +81,60 @@ flowchart LR
 - Eero 6 will be used as an Access Point, which will allow us to use it for WiFi connectivity.
 - Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable built-in security settings anymore)
     - This is not a big problem because we can ensure security via router or pfsense or something similar.
+
+## AD-0002 - Set GRUB_TIMEOUT to 0
+
+**Context**
+
+Two of my machines (namely M70q Gen.2) won't go past GRUB unless keyboard is plugged in.
+
+When I was bootstrapping my newer machines, two of them failed on a task that does periodic pings to wait for machine to come online. I plugged the monitor into one of them and found that it was hanging on the GRUB screen with the first option highlighted. So I needed to plug the keyboard back in and select the entry manually. Other machines start an automatic countdown whether they detect a kb or not, but on these no keyboard -> no countdown -> no boot, just stuck on the GRUB screen.
+
+I've researched a bit and some suggest finding a BIOS setting that says "ignore keyboard errors" or something like that, but none of my Lenovos have such option.
+
+So the alternative was to disable the GRUB timeout altogether.
+
+**Decision**
+
+- We will set `GRUB_TIMEOUT=0` and `GRUB_TIMEOUT_STYLE=hidden` to disable the GRUB menu and boot directly into the default entry.
+
+**Status**
+
+- Accepted
+
+**Consequences**
+
+- The system will boot directly into the default entry without showing the GRUB menu, so no need to fiddle with keyboards etc
+- GRUB can still be accessed by holding down the <key>Shift</key> key during boot.
+    - Some people report that holding <key>Shift</key> doesn't always work. See e.g. [Grub menu at boot time... "holding shift" not working](https://askubuntu.com/questions/668049/grub-menu-at-boot-time-holding-shift-not-working) for troubleshooting. 
+- I've tested this on my M70q Gen.2 machines, and simply setting `GRUB_TIMEOUT=0` with `GRUB_TIMEOUT_STYLE=hidden` worked fine. However, if those settings don't seem to do anything, one might try a workaround as described in this [post](https://ubuntuforums.org/showthread.php?t=1287602&page=14&p=10097915#post10097915):
+
+    > If the "GRUB_TIMEOUT=0" does not work, does your system begin a countdown when the menu displays or does it await input from you? If there is no countdown it's possible that grub is detecting a 'recordfail' and will wait for input. We can change that behaviour as well but by a different method.
+    > 
+    > For now, if the TIMEOUT setting doesn't work, open /etc/grub.d/00_header and go to approximately line 238:
+    >
+    > ```
+    > gksu gedit +238 /etc/grub.d/00_header
+    > ```
+    >
+    > Find this section and make the changes in dark red, then save the file and run "sudo update-grub".
+    >
+    > ```
+    > make_timeout ()
+    > {
+    > cat << EOF
+    > if [ "\${recordfail}" = 1 ]; then
+    > set timeout=-1
+    > else
+    > 
+    > # Manually change timeout to 0
+    > # set timeout=${2}
+    > set timeout=0
+    > # End manual change
+    > 
+    > fi
+    > EOF
+    > }
+    > ```
+    >
+    > This should eliminate the menu display unless there is a "recordfail" event. It also preserves the ability to display the menu by holding down the SHIFT key during boot. Please let me know if this solution works for you.
