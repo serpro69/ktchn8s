@@ -97,5 +97,8 @@ nav:
       - reference/roadmap.md
       - reference/todo.md
   - "☷ Guides":
-      - guides/how_to_configure_minicom.md
-      - guides/how_to_add_or_remove_nodes.md
+      - "☳ HowTo":
+          - guides/how_to_configure_minicom.md
+          - guides/how_to_add_or_remove_nodes.md
+      - "☶ Troubleshooting":
+          - guides/troubleshooting_pxe_boot.md
