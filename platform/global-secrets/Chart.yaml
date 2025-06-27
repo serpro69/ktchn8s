@@ -1,0 +1,4 @@
+---
+apiVersion: v2
+name: global-secrets
+version: 0.0.0

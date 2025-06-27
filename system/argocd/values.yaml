@@ -39,6 +39,7 @@ argocd-apps:
             repoURL: &repoURL http://gitea-http.gitea:3000/ops/homelab
             revision: &revision master
             directories:
+              - path: platform/*
               - path: system/*
       template:
         metadata:
