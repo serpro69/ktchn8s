@@ -82,7 +82,7 @@ See [roadmap](https://serpro69.github.io/ktchn8s/reference/roadmap/) and [open i
 
 Any contributions you make are greatly appreciated.
 
-Please see [contributing guide](https://serpro69.github.io/ktchn8s/reference/contributing) for more information.
+Please see [contributing guide](https://serpro69.github.io/ktchn8s/reference/contributing/) for more information.
 
 ## License
 
