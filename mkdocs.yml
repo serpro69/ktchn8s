@@ -80,7 +80,7 @@ markdown_extensions:
 
 nav:
   - "~/": index.md
-  - "☰ Conceps":
+  - "☰ Concepts":
       - concepts/development_shell.md
       - concepts/pxe_boot.md
   - "☲ Installation":
