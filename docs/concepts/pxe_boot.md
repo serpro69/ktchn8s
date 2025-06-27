@@ -1,12 +1,13 @@
 ---
 icon: material/console-network-outline
+title: PXE Boot
 ---
 
-# :material-console-network-outline: PXE boot
-
-## What is PXE Boot?
+## :material-console-network-outline: PXE boot concepts
 
 PXE (Preboot Execution Environment) boot lets a computer start up and load an operating system **over a network**, instead of from its hard drive or USB.
+
+## What is PXE Boot?
 
 Think of it like this:
 

@@ -50,7 +50,7 @@ More information can be found in [the roadmap](#roadmap) below.
 
 ### Hardware
 
-![image](https://github.com/user-attachments/assets/b5f2e7cb-51bd-44f7-beb4-646403142ad5)
+![hardware](https://github.com/user-attachments/assets/1e901955-52f1-4ae2-817d-42f965480877)
 
 - Network:
     - Cisco C1111-8P Router

@@ -1,8 +1,9 @@
 ---
 icon: material/file-document-multiple
+title: Decision Records
 ---
 
-# :material-file-document-multiple: Decision Records
+## :material-file-document-multiple: Decision Records
 
 Architecture decisions play a crucial role in driving the design and development of a software project. They guide the selection of technologies, the design of software components, and the organization of the codebase. However, these decisions are often made in isolation and without proper documentation. This can lead to confusion, inconsistencies, and suboptimal solutions. Moreover, it makes it nearly impossible to answer questions like "why did we decide to do this? 🤔" as the time goes on.
 
@@ -82,7 +83,7 @@ flowchart LR
 - Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable built-in security settings anymore)
     - This is not a big problem because we can ensure security via router or pfsense or something similar.
 
-## AD-0002 - Set GRUB_TIMEOUT to 0
+## AD-0002 - Disable GRUB_TIMEOUT
 
 **Context**
 
