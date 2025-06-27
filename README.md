@@ -2,6 +2,8 @@
 
 <div markdown="1" style="text-align: center; font-size: 1.2em;">
 
+_...there's no place like_ `~`
+
 <b>🚧 Fork in progress, expect some dust 🚧</b>
 
 [![github-tag](https://img.shields.io/github/v/tag/serpro69/ktchn8s?style=for-the-badge&logo=semver&logoColor=white)](https://github.com/serpro69/ktchn8s/tags)
@@ -46,7 +48,7 @@ This project is still in the experimental stage. This means, among other things,
 - There might be breaking changes that may require a complete redeployment.
 - A proper upgrade path is planned for the stable release.
 
-More information can be found in [the roadmap](#roadmap) below.
+More information can be found in the [roadmap](https://serpro69.github.io/ktchn8s/reference/roadmap/).
 
 ### Hardware
 

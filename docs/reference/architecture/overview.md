@@ -3,7 +3,7 @@ icon: material/earth
 title: Overview
 ---
 
-## :material-earth: Overview
+## :material-earth: Architecture Overview
 
 This page describes a high-level component overview of my homelab.
 

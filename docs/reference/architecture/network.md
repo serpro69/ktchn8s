@@ -3,7 +3,7 @@ icon: material/lan
 title: Network
 ---
 
-## :material-lan: Network
+## :material-lan: Network Overview
 
 ```mermaid
 %% mermaid config https://mermaid.js.org/config/schema-docs/config.html#theme
