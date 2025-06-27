@@ -3,6 +3,8 @@ extends: default
 
 ignore: |-
   system/monitoring-system/templates/configmap.yaml
+  platform/gitea/templates/config-source.yaml
+  platform/global-secrets/templates/secret-generator/configmap.yaml
 
 rules:
   braces:
