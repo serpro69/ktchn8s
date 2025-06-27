@@ -82,7 +82,7 @@ flowchart LR
 - Eero 6 in bridge mode has limited functionality (e.g. you won't be able to enable built-in security settings anymore)
     - This is not a big problem because we can ensure security via router or pfsense or something similar.
 
-## AD-0002 - Set GRUB_TIMEOUT to 0
+## AD-0002 - Disable GRUB_TIMEOUT
 
 **Context**
 
