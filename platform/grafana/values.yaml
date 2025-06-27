@@ -1,0 +1,34 @@
+---
+grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - &host grafana.0xbad.cloud
+    tls:
+      - secretName: grafana-general-tls
+        hosts:
+          - *host
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: monitoring-system
+    datasources:
+      enabled: true
+      searchNamespace: monitoring-system
+  envFromSecret: grafana-secrets
+  grafana.ini:
+    server:
+      root_url: https://grafana.0xbad.cloud
+    auth.generic_oauth:
+      enabled: true
+      allow_sign_up: true
+      name: Dex
+      client_id: grafana-sso
+      client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
+      scopes: openid profile email groups
+      auth_url: https://dex.0xbad.cloud/auth
+      token_url: https://dex.0xbad.cloud/token
+      api_url: https://dex.0xbad.cloud/userinfo
