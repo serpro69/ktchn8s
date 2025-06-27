@@ -68,33 +68,36 @@ func createOrUpdateSecret(client *kubernetes.Clientset, name string, randomSecre
 	secret, err := client.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
 
 	if err != nil {
-		// Secret not found, create a new one
-		secretData := map[string][]byte{}
+		if errors.IsNotFound(err) {
+			// Secret not found, create a new one
+			secretData := map[string][]byte{}
 
-		for _, randomPassword := range randomSecret.Data {
-			password, err := generateRandomPassword(randomPassword.Length, randomPassword.Special)
-			if err != nil {
-				log.Printf("Error generating password for key '%s': %v", randomPassword.Key, err)
-				continue
+			for _, randomPassword := range randomSecret.Data {
+				password, err := generateRandomPassword(randomPassword.Length, randomPassword.Special)
+				if err != nil {
+					log.Printf("Error generating password for key '%s': %v", randomPassword.Key, err)
+					continue
+				}
+
+				secretData[randomPassword.Key] = []byte(password)
 			}
 
-			secretData[randomPassword.Key] = []byte(password)
-		}
+			newSecret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Data: secretData,
+			}
 
-		newSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-			},
-			Data: secretData,
+			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), newSecret, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("Unable to create secret: %v", err)
+			}
+			log.Printf("Secret '%s' created successfully.", name)
+		} else {
+			return fmt.Errorf("Error retrieving secret: %v", err)
 		}
-
-		_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), newSecret, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("Unable to create secret: %v", err)
-		}
-		log.Printf("Secret '%s' created successfully.", name)
-	} else {
 		// Secret exists, check for new keys
 		for _, randomKey := range randomSecret.Data {
 			if _, exists := secret.Data[randomKey.Key]; !exists {
