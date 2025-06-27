@@ -1,8 +1,9 @@
 ---
 icon: material/console
+title: Development Shell
 ---
 
-# :material-console: Development Shell
+## :material-console: Development shell concepts
 
 A development shell makes it easy to get all of the dependencies needed to interact with your homelab. [Nix](https://nixos.org/) with [Flakes](https://nixos.wiki/wiki/Flakes) provides a convenient way to define and manage these dependencies in a reproducible manner.
 

@@ -80,9 +80,9 @@ markdown_extensions:
 
 nav:
   - "~/": index.md
-  - "☰ Conceps":
-      - concepts/development-shell.md
-      - concepts/pxe-boot.md
+  - "☰ Concepts":
+      - concepts/development_shell.md
+      - concepts/pxe_boot.md
   - "☲ Installation":
       - "☱ Production":
           - installation/production/network.md
@@ -91,7 +91,7 @@ nav:
       - "☴ Architecture":
           - reference/architecture/overview.md
           - reference/architecture/network.md
-          - reference/architecture/decision-records.md
+          - reference/architecture/decision_records.md
       - reference/license.md
       - reference/changelog.md
       - reference/roadmap.md
