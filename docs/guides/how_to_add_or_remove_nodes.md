@@ -1,12 +1,13 @@
 ---
 icon: material/crosshairs-question
+title: Add, Move/Rename, Remove Nodes
 ---
 
-# :material-crosshairs-question: Add, move (rename), or remove nodes
+## :material-crosshairs-question: HowTo add, move (rename), or remove nodes
 
 ...or how to scale vertically. To replace the same node with a clean OS, remove it and add it again.
 
-## Add new nodes
+### Add new nodes
 
 !!! tip
     You can add multiple nodes at the same time
@@ -33,7 +34,7 @@ make metal
 
 That's it!
 
-## Remove a node
+### Remove a node
 
 !!! danger
     It is highly recommended to remove nodes one at a time.
@@ -70,7 +71,7 @@ Shutdown the node:
 ssh root@${NODE_IP} poweroff
 ```
 
-## Rename a node
+### Rename a node
 
 !!! warning
     Make sure to stop and remove ephemeral pxe docker containers before you re-run `bootstrap`:

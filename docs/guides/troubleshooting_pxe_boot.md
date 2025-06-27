@@ -1,10 +1,11 @@
 ---
 icon: material/crosshairs-question
+title: PXE Boot
 ---
 
-# :material-crosshairs-question: PXE Boot
+## :material-crosshairs-question: Troubleshooting PXE Boot
 
-## PXE server logs
+### PXE server logs
 
 To view PXE server (includes DHCP, TFTP and HTTP server) logs:
 
@@ -19,7 +20,7 @@ To view PXE server (includes DHCP, TFTP and HTTP server) logs:
     ./scripts/pxe-logs http
     ```
 
-## Nodes not booting from the network
+### Nodes not booting from the network
 
 First things to try:
 
@@ -40,7 +41,7 @@ First things to try:
     - If not, try to select it manually or remove the previous OS boot entry
 - Examine the network boot process with [Wireshark](https://www.wireshark.org) or [Termshark](https://termshark.io)
 
-## Nodes not booting after OS installation
+### Nodes not booting after OS installation
 
 - Check if the node gets stuck in GRUB after OS has been installed
     - Some systems expect a connected keyboard or screen (or both) for GRUB to start the countdown before automatically selecting the first entry. 

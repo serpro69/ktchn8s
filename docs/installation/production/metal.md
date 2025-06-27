@@ -1,8 +1,16 @@
 ---
 icon: material/server
+title: Metal Provisioning
 ---
 
-# :material-server: Metal Provisioning
+## :material-server: Metal Provisioning
+
+TL;DR
+
+```bash
+nix develop
+make metal
+```
 
 ## Pre-Requisites
 
