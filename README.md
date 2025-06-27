@@ -50,7 +50,7 @@ More information can be found in [the roadmap](#roadmap) below.
 
 ### Hardware
 
-![hardware](https://github.com/user-attachments/assets/1e901955-52f1-4ae2-817d-42f965480877)
+![PXL_20250627_134343069_21](https://github.com/user-attachments/assets/7a5c9ce3-c1de-4d23-a5a6-796e0e08a2ec)
 
 - Network:
     - Cisco C1111-8P Router
@@ -76,7 +76,7 @@ More information can be found in [the roadmap](#roadmap) below.
 
 ## Roadmap
 
-See [roadmap](https://serpro69.github.io/reference/roadmap) and [open issues](https://github.com/khuedoan/homelab/issues) for a list of proposed features and known issues.
+See [roadmap](https://serpro69.github.io/ktchn8s/reference/roadmap/) and [open issues](https://github.com/serpro69/ktchn8s/issues) for a list of proposed features and known issues.
 
 ## Contributing
 
