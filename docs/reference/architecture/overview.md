@@ -5,7 +5,7 @@ title: Overview
 
 ## :material-earth: Architecture Overview
 
-This page describes a high-level component overview of my homelab.
+This page provides a high-level architecture and component overview of my homelab.
 
 ## Components
 
@@ -15,19 +15,19 @@ This page describes a high-level component overview of my homelab.
 architecture-beta
     group home(si:kubernetes)[ktchn8s]
 
-    group control(mdi:account-tie-hat) in home
-    group worker(mdi:worker) in home
-    group storage(mdi:network-attached-storage) in home
+    group control(mdi:account-tie-hat)[control] in home
+    group worker(mdi:worker)[worker] in home
+    group storage(mdi:network-attached-storage)[storage] in home
 
-    service odin(server)[Odin] in control
-    service freyja(server)[Freyja] in control
-    service heimdall(server)[Heimdall] in control
+    service odin(server)[odin] in control
+    service freyja(server)[freyja] in control
+    service heimdall(server)[heimdall] in control
 
-    service draupnir(server)[Draupnir] in worker
-    service megingjord(server)[Megingjord] in worker
+    service draupnir(server)[draupnir] in worker
+    service megingjord(server)[megingjord] in worker
 
-    service yggdrasil(server)[Yggdrasil] in storage
-    service disks(disk) in storage
+    service yggdrasil(server)[yggdrasil] in storage
+    service disks(disk)[6x18TB] in storage
 
     yggdrasil:B -- T:disks
 
@@ -35,12 +35,12 @@ architecture-beta
     odin{group}:B <--> T:yggdrasil{group}
     megingjord{group}:L <--> R:yggdrasil{group}
 
-    %% External Services
+    %% external services
 
-    group external(mdi:cloud)[External]
+    group external(mdi:cloud)[external]
 
-    service cloudflare(si:cloudflare)[Cloudflare] in external
-    service letsencrypt(si:letsencrypt)[LetsEncrypt] in external
+    service cloudflare(si:cloudflare)[cloudflare] in external
+    service letsencrypt(si:letsencrypt)[letsencrypt] in external
 
     cloudflare{group}:B <--> T:heimdall{group}
 ```
