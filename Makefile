@@ -36,6 +36,9 @@ external: ## Provision external resources
 
 # misc
 
+finalize:
+	@./scripts/post-install.py
+
 docs: ## Serve documentation on localhost
 	@mkdocs serve
 
