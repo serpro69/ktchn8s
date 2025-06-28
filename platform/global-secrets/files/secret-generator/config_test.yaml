@@ -1,0 +1,9 @@
+- name: test-secret
+  data:
+    - key: key1
+      length: 10
+      special: false
+    - key: key2
+      length: 12
+      special: true
+
