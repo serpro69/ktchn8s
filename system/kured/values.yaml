@@ -4,5 +4,3 @@ kured:
     annotateNodes: true
     rebootSentinelCommand: sh -c "! needs-restarting --reboothint"
     timeZone: Europe/Oslo
-  nodeSelector:
-    kured-paused: "true"
