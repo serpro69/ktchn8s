@@ -114,6 +114,7 @@
               jmespath
               kubernetes
               netaddr
+              # post-install
               pexpect
               rich
             ]))
