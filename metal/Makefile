@@ -174,7 +174,7 @@ define play
 	fi; \
 	\
 	if [ ! "$${tags_val}" = "" ]; then \
-		cmd+=("--tags" "'$${tags_val}'"); \
+		cmd+=("--tags" "$${tags_val}"); \
 	fi; \
 	if [ ! "$${targets_val}" = "" ]; then \
 		cmd+=("--limit" "$${targets_val}"); \
