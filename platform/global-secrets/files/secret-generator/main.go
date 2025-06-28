@@ -10,6 +10,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -26,13 +27,13 @@ type RandomSecret struct {
 	}
 }
 
-func getClient() (*kubernetes.Clientset, error) {
+func getClient() (kubernetes.Interface, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	overrides := &clientcmd.ConfigOverrides{}
 
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("Error building client config: %v", err)
+		return nil, fmt.Errorf("error building client config: %v", err)
 	}
 
 	return kubernetes.NewForConfig(config)
@@ -52,21 +53,20 @@ func generateRandomPassword(length int, special bool) (string, error) {
 func readConfigFile(filename string) ([]RandomSecret, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read config file: %v", err)
+		return nil, fmt.Errorf("unable to read config file: %v", err)
 	}
 
 	var randomSecrets []RandomSecret
 	err = yaml.Unmarshal(data, &randomSecrets)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing config file: %v", err)
+		return nil, fmt.Errorf("error parsing config file: %v", err)
 	}
 
 	return randomSecrets, nil
 }
 
-func createOrUpdateSecret(client *kubernetes.Clientset, name string, randomSecret RandomSecret) error {
+func createOrUpdateSecret(client kubernetes.Interface, name string, randomSecret RandomSecret) error {
 	secret, err := client.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Secret not found, create a new one
@@ -92,30 +92,36 @@ func createOrUpdateSecret(client *kubernetes.Clientset, name string, randomSecre
 
 			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), newSecret, metav1.CreateOptions{})
 			if err != nil {
-				return fmt.Errorf("Unable to create secret: %v", err)
+				return fmt.Errorf("unable to create secret: %v", err)
 			}
 			log.Printf("Secret '%s' created successfully.", name)
+			return nil
 		} else {
-			return fmt.Errorf("Error retrieving secret: %v", err)
+			return fmt.Errorf("error retrieving secret: %v", err)
 		}
-		// Secret exists, check for new keys
-		for _, randomKey := range randomSecret.Data {
-			if _, exists := secret.Data[randomKey.Key]; !exists {
-				// New key found, generate new password
-				log.Printf("New key '%s' found in config for secret '%s', generating new password", randomKey.Key, name)
-				password, err := generateRandomPassword(randomKey.Length, randomKey.Special)
-				if err != nil {
-					log.Printf("Error generating password for key '%s': %v", randomKey.Key, err)
-					continue
-				}
-				secret.Data[randomKey.Key] = []byte(password)
-			}
-		}
+	}
 
+	// Secret exists, check for new keys
+	var updated bool
+	for _, randomKey := range randomSecret.Data {
+		if _, exists := secret.Data[randomKey.Key]; !exists {
+			// New key found, generate new password
+			log.Printf("New key '%s' found in config for secret '%s', generating new password", randomKey.Key, name)
+			password, err := generateRandomPassword(randomKey.Length, randomKey.Special)
+			if err != nil {
+				log.Printf("Error generating password for key '%s': %v", randomKey.Key, err)
+				continue
+			}
+			secret.Data[randomKey.Key] = []byte(password)
+			updated = true
+		}
+	}
+
+	if updated {
 		// Update the secret
 		_, err := client.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("Unable to update secret: %v", err)
+			return fmt.Errorf("unable to update secret: %v", err)
 		}
 	}
 
@@ -126,12 +132,12 @@ func main() {
 	configFilename := "./config.yaml"
 	randomSecrets, err := readConfigFile(configFilename)
 	if err != nil {
-		log.Fatalf("Error reading config file: %v", err)
+		log.Fatalf("error reading config file: %v", err)
 	}
 
 	client, err := getClient()
 	if err != nil {
-		log.Fatalf("Unable to create Kubernetes client: %v", err)
+		log.Fatalf("unable to create Kubernetes client: %v", err)
 	}
 
 	for _, randomSecret := range randomSecrets {
