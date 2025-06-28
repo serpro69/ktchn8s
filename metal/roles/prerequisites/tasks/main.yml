@@ -10,3 +10,9 @@
       value: 8192
     - name: "fs.inotify.max_user_watches"
       value: 524288
+
+- name: Ensure base packages are installed
+  dnf:
+    name:
+      - dnf-utils # provides 'needs-restarting' for kured
+    state: present
