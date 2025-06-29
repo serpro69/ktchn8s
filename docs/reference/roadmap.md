@@ -20,13 +20,23 @@ Anything that works (...or doesn't 🤷).
 
 Good enough for tinkering and personal usage, and reasonably secure.
 
-- [ ] Automated bare metal provisioning
-    - [ ] Controller set up (Docker)
-    - [ ] OS installation (PXE boot)
-- [ ] Automated cluster creation (k3s)
-- [ ] Automated application deployment (ArgoCD)
-- [ ] Automated DNS management
-- [ ] Initialize GitOps repository on Gitea automatically
+- [ ] Change OS To Ubuntu
+    - Personal preference over fedora
+    - NB! only if I find a way to automate OS provisioning
+    - Existing bits that need to be changed:
+        - [ ] pxe - [netboot.xyz](https://netboot.xyz/)?
+        - [ ] cloud-init - [subiquity autoinstall](https://canonical-subiquity.readthedocs-hosted.com/en/latest/intro-to-autoinstall.html)
+        - [ ] `dnf` -> `apt`
+        - [ ] `sysctl`
+        - [ ] [dnf automatic](https://linuxcapable.com/how-to-install-dnf-automatic-on-fedora-linux/) -> ?
+        - [ ] kured (`rebootSentinelCommand`)
+- [x] Automated bare metal provisioning
+    - [x] Controller set up (Docker)
+    - [x] OS installation (PXE boot)
+- [x] Automated cluster creation (k3s)
+- [x] Automated application deployment (ArgoCD)
+- [x] Automated DNS management
+- [x] Initialize GitOps repository on Gitea automatically
 - [ ] Observability
     - [ ] Monitoring
     - [ ] Logging
@@ -37,15 +47,15 @@ Good enough for tinkering and personal usage, and reasonably secure.
     - [ ] Declarative secret management
     - [ ] Replace all default passwords with randomly generated ones
     - [ ] Expose services to the internet securely with Cloudflare Tunnel
-- [ ] Only use open-source technologies (except external managed services in `./external`)
-- [ ] Everything is defined as code
+- [x] Only use open-source technologies (except external managed services in `./external`)
+- [x] Everything is defined as code
 - [ ] Backup solution (3 copies, 2 seperate devices, 1 offsite)
 - [ ] Define [SLOs](https://en.wikipedia.org/wiki/Service-level_objective):
     - [ ] 70% availability (might break in the weekend due to new experimentation)
 - [ ] Core applications
-    - [ ] Gitea
-    - [ ] Woodpecker
-    - [ ] Private container registry
+    - [x] Gitea
+    - [x] Woodpecker
+    - [x] Private container registry
     - [ ] Homepage
 
 ## Stable requirements
