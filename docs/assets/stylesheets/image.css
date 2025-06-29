@@ -1,11 +1,18 @@
-/* Styles for banner images, ensuring they appear above the page title */
+/* Styles for images, including banners (and ensuring they appear above the page title) */
 
-/* Apply flexbox to the main content area.
-   The <article class="md-content__inner md-typeset"> is the typical container. */
 /* stylelint-disable-next-line selector-class-pattern */
+/* Use absolute positioning to place the banner at the top */
 article.md-content__inner.md-typeset {
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  /* Make space for the banner: image height (250px) + desired gap (1.5em) */
+  padding-top: calc(250px + 1.5em);
+}
+
+/* Style the injected buttons to appear next to each other */
+.md-typeset .md-content__button {
+  display: inline-block;
+  margin-right: 1em; /* Space between buttons */
+  margin-bottom: 1em; /* Space if they wrap to a new line */
 }
 
 /* Default order for all direct children of the flex container.
@@ -17,10 +24,10 @@ article.md-content__inner.md-typeset > * {
 
 /* The .banner-image-wrapper DIV is now the flex item we order. */
 .banner-image-wrapper {
-  order: -1 !important; /* This moves the entire wrapper (and its image) to the top */
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%; /* Wrapper takes full width */
-  margin-bottom: 1.5em; /* Space between the banner and the content below (e.g., title) */
-
   /* Height will be determined by the .banner-image inside */
 }
 
