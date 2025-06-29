@@ -3,7 +3,7 @@ icon: material/handshake
 title: Contributing
 ---
 
-## :material-handshake: Contributing
+# :material-handshake: Contributing
 
 So, you've made it this far 🤓 Congrats! 🎉 I've primarily made this to document my own steps, but, having learned most of what I know today about software (and hardware) from open-source, I'm happy if you've found any of this code useful as well. If you want to contribute anything: fixes to code, configurations, documentation; like, literally, anything - you should definitely do so.
 

@@ -1,4 +1,4 @@
-## :material-pillar: Reference Architecture
+# :material-pillar: Reference Architecture
 
 - [Overview](./overview.md)
 - [Network](./network.md)

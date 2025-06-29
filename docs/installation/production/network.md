@@ -3,7 +3,7 @@ icon: material/lan
 title: Network Configuration
 ---
 
-## :material-lan: Network Configuration
+# :material-lan: Network Configuration
 
 !!! warning
     The following describes my current network components and configurations. Don't blindly copy-paste, but instead use this as a learning point and adjust to your needs, especially if you're using different hardware components.

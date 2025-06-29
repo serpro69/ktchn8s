@@ -134,21 +134,25 @@ nav:
   - "~/": index.md
   - "☲ Installation":
       - "☱ Production":
+          - installation/production/index.md
           - installation/production/network.md
           - installation/production/metal.md
   - "☰ Concepts":
+      - concepts/index.md
       - concepts/development_shell.md
       - concepts/pxe_boot.md
   - "☵ Referece":
       - "☴ Architecture":
+          - reference/architecture/index.md
           - reference/architecture/overview.md
           - reference/architecture/network.md
           - reference/architecture/decision_records.md
-      - reference/license.md
-      - reference/changelog.md
-      - reference/roadmap.md
-      - reference/contributing.md
-      - reference/todo.md
+      - "":
+          - reference/license.md
+          - reference/changelog.md
+          - reference/roadmap.md
+          - reference/contributing.md
+          - reference/todo.md
   - "☷ Guides":
       - guides/index.md
       - "☳ HowTo":

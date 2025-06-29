@@ -3,7 +3,7 @@ icon: material/copyright
 title: License
 ---
 
-## :material-copyright: License
+# :material-copyright: License
 
 --8<--
 LICENSE.md
