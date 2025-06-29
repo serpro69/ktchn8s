@@ -1,8 +1,9 @@
 /* Styles for images, including banners (and ensuring they appear above the page title) */
 
-/* stylelint-disable-next-line selector-class-pattern */
 /* Use absolute positioning to place the banner at the top */
-article.md-content__inner.md-typeset {
+/* Use :has() to apply styles only when a banner is present */
+/* stylelint-disable-next-line selector-class-pattern */
+article.md-content__inner.md-typeset:has(.banner-image-wrapper) {
   position: relative;
   /* Make space for the banner: image height (250px) + desired gap (1.5em) */
   padding-top: calc(250px + 1.5em);
