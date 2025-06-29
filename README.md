@@ -80,6 +80,44 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
         - RAM: `16GB`
         - SSD: `512GB`
 
+### Features
+
+- [x] Common applications: Gitea, Jellyfin, Paperless...
+- [x] Automated bare metal provisioning with PXE boot
+- [x] Automated Kubernetes installation and management
+- [x] Installing and managing applications using GitOps
+- [x] Automatic rolling upgrade for OS and Kubernetes
+- [ ] Automatically update apps (with approval)
+- [x] Modular architecture, easy to add or remove features/components
+- [x] Automated certificate management
+- [x] Automatically update DNS records for exposed services
+- [ ] VPN (Tailscale or Wireguard)
+- [x] Expose services to the internet securely with [Cloudflare Tunnel](https://www.cloudflare.com/products/tunnel/)
+- [x] CI/CD platform
+- [x] Private container registry
+- [ ] Distributed storage
+- [ ] Support multiple environments (dev, prod)
+- [ ] Monitoring and alerting
+- [ ] Automated backup and restore
+- [x] Single sign-on
+- [x] Infrastructure testing
+
+Some demo videos and screenshots are shown here.
+They can't capture all the project's features, but they are sufficient to get a concept of it.
+
+| Demo                                                                                                            |
+| :--:                                                                                                            |
+| Homepage powered by... [Homepage](https://gethomepage.dev)                                                      |
+| [![][homepage-demo]][homepage-demo]                                                                             |
+| Git server powered by [Gitea](https://gitea.io/en-us)                                                           |
+| [![][gitea-demo]][gitea-demo]                                                                                   |
+| Continuous deployment with [ArgoCD](https://argoproj.github.io/cd)                                              |
+| [![][argocd-demo]][argocd-demo]                                                                                 |
+
+[homepage-demo]: https://github.com/user-attachments/assets/8b2680c1-53e1-47c5-818d-08d3502f144b
+[gitea-demo]: https://github.com/user-attachments/assets/f3775815-6c55-4086-b15a-8e0562e5d6a6
+[argocd-demo]: https://github.com/user-attachments/assets/bdd91804-2e10-4910-8cf6-afa15e433178
+
 ## Getting Started
 
 [Deploy on real hardware](https://serpro69.github.io/ktchn8s/installation/production) for production workload.
