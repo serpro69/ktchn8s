@@ -19,6 +19,7 @@ argocd-apps:
             repoURL: &repoURL https://github.com/serpro69/ktchn8s
             revision: &revision master
             directories:
+              - path: apps/*
               - path: platform/*
               - path: system/*
       template:
