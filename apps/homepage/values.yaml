@@ -1,0 +1,146 @@
+---
+app-template:
+  controllers:
+    main:
+      containers:
+        main:
+          image:
+            repository: ghcr.io/gethomepage/homepage
+            tag: v0.8.8
+  service:
+    main:
+      ports:
+        http:
+          port: 3000
+          protocol: HTTP
+  ingress:
+    main:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: &host home.0xbad.cloud
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                name: main
+                port: http
+      tls:
+        - hosts:
+            - *host
+          secretName: homepage-tls-certificate
+  persistence:
+    config:
+      enabled: true
+      type: configMap
+      name: homepage-config
+      globalMounts:
+        - path: /app/config/settings.yaml
+          subPath: settings.yaml
+        - path: /app/config/widgets.yaml
+          subPath: widgets.yaml
+        - path: /app/config/services.yaml
+          subPath: services.yaml
+        - path: /app/config/bookmarks.yaml
+          subPath: bookmarks.yaml
+  configMaps:
+    config:
+      enabled: true
+      data:
+        settings.yaml: |
+          background: https://images.unsplash.com/photo-1708112292872-fd5612affa79?q=80&w=2109&auto=format&fit=crop
+          cardBlur: md
+          theme: dark
+          headerStyle: boxed
+          hideVersion: true
+        widgets.yaml: |
+          - search:
+              provider: duckduckgo
+              target: _blank
+        services.yaml: |
+          - Popular:
+            - Matrix:
+                href: https://chat.0xbad.cloud
+                description: Chat client
+                icon: element.svg
+            - Jellyfin:
+                href: https://jellyfin.0xbad.cloud
+                description: Media system (movies, music, etc.)
+                icon: jellyfin.svg
+            - Jellyseerr:
+                href: https://jellyseerr.0xbad.cloud
+                description: Request media
+                icon: jellyseerr.svg
+            - Paperless:
+                href: https://paperless.0xbad.cloud
+                description: Document management system
+                icon: paperless.svg
+          - Management:
+            - Transmission:
+                href: https://transmission.0xbad.cloud
+                description: Bittorrent client
+                icon: transmission.svg
+            - Prowlarr:
+                href: https://prowlarr.0xbad.cloud
+                description: Indexer manager
+                icon: prowlarr.svg
+            - Radarr:
+                href: https://radarr.0xbad.cloud
+                description: Movie manager
+                icon: radarr.svg
+            - Sonarr:
+                href: https://sonarr.0xbad.cloud
+                description: TV show manager
+                icon: sonarr.svg
+            - Kanidm:
+                href: https://auth.0xbad.cloud
+                description: Identity management
+                icon: https://auth.0xbad.cloud/pkg/img/logo-square.svg
+          - Development:
+            - ArgoCD:
+                href: https://argocd.0xbad.cloud
+                description: Continuous deployment
+                icon: argocd.svg
+            - Gitea:
+                href: https://git.0xbad.cloud
+                description: Git forge
+                icon: gitea.svg
+            - Woodpecker:
+                href: https://ci.0xbad.cloud
+                description: Continuous integration
+                icon: woodpecker-ci.svg
+            - Grafana:
+                href: https://grafana.0xbad.cloud
+                description: Observability dashboards
+                icon: grafana.svg
+            - Registry:
+                href: https://registry.0xbad.cloud
+                description: Container registry
+                icon: docker.svg
+          - Utilities:
+            - Excalidraw:
+                href: https://draw.0xbad.cloud
+                description: Virtual whiteboard
+                icon: excalidraw.svg
+            - Speedtest:
+                href: https://speedtest.0xbad.cloud
+                description: Internal network speed test
+                icon: openspeedtest.png
+        bookmarks.yaml: |-
+          - Homelab:
+            - Documentation:
+              - href: https://serpro69.github.io/ktchn8s/
+                icon: google-docs.svg
+            - Public homelab repository:
+              - href: https://github.com/serpro69/ktchn8s
+                icon: github.svg
+          - Managed services:
+            - Cloudflare:
+              - href: https://dash.cloudflare.com
+                icon: cloudflare.svg
+          - Infrastructure:
+            - Google Cloud:
+              - href: https://console.cloud.google.com
+                icon: google-cloud-platform.svg
