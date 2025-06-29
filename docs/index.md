@@ -1,5 +1,5 @@
 ---
-template: main.html
+template: home.html
 ---
 
 <!-- markdownlint-disable-next-line MD041 -->
