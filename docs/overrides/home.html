@@ -5,6 +5,10 @@
   {{ super() }}
 
   <style>
+    article.md-content__inner.md-typeset {
+      display: flex;
+      flex-direction: column; /* Stack children vertically */
+    }
 
     article.md-content__inner.md-typeset > h1:first-of-type {
       order: 1 !important; /* After banner */
