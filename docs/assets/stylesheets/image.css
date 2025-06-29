@@ -26,6 +26,7 @@ article.md-content__inner.md-typeset > * {
 /* The .banner-image-wrapper DIV is now the flex item we order. */
 .banner-image-wrapper {
   position: absolute;
+  z-index: -1; /* Ensure it is behind the content */
   top: 0;
   left: 0;
   width: 100%; /* Wrapper takes full width */
