@@ -1,8 +1,10 @@
-# docs
+### docs
 mkdocs
 mkdocs-material
+# plugins
+mkdocs-minify-plugin
 mkdocs-panzoom-plugin
-# post-install dependencies (e.g. if using vim outside of nix shell)
+### post-install dependencies (e.g. if using vim outside of nix shell)
 kubernetes
 pexpect
 rich

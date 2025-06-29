@@ -10,7 +10,10 @@ copyright: Copyright &copy; 2025 - present, serpro69
 repo_url: https://github.com/serpro69/ktchn8s
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
   - panzoom:
       always_show_hint: true
 
@@ -29,11 +32,33 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.expand
-    - navigation.instant
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    # - content.code.select
+    # - content.footnote.tooltips
+    # - content.tabs.link
+    - content.tooltips
+    # - header.autohide
+    # - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    # - navigation.instant
+    # - navigation.instant.prefetch
+    # - navigation.instant.progress
+    # - navigation.prune
     - navigation.sections
+    - navigation.tabs
+    # - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
     - search.highlight
     - search.share
+    - search.suggest
+    - toc.follow
+    # - toc.integrate
   # https://squidfunk.github.io/mkdocs-material/setup/changing-the-logo-and-icons/
   icon:
     logo: material/kubernetes
@@ -49,6 +74,8 @@ extra_javascript:
     type: module
 
 markdown_extensions:
+  - abbr
+  - footnotes
   # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
   # https://squidfunk.github.io/mkdocs-material/reference/images/
   - attr_list
@@ -60,14 +87,28 @@ markdown_extensions:
   - def_list
   # https://squidfunk.github.io/mkdocs-material/reference/admonitions/
   - admonition
+  - toc:
+      permalink: true
+  - pymdownx.caret
   - pymdownx.details
   - pymdownx.extra
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.tilde
   - pymdownx.superfences:
       custom_fences:
         # mermaid support
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.snippets:
       base_path:
         # https://www.mkdocs.org/user-guide/configuration/#paths-relative-to-the-current-file-or-site
@@ -75,18 +116,28 @@ markdown_extensions:
         - !relative $docs_dir
       check_paths: true
   - pymdownx.tasklist:
-  - pymdownx.tabbed:
-      alternate_style: true
+      custom_checkbox: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: serpro69
+      repo: ktchn8s
 
 nav:
   - "~/": index.md
-  - "☰ Concepts":
-      - concepts/development_shell.md
-      - concepts/pxe_boot.md
   - "☲ Installation":
       - "☱ Production":
           - installation/production/network.md
           - installation/production/metal.md
+  - "☰ Concepts":
+      - concepts/development_shell.md
+      - concepts/pxe_boot.md
   - "☵ Referece":
       - "☴ Architecture":
           - reference/architecture/overview.md
@@ -98,6 +149,7 @@ nav:
       - reference/contributing.md
       - reference/todo.md
   - "☷ Guides":
+      - guides/index.md
       - "☳ HowTo":
           - guides/how_to_configure_minicom.md
           - guides/how_to_add_or_remove_nodes.md
