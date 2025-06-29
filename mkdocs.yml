@@ -62,6 +62,7 @@ theme:
   # https://squidfunk.github.io/mkdocs-material/setup/changing-the-logo-and-icons/
   icon:
     logo: material/kubernetes
+  custom_dir: docs/overrides
 
 extra_css:
   - assets/stylesheets/image.css

@@ -38,28 +38,3 @@ article.md-content__inner.md-typeset > * {
     transparent 100%
   ); /* Safari/Chrome compatibility */
 }
-
-/* The first H1 (assumed from README.md) */
-/* stylelint-disable-next-line selector-class-pattern */
-article.md-content__inner.md-typeset > h1:first-of-type {
-  order: 1 !important; /* After banner */
-  margin-top: 1.5em; /* Add some space above H1 if banner is present */
-  display: none; /* NOTE: display logo instead of header */
-}
-
-/* The .logo-image-wrapper DIV */
-.logo-image-wrapper {
-  order: 2 !important; /* After the first H1 */
-  display: flex; /* Use flex to center the image */
-  justify-content: center; /* Center horizontally */
-  width: 100%; /* Wrapper takes full width */
-  margin-top: 1em; /* Space above the logo */
-  margin-bottom: 1.5em; /* Space below the logo */
-}
-
-/* Styles for the actual logo <img> tag */
-.logo-image-wrapper > .logo-image {
-  display: block; /* Good practice for images */
-  max-width: 25%; /* Ensure logo is responsive if needed */
-  height: auto; /* Maintain aspect ratio */
-}
