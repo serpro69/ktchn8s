@@ -107,11 +107,11 @@ So the alternative was to disable the GRUB timeout altogether.
 
 - The system will boot directly into the default entry without showing the GRUB menu, so no need to fiddle with keyboards etc
 - GRUB can still be accessed by holding down the <key>Shift</key> key during boot.
-    - Some people report that holding <key>Shift</key> doesn't always work. See e.g. [Grub menu at boot time... "holding shift" not working](https://askubuntu.com/questions/668049/grub-menu-at-boot-time-holding-shift-not-working) for troubleshooting. 
+    - Some people report that holding <key>Shift</key> doesn't always work. See e.g. [Grub menu at boot time... "holding shift" not working](https://askubuntu.com/questions/668049/grub-menu-at-boot-time-holding-shift-not-working) for troubleshooting.
 - I've tested this on my M70q Gen.2 machines, and simply setting `GRUB_TIMEOUT=0` with `GRUB_TIMEOUT_STYLE=hidden` worked fine. However, if those settings don't seem to do anything, one might try a workaround as described in this [post](https://ubuntuforums.org/showthread.php?t=1287602&page=14&p=10097915#post10097915):
 
     > If the "GRUB_TIMEOUT=0" does not work, does your system begin a countdown when the menu displays or does it await input from you? If there is no countdown it's possible that grub is detecting a 'recordfail' and will wait for input. We can change that behaviour as well but by a different method.
-    > 
+    >
     > For now, if the TIMEOUT setting doesn't work, open /etc/grub.d/00_header and go to approximately line 238:
     >
     > ```
@@ -127,12 +127,12 @@ So the alternative was to disable the GRUB timeout altogether.
     > if [ "\${recordfail}" = 1 ]; then
     > set timeout=-1
     > else
-    > 
+    >
     > # Manually change timeout to 0
     > # set timeout=${2}
     > set timeout=0
     > # End manual change
-    > 
+    >
     > fi
     > EOF
     > }
