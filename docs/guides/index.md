@@ -4,6 +4,10 @@ title: Guides
 
 # :material-bow-arrow: Guides
 
+<div class="banner-image-wrapper">
+  <img class="banner-image" src="https://images.unsplash.com/photo-1600492515568-8868f609511e?q=80&w=1550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 0% 55%; height: 250px;">
+</div>
+
 ## How-To Guides
 
 - [Configuring Minicom](./how_to_configure_minicom.md)
