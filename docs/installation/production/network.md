@@ -708,9 +708,9 @@ ip dhcp excluded-address 10.10.10.10 10.10.10.19    ! k8s control plane nodes
 ip dhcp excluded-address 10.10.10.20 10.10.10.29    ! k8s worker nodes
 ip dhcp excluded-address 10.10.10.30 10.10.10.39    ! storage nodes
 
-! Exclude the IP range you plan to use for MetalLB (for K8s LoadBalancer services).
+! Exclude the IP range you plan to use for LoadBalancer
 ! This range should NOT overlap with any static or DHCP-assigned IPs.
-ip dhcp excluded-address 10.10.10.40 10.10.10.69    ! metal lb range
+ip dhcp excluded-address 10.10.10.40 10.10.10.69    ! LB IP pool
 
 ! Define the DHCP pool for the Homelab network
 ip dhcp pool HOMELAB_POOL_VLAN10
@@ -939,6 +939,8 @@ ip access-list extended ACL_FROM_HOME_NETWORK
  402 permit tcp 192.168.1.0 0.0.0.255 object-group K8S_LB_POOL_NETS eq 443
  403 remark -> Permit Home to k8s control plane endpoint
  403 permit tcp 192.168.1.0 0.0.0.255 host 10.10.10.100 eq 6443
+ 404 remark -> Permit SSH from Home to K8s LoadBalancer Pool
+ 404 permit tcp 192.168.1.0 0.0.0.255 object-group K8S_LB_POOL_NETS eq 22
  499 remark --- END ---
 
  500 remark --- ICMP Rules for Home Network ---
