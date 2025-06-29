@@ -41,6 +41,14 @@ It can also be used as a framework to build your own homelab.
 If you encounter an issue or want to contribute a fix or an improvement, please create [a bug issue](https://github.com/serpro69/ktchn8s/issues/new?template=bug.md).
 <br>If you have a question or want to chat about this project, please create [a new discussion](https://github.com/serpro69/ktchn8s/discussions/new/choose).
 
+### History
+
+One of the biggest drivers behind this project was to get a much deeper familiarity with Kubernetes. I could play around with something like minikube on my laptop all day long, but I wanted something that would require me to treat it as production (or at least production-like) to get more hands on feel, break things, get frustrated, then fix them, rinse and repeat. That's pretty much how I like to learn.
+
+I also got my hands on a few old cisco devices and used this opportunity to get more hands-on with networking, which is another area I wanted to improve my skills in. Eventually I want to have a homelab that would be fully-operational and ready for production workloads, so I could use it for my personal projects, as well as for testing and experimenting with new technologies.
+
+I have a lot of experience with Ansible and Terraform, and I spent some time looking into how to provision the nodes. Most solutions were pretty heavy and cumbersome, to say the least. I eventually found [Khue's homelab repo](https://github.com/khuedoan/homelab) which just spins up a container to handle [PXE booting](https://serpro69.github.io/ktchn8s/concepts/pxe_boot/) the machines and then uses ansible for the rest. This immediately drew my attention as it was one of the pain-points I really wanted to automate. I also liked how his code was laid out and how the provisioning flow was structured - you provision baremetal machines, install k3s, and create ArgoCD resources, and then the latter is responsible for deploying everything else - so I used it as a base for my own homelab cluster. I wanted to make my cluster fully-operational first - working in small increments along the way - and modify it heavily afterwards. Forking his repo would require a lot of cleanups and unnecessary work, that's why my repo is technically not a "fork", although a lot of ideas and initial code was borrowed from his repo, for which he gets all the credits.
+
 ## Overview
 
 This project is still in the experimental stage. This means, among other things, that:
