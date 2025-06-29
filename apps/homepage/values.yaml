@@ -102,7 +102,7 @@ app-template:
             - ArgoCD:
                 href: https://argocd.0xbad.cloud
                 description: Continuous deployment
-                icon: argocd.svg
+                icon: argo-cd.svg
             - Gitea:
                 href: https://git.0xbad.cloud
                 description: Git forge
