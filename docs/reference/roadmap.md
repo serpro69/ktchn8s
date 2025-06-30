@@ -33,6 +33,7 @@ Good enough for tinkering and personal usage, and reasonably secure.
 - [x] Automated bare metal provisioning
     - [x] Controller set up (Docker)
     - [x] OS installation (PXE boot)
+    - [x] Disk wipe (OS re-installation)
 - [x] Automated cluster creation (k3s)
 - [x] Automated application deployment (ArgoCD)
 - [x] Automated DNS management
@@ -43,8 +44,8 @@ Good enough for tinkering and personal usage, and reasonably secure.
     - [ ] Alerting
 - [ ] SSO
 - [ ] Reasonably secure
-    - [ ] Automated certificate management
-    - [ ] Declarative secret management
+    - [x] Automated certificate management
+    - [x] Declarative secret management
     - [ ] Replace all default passwords with randomly generated ones
     - [ ] Expose services to the internet securely with Cloudflare Tunnel
 - [x] Only use open-source technologies (except external managed services in `./external`)
@@ -52,34 +53,34 @@ Good enough for tinkering and personal usage, and reasonably secure.
 - [ ] Backup solution (3 copies, 2 seperate devices, 1 offsite)
 - [ ] Define [SLOs](https://en.wikipedia.org/wiki/Service-level_objective):
     - [ ] 70% availability (might break in the weekend due to new experimentation)
-- [ ] Core applications
+- [x] Core applications
     - [x] Gitea
     - [x] Woodpecker
     - [x] Private container registry
-    - [ ] Homepage
+    - [x] Homepage
 
 ## Stable requirements
 
 Can be used in "production" (for family or even small scale businesses).
 
-- [ ] A single command to deploy everything
-- [ ] Fast deployment time (from empty hard drive to running services in under 1 hour)
+- [ ] :fontawesome-solid-spinner: A single command to deploy everything
+- [x] Fast deployment time (from empty hard drive to running services in under 1 hour)
 - [ ] Fully _automatic_, not just _automated_
-    - [ ] Bare-metal OS rolling upgrade
-    - [ ] Kubernetes version rolling upgrade
-    - [ ] Application version upgrade
+    - [x] Bare-metal OS rolling upgrade
+    - [x] Kubernetes version rolling upgrade
+    - [x] Application version upgrade
     - [ ] Encrypted backups
     - [ ] Secrets rotation
-    - [ ] Self healing
+    - [x] Self healing
 - [ ] Secure by default
     - [ ] SELinux
-    - [ ] Network policies
+    - [x] Network policies
 - [ ] Static code analysis
 - [ ] Chaos testing
-- [ ] Minimal dependency on external services
+- [x] Minimal dependency on external services
 - [ ] Complete documentation
-    - [ ] Diagram as code
-    - [ ] Book (this book)
+    - [x] Diagram as code
+    - [x] Book (this book)
     - [ ] Walkthrough tutorial and feature demo (video)
 - [ ] Configuration script for new users
 - [ ] More dashboards and alert rules
