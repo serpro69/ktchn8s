@@ -4,8 +4,12 @@ mkdocs-material
 # plugins
 mkdocs-minify-plugin
 mkdocs-panzoom-plugin
-### post-install dependencies (e.g. if using vim outside of nix shell)
+### scripts (for development outside of nix shell)
+# backup
+argparse
 kubernetes
+# post-install
+# kubernetes # already included
 pexpect
 rich
 requests
