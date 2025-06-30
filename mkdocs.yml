@@ -137,6 +137,7 @@ nav:
           - installation/production/index.md
           - installation/production/network.md
           - installation/production/metal.md
+          - installation/post_install.md
   - "☰ Concepts":
       - concepts/index.md
       - concepts/development_shell.md
@@ -156,7 +157,10 @@ nav:
   - "☷ Guides":
       - guides/index.md
       - "☳ HowTo":
-          - guides/how_to_configure_minicom.md
           - guides/how_to_add_or_remove_nodes.md
+          - guides/how_to_configure_minicom.md
+          - guides/how_to_for_media_management.md
+          - guides/how_to_update_documentation.md
+          - guides/how_to_use_both_github_and_gitea.md
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
