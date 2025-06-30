@@ -24,11 +24,12 @@ def render_helm_chart(chart_path, namespace, release_name, rendered_path):
             check=True
         )
 
-    run(
-        ['helm', 'template', '--namespace', namespace, release_name, chart_path],
-        stdout=open(rendered_path, 'w'),
-        check=True
-    )
+    with(open(rendered_path, 'w')) as rendered_file:
+        run(
+            ['helm', 'template', '--namespace', namespace, release_name, chart_path],
+            stdout=rendered_file,
+            check=True
+        )
 
 
 def changed_charts(source_path, target_path, subpath):
