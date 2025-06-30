@@ -20,56 +20,67 @@ Anything that works (...or doesn't 🤷).
 
 Good enough for tinkering and personal usage, and reasonably secure.
 
-- [ ] Automated bare metal provisioning
-    - [ ] Controller set up (Docker)
-    - [ ] OS installation (PXE boot)
-- [ ] Automated cluster creation (k3s)
-- [ ] Automated application deployment (ArgoCD)
-- [ ] Automated DNS management
-- [ ] Initialize GitOps repository on Gitea automatically
+- [ ] Change OS To Ubuntu
+    - Personal preference over fedora
+    - NB! only if I find a way to automate OS provisioning
+    - Existing bits that need to be changed:
+        - [ ] pxe - [netboot.xyz](https://netboot.xyz/)?
+        - [ ] cloud-init - [subiquity autoinstall](https://canonical-subiquity.readthedocs-hosted.com/en/latest/intro-to-autoinstall.html)
+        - [ ] `dnf` -> `apt`
+        - [ ] `sysctl`
+        - [ ] [dnf automatic](https://linuxcapable.com/how-to-install-dnf-automatic-on-fedora-linux/) -> ?
+        - [ ] kured (`rebootSentinelCommand`)
+- [x] Automated bare metal provisioning
+    - [x] Controller set up (Docker)
+    - [x] OS installation (PXE boot)
+    - [x] Disk wipe (OS re-installation)
+- [x] Automated cluster creation (k3s)
+- [x] Automated application deployment (ArgoCD)
+- [x] Automated DNS management
+- [x] Initialize GitOps repository on Gitea automatically
 - [ ] Observability
     - [ ] Monitoring
     - [ ] Logging
     - [ ] Alerting
 - [ ] SSO
 - [ ] Reasonably secure
-    - [ ] Automated certificate management
-    - [ ] Declarative secret management
+    - [x] Automated certificate management
+    - [x] Declarative secret management
     - [ ] Replace all default passwords with randomly generated ones
     - [ ] Expose services to the internet securely with Cloudflare Tunnel
-- [ ] Only use open-source technologies (except external managed services in `./external`)
-- [ ] Everything is defined as code
+- [x] Only use open-source technologies (except external managed services in `./external`)
+- [x] Everything is defined as code
 - [ ] Backup solution (3 copies, 2 seperate devices, 1 offsite)
 - [ ] Define [SLOs](https://en.wikipedia.org/wiki/Service-level_objective):
     - [ ] 70% availability (might break in the weekend due to new experimentation)
-- [ ] Core applications
-    - [ ] Gitea
-    - [ ] Woodpecker
-    - [ ] Private container registry
-    - [ ] Homepage
+- [x] Core applications
+    - [x] Gitea
+    - [x] Woodpecker
+    - [x] Private container registry
+    - [x] Homepage
 
 ## Stable requirements
 
 Can be used in "production" (for family or even small scale businesses).
 
-- [ ] A single command to deploy everything
-- [ ] Fast deployment time (from empty hard drive to running services in under 1 hour)
+- [ ] :fontawesome-solid-spinner: A single command to deploy everything
+- [x] Fast deployment time (from empty hard drive to running services in under 1 hour)
 - [ ] Fully _automatic_, not just _automated_
-    - [ ] Bare-metal OS rolling upgrade
-    - [ ] Kubernetes version rolling upgrade
-    - [ ] Application version upgrade
+    - [x] Bare-metal OS rolling upgrade
+    - [x] Kubernetes version rolling upgrade
+    - [x] Application version upgrade
     - [ ] Encrypted backups
     - [ ] Secrets rotation
-    - [ ] Self healing
+    - [x] Self healing
 - [ ] Secure by default
     - [ ] SELinux
-    - [ ] Network policies
+    - [x] Network policies
 - [ ] Static code analysis
 - [ ] Chaos testing
-- [ ] Minimal dependency on external services
+- [x] Minimal dependency on external services
 - [ ] Complete documentation
-    - [ ] Diagram as code
-    - [ ] Book (this book)
+    - [x] Diagram as code
+    - [x] Book (this book)
     - [ ] Walkthrough tutorial and feature demo (video)
 - [ ] Configuration script for new users
 - [ ] More dashboards and alert rules
