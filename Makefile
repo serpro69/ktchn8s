@@ -52,7 +52,7 @@ run: ## Run a CMD command on all servers via SSH
 		exit 1; \
 	fi; \
 	hosts=$$(ansible-inventory -i metal/inventory.sh --list | jq -r '._meta.hostvars | keys[]'); \
-	for host in $${hosts}[@]; do \
+	for host in $${hosts}; do \
 		ssh "$${host}" "$${cmd}" || continue; \
 		printf "done %s on %s\n" "$${cmd}" "$${host}"; \
 	done
