@@ -14,7 +14,7 @@ title: ToDo
     - Maybe use a separate branch for gitea? E.g. `main`?
     - Or maybe use a separate remote for gitea (or for github? since gitea is technically considered "the origin"?) E.g. `gitea` (or `github`, for github repo origin)?
 - [ ] Encrypt kubeconfig with sops so it can be committed to git
-- [ ] Update [architecture/overview](./architecture/overview.md) components
+- [ ] Update [architecture/overview](../reference/architecture/overview.md) components
     - Basic diagram of code components and their relations
     - Description of components and their purpose
 - [ ] Update [concepts/pxe_boot](../concepts/pxe_boot.md) with a visual "in-action" showcase of how it works, once it's in place

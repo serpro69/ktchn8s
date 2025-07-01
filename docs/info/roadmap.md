@@ -11,6 +11,8 @@ title: Roadmap
 
 !!! info
     Current status: **ALPHA**
+    <br>
+    See also [ToDo](./todo.md) and open [issues](https://github.com/serpro69/ktchn8s/issues) for a list of immediate tasks
 
 ## Alpha requirements
 

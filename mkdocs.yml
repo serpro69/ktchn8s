@@ -149,12 +149,6 @@ nav:
           - reference/architecture/overview.md
           - reference/architecture/network.md
           - reference/architecture/decision_records.md
-      - "":
-          - reference/license.md
-          - reference/changelog.md
-          - reference/roadmap.md
-          - reference/contributing.md
-          - reference/todo.md
   - "☷ Guides":
       - guides/index.md
       - "☳ HowTo":
@@ -168,3 +162,10 @@ nav:
           - guides/how_to_use_both_github_and_gitea.md
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
+  - "⛬ Info":
+      - info/index.md
+      - info/roadmap.md
+      - info/changelog.md
+      - info/contributing.md
+      - info/license.md
+      # - info/todo.md # linked from roadmap
