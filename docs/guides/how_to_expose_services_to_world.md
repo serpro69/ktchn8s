@@ -1,4 +1,9 @@
-# Expose Services to the World (Wide Web)
+---
+icon: material/crosshairs-question
+title: Expose Services to the World
+---
+
+# :material-crosshairs-question: HowTo expose services to the world (wide web)
 
 !!! info
     This tutorial is for Cloudflare Tunnel users, please skip if you use port forwarding.

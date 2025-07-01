@@ -1,4 +1,9 @@
-# Run commands on multiple nodes
+---
+icon: material/crosshairs-question
+title: Run Commands on Multiple Nodes
+---
+
+# :material-crosshairs-question: HowTo run commands on multiple nodes
 
 ## Ansible Console
 

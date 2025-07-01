@@ -136,6 +136,7 @@ nav:
       - "☱ Production":
           - installation/production/index.md
           - installation/production/network.md
+          - installation/production/external.md
           - installation/production/metal.md
           - installation/post_install.md
   - "☰ Concepts":
@@ -158,8 +159,11 @@ nav:
       - guides/index.md
       - "☳ HowTo":
           - guides/how_to_add_or_remove_nodes.md
+          - guides/how_to_backup_and_restore.md
           - guides/how_to_configure_minicom.md
+          - guides/how_to_expose_services_to_world.md
           - guides/how_to_for_media_management.md
+          - guides/how_to_run_commands_on_multiple_nodes.md
           - guides/how_to_update_documentation.md
           - guides/how_to_use_both_github_and_gitea.md
       - "☶ Troubleshooting":

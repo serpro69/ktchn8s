@@ -1,4 +1,9 @@
-# Use Both GitHub and Gitea
+---
+icon: material/crosshairs-question
+title: Use Both GitHub and Gitea
+---
+
+# :material-crosshairs-question: HowTo use both github and gitea
 
 Even though we self-host Gitea, you may still want to use GitHub as a backup and for discovery.
 

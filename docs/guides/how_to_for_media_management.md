@@ -1,4 +1,9 @@
-# Media management
+---
+icon: material/crosshairs-question
+title: Media Management
+---
+
+# :material-crosshairs-question: HowTo do media management (the <s>right</s> wrong way)
 
 !!! warning
     This is for educational purposes only :wink: 

@@ -1,4 +1,9 @@
-# Post-install
+---
+icon: material/console
+title: Post-Install
+---
+
+# :material-console: Post-install
 
 ## Backup secrets
 
@@ -19,7 +24,7 @@ Save the following files to a safe location like a password manager (if you're u
 - Kanidm:
     - Usernames: `admin` and `idm_admin`
     - Password: run `./scripts/kanidm-reset-password admin` and `./scripts/kanidm-reset-password idm_admin`
-- Jellyfin and other applications in the \*arr stack: see the [dedicated guide for media management](../guides/media-management.md)
+- Jellyfin and other applications in the \*arr stack: see the [dedicated guide for media management](../guides/how_to_for_media_management.md)
 - Other apps:
     - Username: `admin`
     - Password: get from `global-secrets` namespace
@@ -27,7 +32,7 @@ Save the following files to a safe location like a password manager (if you're u
 ## Backup
 
 Now is a good time to set up backups for your homelab.
-Follow the [backup and restore guide](../how-to-guides/backup-and-restore.md) to get started.
+Follow the [backup and restore guide](../guides/how_to_backup_and_restore.md) to get started.
 
 ## Run the full test suite
 
@@ -38,5 +43,4 @@ make test
 ```
 
 !!! info
-
     The "full" test suit is still in its early stages, so any contribution is greatly appreciated.

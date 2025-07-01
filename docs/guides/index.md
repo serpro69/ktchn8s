@@ -11,9 +11,12 @@ title: Guides
 ## How-To Guides
 
 - [Add/Move/Remove a Node](./how_to_add_or_remove_nodes.md)
+- [Backup and Restore](./how_to_backup_and_restore.md)
 - [Configuring Minicom](./how_to_configure_minicom.md)
 - [Expose Services to the World](./how_to_expose_services_to_world.md)
-- [Media Management](./how_to_for_media_management.md)
+- [Manage your Media](./how_to_for_media_management.md)
+- [Run Commands on Nodes](./how_to_run_commands_on_multiple_nodes.md)
+- [Update Documentation](./how_to_update_documentation.md)
 - [Use Both Github and Gitea](./how_to_use_both_github_and_gitea.md)
 
 ## Troubleshooting Guides
