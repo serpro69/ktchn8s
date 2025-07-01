@@ -21,7 +21,7 @@ resource "cloudflare_record" "tunnel" {
   zone_id = data.cloudflare_zone.zone.id
   type    = "CNAME"
   name    = "homelab-tunnel"
-  value   = "${cloudflare_tunnel.homelab.id}.cfargotunnel.com"
+  content = "${cloudflare_tunnel.homelab.id}.cfargotunnel.com"
   proxied = false
   ttl     = 1 # Auto
 }
@@ -104,10 +104,11 @@ resource "kubernetes_secret" "cert_manager_token" {
   }
 }
 
-resource "cloudflare_bot_management" "example_bot_management" {
-  zone_id            = data.cloudflare_zone.zone.id
-  ai_bots_protection = "block"
-  # crawler_protection = "enabled" # TODO: enable after upgrading provider to 5.x
-  enable_js  = true
-  fight_mode = true
-}
+# TODO: Enable
+# resource "cloudflare_bot_management" "example_bot_management" {
+#   zone_id            = data.cloudflare_zone.zone.id
+#   ai_bots_protection = "block"
+#   # crawler_protection = "enabled" # TODO: enable after upgrading provider to 5.x
+#   enable_js  = true
+#   fight_mode = true
+# }
