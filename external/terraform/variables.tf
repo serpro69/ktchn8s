@@ -1,8 +1,9 @@
 variable "cloudflare" {
   type = object({
     email      = string
-    account_id = string
     api_key    = string
+    account_id = string
+    zone_id    = string
   })
   sensitive = true
 }

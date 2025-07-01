@@ -1,5 +1,6 @@
 data "cloudflare_zone" "zone" {
-  name = "0xbad.cloud"
+  account_id = var.cloudflare_account_id
+  zone_id    = var.cloudflare_zone_id
 }
 
 data "cloudflare_api_token_permission_groups" "all" {}
@@ -101,4 +102,12 @@ resource "kubernetes_secret" "cert_manager_token" {
   data = {
     "api-token" = cloudflare_api_token.cert_manager.value
   }
+}
+
+resource "cloudflare_bot_management" "example_bot_management" {
+  zone_id            = data.cloudflare_zone.zone.id
+  ai_bots_protection = "block"
+  # crawler_protection = "enabled" # TODO: enable after upgrading provider to 5.x
+  enable_js  = true
+  fight_mode = true
 }
