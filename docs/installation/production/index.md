@@ -6,4 +6,5 @@
 </div>
 
 - [Network Configuration](./network.md)
+- [External Resources](./external.md)
 - [Metal Provisioning](./metal.md)

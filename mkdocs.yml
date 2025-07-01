@@ -136,7 +136,9 @@ nav:
       - "☱ Production":
           - installation/production/index.md
           - installation/production/network.md
+          - installation/production/external.md
           - installation/production/metal.md
+          - installation/post_install.md
   - "☰ Concepts":
       - concepts/index.md
       - concepts/development_shell.md
@@ -147,16 +149,23 @@ nav:
           - reference/architecture/overview.md
           - reference/architecture/network.md
           - reference/architecture/decision_records.md
-      - "":
-          - reference/license.md
-          - reference/changelog.md
-          - reference/roadmap.md
-          - reference/contributing.md
-          - reference/todo.md
   - "☷ Guides":
       - guides/index.md
       - "☳ HowTo":
-          - guides/how_to_configure_minicom.md
           - guides/how_to_add_or_remove_nodes.md
+          - guides/how_to_backup_and_restore.md
+          - guides/how_to_configure_minicom.md
+          - guides/how_to_expose_services_to_world.md
+          - guides/how_to_for_media_management.md
+          - guides/how_to_run_commands_on_multiple_nodes.md
+          - guides/how_to_update_documentation.md
+          - guides/how_to_use_both_github_and_gitea.md
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
+  - "⛬ Info":
+      - info/index.md
+      - info/roadmap.md
+      - info/changelog.md
+      - info/contributing.md
+      - info/license.md
+      # - info/todo.md # linked from roadmap
