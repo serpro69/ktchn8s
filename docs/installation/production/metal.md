@@ -143,12 +143,24 @@ Boot order options (select one, each has their pros and cons):
 
 Launch the [dev shell](../../concepts/development_shell.md):
 
-```sh
+```bash
 nix develop
 ```
 
 Bootstrap the nodes:
 
-```sh
+```bash
 make metal
+```
+
+## Testing
+
+!!! warning
+    These tests are still in a work-in-progress state.
+    Any contributions and improvements are very appreciated and most welcome!
+
+Run verifications after the metal nodes have been provisioned with: 
+
+```bash
+./tests/metal.sh
 ```
