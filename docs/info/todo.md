@@ -9,6 +9,14 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Try [rke2](https://docs.rke2.io/networking/basic_network_options?CNIplugin=Cilium+CNI+Plugin) which includes by default Cilium and nginx-ingress + etcd db
+    - ref: https://github.com/khuedoan/homelab/issues/179#issue-2875515756
+
+- [ ] Replace kickstart with cloud-init
+    - Kickstart is gonna end (?) and cloud-init is much more agnostic; also it can trigger ansible pull
+    - Cloud-init can also be used across muppet OSes, not just Fedora, as is the case with kickstart
+    - ref: https://github.com/khuedoan/homelab/issues/179#issue-2875515756
+
 - [ ] Improve github+gitea workflow
     - One of the downsides is that I need to delete non-master (PR) branches on gitea manually (well, via cli, but still)
     - Maybe use a separate branch for gitea? E.g. `main`?
