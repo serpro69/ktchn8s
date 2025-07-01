@@ -4,12 +4,21 @@ mkdocs-material
 # plugins
 mkdocs-minify-plugin
 mkdocs-panzoom-plugin
-### scripts (for development outside of nix shell)
-# backup
-argparse
+
+### ansible (for development outside of nix shell)
+ansible
+ansible-lint
+jinja2
+jmespath
 kubernetes
-# post-install
-# kubernetes # already included
+netaddr
+
+### scripts (for development outside of nix shell)
+# backup.py
+argparse
+#kubernetes # already included
+# post-install.py
+#kubernetes # already included
 pexpect
 rich
 requests

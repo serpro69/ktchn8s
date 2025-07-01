@@ -1270,3 +1270,14 @@ Similar to the KEX issue, you need to configure your SSH client to accept `ssh-r
     ssh user@10.10.10.2
     ```
 
+## Testing
+
+!!! warning
+    These tests are still in a work-in-progress state.
+    Any contributions and improvements are very appreciated and most welcome!
+
+Run verifications after the network has been configured with: 
+
+```bash
+./tests/network_stage4.sh
+```

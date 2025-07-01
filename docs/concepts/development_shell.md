@@ -39,6 +39,11 @@ ktchn8s on  docs [!+] using 󰅟 default/wlcm-tfstate-ffcb87 via 󱔎 default
 /nix/store/86p3knkm02c1ix9rfd3y1b53daybl9ag-python3-3.12.10-env/bin/mkdocs
 ```
 
+!!! warning
+    If you have a python virtual environment activated, you should deactivate it before entering the nix shell.
+    The nix shell environment in this project will create (if not exists) and activate it's own python venv, which may create conflicts.
+    You can also create a custom `nix` bash function that would deactivate any possibly-active virtualenv, and then run the `nix develop` itself.
+
 ### Entering the nix-shell automatically
 
 If you have [`direnv`](https://direnv.net) installed, you can run `direnv allow` once and it will automatically enter the nix shell every time you `cd` into the project.
@@ -55,6 +60,8 @@ alias nix-shell='nix-shell --run $SHELL'
 nix() {
   if [[ $1 == "develop" ]]; then
     shift
+    # deactivate any possibly-active virtualenv
+    command -v deactivate &> /dev/null && deactivate
     command nix develop -c $SHELL "$@"
   else
     command nix "$@"
