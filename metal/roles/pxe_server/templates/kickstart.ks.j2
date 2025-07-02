@@ -8,8 +8,12 @@ keyboard --xlayouts='us'
 # System language
 lang en_US.UTF-8
 
+# https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/installation_guide/sect-kickstart-examples#sect-kickstart-partitioning-example
 # Partition clearing information
 clearpart --all --drives={{ hostvars[item]['disk'] }}
+
+# Initializes unused partition tables
+zerombr
 
 # Partitioning
 ignoredisk --only-use={{ hostvars[item]['disk'] }}

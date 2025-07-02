@@ -79,9 +79,14 @@
     # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
     - name: Ensure gdisk is installed (for sgdisk)
       dnf:
-        name: gdisk
+        name:
+          - gdisk
+          - util-linux # fdisk, sfdisk, ...
         state: present
       when: proceed_with_wipe
+
+    # TODO: much simpler to use 'sfdisk --delete {{ target_disk }}', then 'poweroff'
+    #  can remove all of the below steps with this I think
 
     - name: Stop all swap activity on the system
       command: "swapoff -a"
