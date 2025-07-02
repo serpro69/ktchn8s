@@ -7,6 +7,12 @@
       Available ipv4 addresses on {{ ansible_hostname }} are:
         {{ hostvars['localhost']['ansible_all_ipv4_addresses'] }}
 
+- name: Check ansible_default_ipv4 address
+  assert:
+    that: hostvars['localhost']['ansible_default_ipv4'].address | ansible.utils.ipaddr(homelab_cidr)
+    fail_msg: |
+      Controller's default ipv4 address {{ hostvars['localhost']['ansible_default_ipv4'].address }} is not within {{ homelab_cidr }}
+
 - name: Ensure PXE server prerequisites
   include_tasks:
     file: before.yml
