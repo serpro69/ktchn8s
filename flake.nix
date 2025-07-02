@@ -101,6 +101,7 @@
             kubectl
             kubernetes-helm
             kustomize
+            krew
             # lang support
             go
             gotestsum
@@ -136,6 +137,9 @@
             python -m venv .venv
             source .venv/bin/activate
             pip install -r requirements.txt >/dev/null
+
+            # kubernetes plugins
+            krew install rook-ceph >/dev/null
           '';
         };
       }
