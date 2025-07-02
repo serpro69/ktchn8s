@@ -106,7 +106,7 @@ ifeq ($(origin TERM), undefined)
 endif
 
 ifeq ($(__NO_COLORS),true)
-	__RESET   =
+  __RESET   =
   __BLINK   =
   __BOLD    =
   __DIM     =
