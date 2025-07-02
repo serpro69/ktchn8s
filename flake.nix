@@ -139,7 +139,7 @@
             pip install -r requirements.txt >/dev/null
 
             # kubernetes plugins
-            krew install rook-ceph >/dev/null
+            krew install rook-ceph &>/dev/null
           '';
         };
       }
