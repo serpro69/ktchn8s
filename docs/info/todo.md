@@ -9,6 +9,8 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Install [ARA](https://github.com/ansible-community/ara) to record ansible executions
+
 - [ ] Try [rke2](https://docs.rke2.io/networking/basic_network_options?CNIplugin=Cilium+CNI+Plugin) which includes by default Cilium and nginx-ingress + etcd db
     - ref: https://github.com/khuedoan/homelab/issues/179#issue-2875515756
 
