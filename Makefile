@@ -21,7 +21,8 @@ inventory: ## List metal hosts from the ansible inventory
 	@make -C metal inventory
 
 metal: ## Provision baremetal servers and create a kubernetes cluster
-	@make -C metal main
+	@make -C metal main; \
+	./tests/metal.sh
 
 wake: ## Wake up the metal servers without re-provisioning them
 	@make -C metal wake
@@ -42,7 +43,8 @@ external: ## Provision external resources
 # misc
 
 finalize: clean ## Finalize the ktchn8s homelab cluster setup
-	@./scripts/post-install.py
+	@make -C tests filter=Smoke; \
+	./scripts/post-install.py
 
 docs: ## Serve documentation on localhost
 	@mkdocs serve
