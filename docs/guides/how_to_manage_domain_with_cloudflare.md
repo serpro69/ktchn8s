@@ -30,3 +30,6 @@ title: Manage Domain with Cloudflare
     ![image](../assets/images/guides/461462924-e659d692-5d3c-4259-88b1-8b6dbc0c1c04.png)
 
 - Profit
+
+!!! info
+    For more information see the [cloudflare full DNS setup guide](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/)
