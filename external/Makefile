@@ -9,7 +9,7 @@
 #                                             VARIABLES
 
 export KUBECONFIG 		  = $(shell pwd)/../metal/kubeconfig.yaml
-export KUBE_CONFIG_PATH = $(shell pwd)/../metal/kubeconfig.yaml
+export KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 ################################################################################################
 #                                             TARGETS
