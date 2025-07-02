@@ -156,6 +156,7 @@ nav:
           - guides/how_to_backup_and_restore.md
           - guides/how_to_configure_minicom.md
           - guides/how_to_expose_services_to_world.md
+          - guides/how_to_manage_domain_with_cloudflare.md
           - guides/how_to_for_media_management.md
           - guides/how_to_run_commands_on_multiple_nodes.md
           - guides/how_to_update_documentation.md
