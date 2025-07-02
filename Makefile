@@ -17,13 +17,13 @@ ktchn8s: metal system external finalize ## Provision ktchn8s homelab cluster
 console: ## Start the Ansible console
 	@make -C metal console
 
-inventory: ## List hosts from the ansible inventory
+inventory: ## List metal hosts from the ansible inventory
 	@make -C metal inventory
 
 metal: ## Provision baremetal servers and create a kubernetes cluster
 	@make -C metal main
 
-wake: ## Wake up the servers without re-provisioning them
+wake: ## Wake up the metal servers without re-provisioning them
 	@make -C metal wake
 
 clean: ## Shutdown ephemeral PXE server resources
@@ -48,7 +48,7 @@ docs: ## Serve documentation on localhost
 	@mkdocs serve
 
 help: ## Print this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 run: ## Run a CMD command on all servers via SSH
 	@cmd=$(CMD); \
