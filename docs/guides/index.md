@@ -14,6 +14,7 @@ title: Guides
 - [Backup and Restore](./how_to_backup_and_restore.md)
 - [Configuring Minicom](./how_to_configure_minicom.md)
 - [Expose Services to the World](./how_to_expose_services_to_world.md)
+- [Manage Domains with Cloudflare](./how_to_manage_domain_with_cloudflare.md)
 - [Manage your Media](./how_to_for_media_management.md)
 - [Run Commands on Nodes](./how_to_run_commands_on_multiple_nodes.md)
 - [Update Documentation](./how_to_update_documentation.md)

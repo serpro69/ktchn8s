@@ -23,7 +23,7 @@ You'll be asked to provide these credentials on first build.
 
 ### Cloudflare
 
-- Buy a domain 
+- Buy a domain (from any registrar you like) and [set it up with cloudflare](../../guides/how_to_manage_domain_with_cloudflare.md)
     - You may also wish to [transfer domain to Cloudflare](https://developers.cloudflare.com/registrar/get-started/transfer-domain-to-cloudflare) entirely, it's up to you.
 - Get Cloudflare email and account ID
 - Get Cloudflare **Global API key**: <https://dash.cloudflare.com/profile/api-tokens>
