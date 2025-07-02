@@ -70,7 +70,10 @@ echo "Using KUBECONFIG: $KUBECONFIG"
 # --- A. Verify Kubernetes Cluster Health & Basic Functionality ---
 print_step "A. Verify Kubernetes Cluster Health & Basic Functionality"
 
-print_sub_step "A1: Check Node Status and Details"
+print_sub_step "A0: Wait for Nodes to be Ready"
+kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+print_sub_step "A1: Check Node Details"
 kubectl get nodes -o wide
 # Manual verification: Check all nodes are Ready, roles, IPs, versions.
 
