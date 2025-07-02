@@ -28,5 +28,6 @@ _requirements:
 
 main: SHELL:=$(shell which bash)
 main: ## Provision external resources
-	@make -C ansible main
-	@make -C terraform apply
+	@make -C ansible main; \
+	make -C terraform init WORKSPACE=ktchn8s; \
+	make -C terraform apply
