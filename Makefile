@@ -10,6 +10,8 @@ KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 default: help
 
+ktchn8s: metal system external finalize ## Provision ktchn8s homelab cluster
+
 # metal
 
 console: ## Start the Ansible console
@@ -24,6 +26,9 @@ metal: ## Provision baremetal servers and create a kubernetes cluster
 wake: ## Wake up the servers without re-provisioning them
 	@make -C metal wake
 
+clean: ## Shutdown ephemeral PXE server resources
+	@docker compose --project-directory ./metal/roles/pxe_server/files down
+
 # system
 
 system: ## Provision system resources on the kubernetes cluster
@@ -36,7 +41,7 @@ external: ## Provision external resources
 
 # misc
 
-finalize:
+finalize: clean ## Finalize the ktchn8s homelab cluster setup
 	@./scripts/post-install.py
 
 docs: ## Serve documentation on localhost
