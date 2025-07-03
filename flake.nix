@@ -9,57 +9,24 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
+        # kanidm 1.2.3, lowest I find and build with nix that's <= kanidm server version (1.3.3)
+        # using client version > 1.3.3 results in incompatibilities and errors
+        # e.g. I couldn't reset a person's token because it throws an error about missing input for expiration time
+        kanidm-overlay = final: prev: {
+          kanidm_1_2 = (import (builtins.fetchTarball {
+            # https://lazamar.co.uk/nix-versions/?channel=nixos-25.05&package=kanidm
+            url = "https://github.com/NixOS/nixpkgs/archive/f27b62e789ceae5531852d8a015bae05ada145de.tar.gz";
+            # sha256 can be computed with:
+            # nix-prefetch-url --unpack <URL>
+            sha256 = "0h5wj3bi3z01wdk62j6li5lhpac141l6sgjspszfv59nxrpan28z";
+          }) { inherit system; }).kanidm;
+        };
+
         pkgs = import nixpkgs {
            inherit system;
            config.allowUnfree = true;
-
-           overlays = [
-               (import (
-                 fetchTarball {
-                   url = "https://github.com/oxalica/rust-overlay/archive/master.tar.gz";
-                   # TODO: better way to ensure sha matches master branch, especially if it's updated quite frequently
-                   sha256 = "sha256:05di19x4h0w4gdd47qbmi9zch5l60h550447msdm72yc910kly40";
-                 })
-               )
-             ];
-           };
-
-           rustPlatform = pkgs.makeRustPlatform {
-             cargo = pkgs.rust-bin.stable.latest.minimal;
-             rustc = pkgs.rust-bin.stable.latest.minimal;
-           };
-
-           kanidmFromSource = rustPlatform.buildRustPackage rec {
-             pname = "kanidm";
-             version = "1.6.4";
-
-             src = pkgs.fetchzip {
-               url = "https://github.com/kanidm/kanidm/archive/refs/tags/v${version}.tar.gz";
-               hash = "sha256-zI+IPwpkkF67/JSl3Uu+Q1giUN49r/hjvY+/QLqB5eM=";
-             };
-
-             nativeBuildInputs = [ pkgs.openssl pkgs.pam ];
-
-             cargoHash = "sha256-l4UNdVvPteqs46Fm7yVgkgplANvkAmb4fooLigXRqZM=";
-
-             cargoRoot = "tools/cli";
-             cargoLock = {
-               lockFile = "${src}/Cargo.lock";
-             };
-
-             cargoBuildFlags = [ "--bin" "kanidm" ];
-
-             postPatch = ''
-               ln -s ${src}/Cargo.lock tools/cli/Cargo.lock
-             '';
-
-             meta = {
-               description = "A simple, secure, and fast identity management platform";
-               homepage = "https://github.com/kanidm/kanidm";
-               license = pkgs.lib.licenses.mpl20;
-               maintainers = [ ];
-             };
-           };
+           overlays = [ kanidm-overlay ];
+        };
       in
       with pkgs;
       {
@@ -96,7 +63,7 @@
             # k8s tools
             dyff
             k9s
-            kanidm
+            kanidm_1_2
             kube3d
             kubectl
             kubernetes-helm
@@ -122,14 +89,12 @@
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # NOTE: Darwin-only packages for cross-platform compatibility
             # k8s tools
-            kanidmFromSource
           ] ++ lib.optionals pkgs.stdenv.isLinux [
             # NOTE: Linux-only packages for cross-platform compatibility
             # networking tools
             iproute2
             # k8s tools
             helm
-            kanidm
           ];
 
           shellHook = ''
