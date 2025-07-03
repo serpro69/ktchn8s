@@ -20,6 +20,5 @@
 - name: Ensure base packages are installed
   dnf:
     name:
-      - '*' # update packages
       - dnf-utils # provides 'needs-restarting' for kured
     state: present
