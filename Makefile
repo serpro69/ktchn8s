@@ -85,10 +85,10 @@ destroy: ## Destroy the ktchn8s homelab cluster and all associated resources
 	printf "$(__BOLD)$(__RED)Do you want to proceed?$(__RESET)\n"; \
 	read -p "$(__BOLD)$(__RED)Only 'YES' will be accepted: $(__RESET)" ANSWER && \
 	if [ "$${ANSWER}" = "YES" ]; then \
+		make -C external/terraform destroy; \
 		for hst in $$(make inventory | xargs); do \
 			make -C metal wipe SERVER=$$hst; \
 		done; \
-		make -C external destroy; \
 		make clean; \
 		printf "$(__GREEN)All resources have been destroyed!$(__RESET)\n"; \
 		printf "$(__GREEN)  - Commit the terraform state with deleted resources: $(__DIM)git add external/terraform/terraform.tfstate.d && git commit -m 'Delete external resources'$(__RESET)\n"; \
