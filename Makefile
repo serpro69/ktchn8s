@@ -5,7 +5,7 @@
 .PHONY: *
 # .EXPORT_ALL_VARIABLES: this causes issues with tput, dunno why...
 
-export KUBECONFIG       = $(shell pwd)/../metal/kubeconfig.yaml
+export KUBECONFIG       = $(shell pwd)/metal/kubeconfig.yaml
 export KUBE_CONFIG_PATH = $(KUBECONFIG)
 
 ################################################################################################
@@ -86,7 +86,7 @@ destroy: ## Destroy the ktchn8s homelab cluster and all associated resources
 	read -p "$(__BOLD)$(__RED)Only 'YES' will be accepted: $(__RESET)" ANSWER && \
 	if [ "$${ANSWER}" = "YES" ]; then \
 		make -C external/terraform destroy; \
-		for hst in $$(make inventory | xargs); do \
+		for hst in $$(make --quiet inventory | xargs); do \
 			make -C metal wipe SERVER=$$hst; \
 		done; \
 		make clean; \
