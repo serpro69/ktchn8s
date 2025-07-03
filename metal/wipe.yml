@@ -29,7 +29,7 @@
       changed_when: false
 
     - name: Get current disk and partition information
-      command: "lsblk -J -o NAME,PATH,SIZE,FSTYPE,MOUNTPOINT,PARTTYPE,UUID"
+      command: lsblk -J -o NAME,PATH,SIZE,FSTYPE,MOUNTPOINT,PARTTYPE,UUID
       register: lsblk_output
       changed_when: false
 
@@ -41,7 +41,7 @@
           {{ lsblk_output.stdout | from_json | to_nice_yaml }}
 
     - name: Get root filesystem device (for additional safety check)
-      command: "findmnt -n -o SOURCE /"
+      command: findmnt -n -o SOURCE /
       register: root_fs_source
       changed_when: false
       failed_when: false # allow to proceed if findmnt isn't available or fails
@@ -77,25 +77,20 @@
     # These tasks will only run if 'proceed_with_wipe' is true
 
     # TODO: this should be platform-agnostic (e.g. on ubuntu the package is called sgdisk)
-    - name: Ensure gdisk is installed (for sgdisk)
+    - name: Ensure necessary packages are present
       dnf:
         name:
-          - gdisk
+          - gdisk # sgdisk
           - util-linux # fdisk, sfdisk, ...
         state: present
-      when: proceed_with_wipe
-
-    # TODO: much simpler to use 'sfdisk --delete {{ target_disk }}', then 'poweroff'
-    #  can remove all of the below steps with this I think
 
     - name: Stop all swap activity on the system
-      command: "swapoff -a"
+      command: swapoff -a
       changed_when: true
       failed_when: false # don't fail if no swap is active or already stopped
-      when: proceed_with_wipe
 
     - name: Disconnect any mounted non-root partitions on the target disk
-      command: "umount -f {{ item.mountpoint }}"
+      command: umount -f {{ item.mountpoint }}
       loop: "{{ lsblk_output.stdout | from_json | json_query('blockdevices[?starts_with(path, `' + target_disk + '`) && mountpoint
         != null && mountpoint != `` && mountpoint != `/`]') }}"
       loop_control:
@@ -103,62 +98,32 @@
       changed_when: true
       failed_when: false # don't fail if already unmounted or not present
       ignore_errors: true # try to unmount, but don't stop if it fails for some reason
-      when: proceed_with_wipe
 
-    - name: Forcefully clear all GPT/MBR partition tables and data with sgdisk
-      # sgdisk --zap-all clears all partition table entries, MBR, GPT, and protective MBR.
-      # This effectively "removes all existing partitions" and "creates a new partition table" in one brutal step.
-      # This is the most reliable way to wipe a live boot disk for reinstallation.
-      command: "sgdisk --zap-all {{ target_disk }}"
+    - name: Delete all partition tables and data with sgdisk
+      command: sgdisk --zap-all {{ target_disk }}
       changed_when: true
-      when: proceed_with_wipe
 
-    - name: Sync disk after partition table wipe
-      command: "sync"
-      changed_when: false
-      when: proceed_with_wipe
-
-    - name: Zero out the first 2MB of the disk to clear residual bootloaders/headers
-      command: "dd if=/dev/zero of={{ target_disk }} bs=1M count=2"
-      changed_when: true
-      when: proceed_with_wipe
+    # - name: Delete all partition tables and data with sfdisk
+    #   command: sfdisk --delete {{ target_disk }}
+    #   changed_when: true
 
     - name: Wipe filesystem, RAID, and LVM signatures from the entire disk
-      command: "wipefs -a {{ target_disk }}"
+      command: wipefs -a {{ target_disk }}
       changed_when: true
-      when: proceed_with_wipe
       # This task might still fail occasionally due to stubborn kernel references
       # on extremely busy root disks. If it does, a reboot is the final solution.
       failed_when: false
 
-    - name: Get disk size in 512-byte sectors for dd operation
-      command: "blockdev --getsz {{ target_disk }}"
-      register: disk_sectors
-      changed_when: false
-      when: proceed_with_wipe
-
-    - name: Zero out the last 2MB of the disk to clear backup GPT header (if GPT)
-      shell: |
-        dd if=/dev/zero of={{ target_disk }} bs=1M seek=$(( ({{ disk_sectors.stdout | int }} * 512 / (1024*1024)) - 2 )) count=2 conv=notrunc
-      changed_when: true
-      when: proceed_with_wipe and disk_sectors.stdout is defined
-
     - name: Sync disk to ensure all changes are written
       command: "sync"
       changed_when: false
-      when: proceed_with_wipe
+
+    - name: Shutdown the server
+      community.general.shutdown:
 
     - name: Notify successful disk wipe
       debug:
         msg: >-
           Disk {{ target_disk }} has been successfully wiped and prepared for reinstallation.
-          The {{ inventory_hostname }} server is now ready for a fresh OS install.
-      when: proceed_with_wipe
+          The {{ inventory_hostname }} server has been powered off and is now ready for a fresh OS install.
 
-    - name: Reboot the server (if desired for reinstallation)
-      reboot:
-        reboot_command: poweroff # poweroff and forget, we're installing the OS via bootstrap play later
-        reboot_timeout: 10 # wait up to 10 minutes for poweroff
-      failed_when: false
-      ignore_unreachable: true
-      when: proceed_with_wipe
