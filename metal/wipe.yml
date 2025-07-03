@@ -127,4 +127,3 @@
         msg: >-
           Disk {{ target_disk }} has been successfully wiped and prepared for reinstallation.
           The {{ inventory_hostname }} server has been powered off and is now ready for a fresh OS install.
-
