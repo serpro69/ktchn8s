@@ -9,6 +9,71 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Test zapping devices and make sure it works fine. Current version was tested on `draupnir`, which seemed to wipe the disk fine, but I had to do some manual steps afterwards to create OSD on the new node once the node was re-provisioned and joined the cluster again. Particularly, I had to restart the rook-ceph-operator.
+
+    Looking at the OSD pods with
+
+    ```bash
+    kubectl -n rook-ceph get pod -l app=rook-ceph-osd
+    ```
+
+    ...showed only 4 nodes even after a few hours of re-provisioning the node
+
+    ```
+    NAME                               READY   STATUS    RESTARTS   AGE
+    rook-ceph-osd-0-5554f4f4bc-rrpj6   1/1     Running   0          3h25m
+    rook-ceph-osd-1-5bdcf57db5-ccwnf   1/1     Running   0          3h25m
+    rook-ceph-osd-3-7d9f568c86-hjj5m   1/1     Running   0          3h18m
+    rook-ceph-osd-4-5994f5bf78-kvvlh   1/1     Running   0          3h24m
+    ```
+
+    And prepare pod for `draupnir` didn't start on its own after re-provisioning the node:
+
+    ```bash
+    kubectl -n rook-ceph get pod -l app=rook-ceph-osd-prepare
+    ```
+
+    ```
+    NAME                                     READY   STATUS      RESTARTS   AGE
+    rook-ceph-osd-prepare-freyja-5x2jp       0/1     Completed   0          3h25m
+    rook-ceph-osd-prepare-heimdall-qt596     0/1     Completed   0          3h25m
+    rook-ceph-osd-prepare-megingjord-24cm7   0/1     Completed   0          3h18m
+    rook-ceph-osd-prepare-odin-v5kwm         0/1     Completed   0          3h24m
+    ```
+
+    So I had to dig into troubleshooting guides and eventually found something that seemed to work based on this [solution](https://rook.io/docs/rook/latest-release/Troubleshooting/ceph-common-issues/#solution_5):
+
+    > After the settings are updated or the devices are cleaned, trigger the operator to analyze the devices again by restarting the operator. Each time the operator starts, it will ensure all the desired devices are configured. The operator does automatically deploy OSDs in most scenarios, but an operator restart will cover any scenarios that the operator doesn't detect automatically.
+
+    ```bash
+    # Restart the operator to ensure devices are configured. A new pod will automatically be started when the current operator pod is deleted.
+    $ kubectl -n rook-ceph delete pod -l app=rook-ceph-operator
+    ```
+
+    Then checking the pods after the operator restarted:
+
+    ```bash
+    kubectl -n rook-ceph get pod -l app=rook-ceph-osd
+    #NAME                               READY   STATUS    RESTARTS   AGE
+    #rook-ceph-osd-0-5554f4f4bc-rrpj6   1/1     Running   0          3h25m
+    #rook-ceph-osd-1-5bdcf57db5-ccwnf   1/1     Running   0          3h25m
+    #rook-ceph-osd-3-7d9f568c86-hjj5m   1/1     Running   0          3h18m
+    #rook-ceph-osd-4-5994f5bf78-kvvlh   1/1     Running   0          3h24m
+    #rook-ceph-osd-5-798fd5f45c-xjzz2   1/1     Running   0          6m18s
+
+    kubectl -n rook-ceph get pod -l app=rook-ceph-osd-prepare
+    #NAME                                     READY   STATUS      RESTARTS   AGE
+    #rook-ceph-osd-prepare-draupnir-gqz9p     0/1     Completed   0          9m25s
+    #rook-ceph-osd-prepare-freyja-5x2jp       0/1     Completed   0          9m21s
+    #rook-ceph-osd-prepare-heimdall-qt596     0/1     Completed   0          9m18s
+    #rook-ceph-osd-prepare-megingjord-24cm7   0/1     Completed   0          9m15s
+    #rook-ceph-osd-prepare-odin-v5kwm         0/1     Completed   0          9m12s
+    ```
+
+    - see also:
+        - [ceph teardown - zapping devices](https://rook.io/docs/rook/latest-release/Storage-Configuration/ceph-teardown/#zapping-devices)
+        - [ceph common issues](https://rook.io/docs/rook/latest-release/Troubleshooting/ceph-common-issues/#osd-pods-are-not-created-on-my-devices)
+
 - [ ] Install [ARA](https://github.com/ansible-community/ara) to record ansible executions
 
 - [ ] Try [rke2](https://docs.rke2.io/networking/basic_network_options?CNIplugin=Cilium+CNI+Plugin) which includes by default Cilium and nginx-ingress + etcd db
