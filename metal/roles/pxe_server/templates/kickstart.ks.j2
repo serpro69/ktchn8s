@@ -1,5 +1,18 @@
 #version=RHEL8
 
+# using this pre instead of regular partitioning to preserve the order of the partitions
+# ref: https://discussion.fedoraproject.org/t/partition-order-with-kickstart/119359/5
+%pre
+# create partitions
+wipefs -af /dev/{{ hostvars[item]['disk'] }}
+sfdisk /dev/{{ hostvars[item]['disk'] }} << EOF
+label: gpt
+size=512M, type=uefi
+size=65536M, type=linux
+EOF
+
+%end
+
 # Do not use graphical install
 text
 
@@ -8,17 +21,9 @@ keyboard --xlayouts='us'
 # System language
 lang en_US.UTF-8
 
-# https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/installation_guide/sect-kickstart-examples#sect-kickstart-partitioning-example
-# Partition clearing information
-clearpart --all --drives={{ hostvars[item]['disk'] }}
-
-# Initializes unused partition tables
-zerombr
-
-# Partitioning
-ignoredisk --only-use={{ hostvars[item]['disk'] }}
-partition /boot/efi --fstype=vfat --size=512
-partition / --fstype=ext4 --size=65536
+# Partitions
+part /boot/efi --fstype=efi --onpart={{ hostvars[item]['disk'] }}{% if hostvars[item]['disk'] is match("nvme") -%} p {%- endif %}1
+part / --fstype=ext4 --onpart={{ hostvars[item]['disk'] }}{% if hostvars[item]['disk'] is match("nvme") -%} p {%- endif %}2
 
 # Network information
 network --bootproto=static --device={{ hostvars[item]['network_interface'] }} --ip={{ hostvars[item]['ansible_host'] }} --gateway={{ ansible_default_ipv4.gateway }} --nameserver={{ dns_server }} --netmask={{ ansible_default_ipv4.netmask }} --ipv6=auto --hostname={{ hostvars[item]['inventory_hostname'] }} --activate
