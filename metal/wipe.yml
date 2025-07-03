@@ -11,7 +11,7 @@
     # !!! CRITICAL: Replace with the EXACT path to the disk you want to wipe !!!
     # Based on your lsblk output, this is your primary OS disk.
     # e.g., "/dev/sda", "/dev/sdb", "/dev/nvme0n1"
-    target_disk: "/dev/nvme0n1"
+    target_disk: "{{ hostvars['disk'] }}"
 
   tasks:
     - name: Check if target_disk variable is defined
@@ -99,20 +99,21 @@
       failed_when: false # don't fail if already unmounted or not present
       ignore_errors: true # try to unmount, but don't stop if it fails for some reason
 
-    - name: Delete all partition tables and data with sgdisk
-      command: sgdisk --zap-all {{ target_disk }}
-      changed_when: true
-
-    # - name: Delete all partition tables and data with sfdisk
-    #   command: sfdisk --delete {{ target_disk }}
+    # - name: Delete all partition tables and data with sgdisk
+    #   command: sgdisk --zap-all {{ target_disk }}
     #   changed_when: true
 
-    - name: Wipe filesystem, RAID, and LVM signatures from the entire disk
-      command: wipefs -a {{ target_disk }}
+    - name: Delete all partition tables and data with sfdisk
+      command: sfdisk --delete {{ target_disk }}
       changed_when: true
-      # This task might still fail occasionally due to stubborn kernel references
-      # on extremely busy root disks. If it does, a reboot is the final solution.
-      failed_when: false
+
+    # NOTE: We run this as part of kickstart when (re-)installing the OS
+    # - name: Wipe filesystem, RAID, and LVM signatures from the entire disk
+    #   command: wipefs -a {{ target_disk }}
+    #   changed_when: true
+    #   # This task might still fail occasionally due to stubborn kernel references
+    #   # on extremely busy root disks. If it does, a reboot is the final solution.
+    #   failed_when: false
 
     - name: Sync disk to ensure all changes are written
       command: "sync"
