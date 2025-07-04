@@ -63,7 +63,6 @@
             # k8s tools
             dyff
             k9s
-            kanidm_1_2
             kube3d
             kubectl
             kubernetes-helm
@@ -95,6 +94,7 @@
             iproute2
             # k8s tools
             helm
+            kanidm_1_2
           ];
 
           shellHook = ''
