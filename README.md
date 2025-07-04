@@ -109,7 +109,13 @@ They can't capture all the project's features, but they are sufficient to get a 
 
 ...or simply:
 
-```
+<pre style="margin-left: 25%; margin-right: auto;">
+<style>
+.md-clipboard.md-icon {
+  display: none;
+}
+</style>
+<code style="background-color: #070707;">
              ________________________________________________
             /                       🐧                       \
            |    _________________________________________     |
@@ -135,7 +141,7 @@ They can't capture all the project's features, but they are sufficient to get a 
  _-'.-.-.-.-.-. .---.-. .-------------------------. .-.---. .---.-.-.-.`-_
 :-------------------------------------------------------------------------:
 `---._.-------------------------------------------------------------._.---'
-```
+</code></pre>
 
 ## Roadmap
 
