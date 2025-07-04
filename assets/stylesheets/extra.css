@@ -1,0 +1,7 @@
+/* 
+Maximum space for text block
+ref: https://github.com/squidfunk/mkdocs-material/discussions/3692#discussioncomment-2331804
+*/
+.md-grid {
+  max-width: 96%; /* or 100%, if you want to stretch to full-width */
+}
