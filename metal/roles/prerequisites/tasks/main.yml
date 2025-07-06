@@ -17,6 +17,11 @@
     search_string: fastestmirror
     line: fastestmirror=True
 
+- name: Update all packages # noqa package-latest
+  dnf:
+    name: '*'
+    state: latest
+
 - name: Ensure base packages are installed
   dnf:
     name:

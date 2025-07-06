@@ -85,6 +85,11 @@ EOF
 sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0\nGRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 
+# Required for ansible since it defaults to dnf5 on fedora42
+# ref: https://github.com/ansible/ansible/issues/84206
+# ref: https://github.com/ansible/ansible/issues/82930
+dnf install python3-libdnf5 -y
+
 %end
 
 reboot
