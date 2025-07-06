@@ -232,10 +232,7 @@ wake: SHELL:=$(shell which bash)
 wake: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up the servers without re-provisioning them
 	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),--extra-vars "pxe_state=absent")
 
-DISK ?= /dev/nvme0n1
-
 wipe: SHELL:=$(shell which bash)
 wipe: ~/.ssh/homelab_id_ed25519 _requirements ## Wipe the DISK disk on the SERVER
 	@$(call check_defined, SERVER, missing or empty variable; run 'make inventory' for a list of hosts)
-	@$(call check_defined, DISK, missing or empty variable; run 'make inventory' for a list of hosts)
-	@$(call play,wipe.yml,$(ANSIBLE_TAGS),,-e "wipe_target=$(SERVER)" -e "target_disk=$(DISK)")
+	@$(call play,wipe.yml,$(ANSIBLE_TAGS),,-e "wipe_target=$(SERVER)")
