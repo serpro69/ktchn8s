@@ -8,10 +8,7 @@
   gather_facts: no # no need to gather all facts initially, we'll get what we need
 
   vars:
-    # !!! CRITICAL: Replace with the EXACT path to the disk you want to wipe !!!
-    # Based on your lsblk output, this is your primary OS disk.
-    # e.g., "/dev/sda", "/dev/sdb", "/dev/nvme0n1"
-    target_disk: "{{ hostvars['disk'] }}"
+    target_disk: "/dev/{{ hostvars[inventory_hostname]['disk'] }}"
 
   tasks:
     - name: Check if target_disk variable is defined
@@ -33,18 +30,18 @@
       register: lsblk_output
       changed_when: false
 
-    - name: Display current disk information (CRITICAL REVIEW STEP)
+    - name: Get root filesystem device
+      command: findmnt -n -o SOURCE /
+      register: root_fs_source
+      changed_when: false
+      failed_when: false # allow to proceed if findmnt isn't available or fails
+
+    - name: Display current disk information
       debug:
         msg: |
           ATTENTION: You are about to perform a destructive operation on {{ target_disk }}.
           Current disk info:
           {{ lsblk_output.stdout | from_json | to_nice_yaml }}
-
-    - name: Get root filesystem device (for additional safety check)
-      command: findmnt -n -o SOURCE /
-      register: root_fs_source
-      changed_when: false
-      failed_when: false # allow to proceed if findmnt isn't available or fails
 
     - name: Perform a final safety confirmation before wipe
       pause:
