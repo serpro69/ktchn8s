@@ -102,7 +102,7 @@ console: ## Start the Ansible console
 	@make -C metal console
 
 inventory: ## List metal hosts from the ansible inventory
-	@make -C metal inventory
+	@make --quiet -C metal inventory
 
 metal: ## Provision baremetal servers and create a kubernetes cluster
 	@make -C metal main; \
