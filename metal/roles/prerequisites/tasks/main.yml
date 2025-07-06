@@ -21,4 +21,12 @@
   dnf:
     name:
       - dnf-utils # provides 'needs-restarting' for kured
+      # hardware monitoring tools
+      - lm_sensors
+      - hddtemp
+      - smartmontools
     state: present
+
+- name: Detect sensors
+  command: sensors-detect --auto
+  changed_when: true
