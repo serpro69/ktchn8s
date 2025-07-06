@@ -9,6 +9,16 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Stream/export sensor data from baremetal and visualize it in grafana
+    - some potentially-useful resources to explore:
+        - https://grafana.com/blog/2019/11/06/how-to-stream-sensor-data-with-grafana-and-influxdb/
+        - https://grafana.com/blog/2021/08/12/streaming-real-time-sensor-data-to-grafana-using-mqtt-and-grafana-live/
+        - https://grafana.com/blog/2024/01/03/how-to-create-alert-rules-to-monitor-sensor-data-with-grafana-and-raspberry-pi/
+        - https://github.com/sbnb-io/sbnb/blob/main/README-GRAFANA.md
+            - https://www.reddit.com/r/homelab/comments/1iuvbxp/fastest_way_to_start_bare_metal_server_from_zero/
+        - https://grafana.com/grafana/dashboards/237-sensors/
+        - https://github.com/ncabatoff/sensor-exporter
+
 - [ ] Automate [firmware updates](../guides/how_to_update_firmware.md)
 
 - [ ] Test zapping devices and make sure it works fine. Current version was tested on `draupnir`, which seemed to wipe the disk fine, but I had to do some manual steps afterwards to create OSD on the new node once the node was re-provisioned and joined the cluster again. Particularly, I had to restart the rook-ceph-operator.
