@@ -1,6 +1,6 @@
 ---
-iso_url: "https://download.fedoraproject.org/pub/fedora/linux/releases/39/Server/x86_64/iso/Fedora-Server-dvd-x86_64-39-1.5.iso"
-iso_checksum: "sha256:2755cdff6ac6365c75be60334bf1935ade838fc18de53d4c640a13d3e904f6e9"
+iso_url: https://download.fedoraproject.org/pub/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-dvd-x86_64-42-1.1.iso
+iso_checksum: "sha256:7fee9ac23b932c6a8be36fc1e830e8bba5f83447b0f4c81fe2425620666a7043"
 timezone: Europe/Oslo
 dhcp_proxy: true
 
