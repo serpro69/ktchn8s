@@ -41,6 +41,21 @@ __WHITE          = $(shell tput setaf 7)
 # set to 'true' to disable colors
 __NO_COLORS      = false
 
+# https://stackoverflow.com/a/10858332
+# Check that given variables are set and all have non-empty values,
+# die with an error otherwise.
+#
+# Params:
+#   1. Variable name(s) to test.
+#   2. (optional) Error message to print.
+check_defined = \
+    $(strip $(foreach 1,$1, \
+        $(call __check_defined,$1,$(strip $(value 2)))))
+
+__check_defined = \
+    $(if $(value $1),, \
+      $(error Undefined $1$(if $2, ($2))))
+
 ################################################################################################
 #                                             RULES
 
@@ -94,6 +109,24 @@ destroy: ## Destroy the ktchn8s homelab cluster and all associated resources
 		printf "$(__GREEN)  - Commit the terraform state with deleted resources: $(__DIM)git add external/terraform/terraform.tfstate.d && git commit -m 'Delete external resources'$(__RESET)\n"; \
 		printf "$(__GREEN)  - Clean up DNS records created by the cluster in your cloudflare zone $(__DIM)(yes, this is manual for now 😔)$(__RESET)\n"; \
 		printf "$(__GREEN)  - Make a new cluster: $(__DIM)make ktchn8s$(__RESET) 🚀\n"; \
+	fi
+
+remove: ## Remove a node from the cluster
+	@$(call check_defined, NODE_NAME, missing or empty variable; run 'make inventory' for a list of hosts)
+	@printf "$(__BOLD)$(__RED)WARNING! You are about to remove $(NODE_NAME) node from your cluster and wipe its disk! This can not be reverted!$(__RESET)\n"; \
+	printf "$(__BOLD)$(__RED)Do you want to proceed?$(__RESET)\n"; \
+	read -p "$(__BOLD)$(__RED)Only 'YES' will be accepted: $(__RESET)" ANSWER && \
+	if [ "$${ANSWER}" = "YES" ]; then \
+		kubectl get nodes -o name | grep -q $(NODE_NAME) || printf "$(__YELLOW)Warning: $(NODE_NAME) is not a part of the cluster!$(__RESET)\n"; \
+		kubectl get nodes -o name | grep -q $(NODE_NAME) && {
+			kubectl drain $(NODE_NAME) --delete-emptydir-data --ignore-daemonsets --force; \
+			kubectl delete node $(NODE_NAME); \
+		}; \
+		make -C metal wipe SERVER=$(NODE_NAME); \
+		make clean; \
+		printf "$(__GREEN)$(NODE_NAME) has been removed from the cluster!$(__RESET)\n"; \
+		printf "$(__GREEN)  - Remove the $(NODE_NAME) from the metal inventory file if you want to permanently remove it from the cluster$(__RESET)\n"; \
+		printf "$(__GREEN)  - Re-add the node to the cluster with: $(__DIM)make -C metal main ANSIBLE_TARGETS=localhost,$(NODE_NAME)$(__RESET) 🚀\n"; \
 	fi
 
 ### metal
