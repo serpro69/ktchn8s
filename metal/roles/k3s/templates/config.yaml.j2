@@ -9,12 +9,12 @@ token-file: "{{ k3s_token_file }}"
 node-ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
 advertise-address: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
 
-{% if inventory_hostname == (groups['control_plane'] | first) %}
+{% if (not cluster_exists) and (inventory_hostname == control_plane_node) %}
 cluster-init: true
 {% else %}
 server: "https://{{ control_plane_endpoint }}:6443" # Assumes kube-vip brings up control_plane_endpoint
 # Alternative if VIP isn't ready yet for joining nodes:
-# server: "https://{{ hostvars[groups['control_plane'] | first]['ansible_host'] }}:6443"
+# server: "https://{{ hostvars[control_plane_node]['ansible_host'] }}:6443"
 {% endif %}
 
 # Ensure all control plane members and the VIP are in tls-san
