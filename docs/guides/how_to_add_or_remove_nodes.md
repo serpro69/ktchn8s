@@ -71,11 +71,18 @@ Shutdown the node:
 ssh root@${NODE_IP} poweroff
 ```
 
+!!! tip
+    You can run `make remove NODE_NAME=bar` to achieve the above steps.
+    <br>
+    _**NB! this will also wipe the disk on the node!**_
+
 ## Rename a node
 
 !!! warning
     Make sure to stop and remove ephemeral pxe docker containers before you re-run `bootstrap`:
     `docker stop files-http-1 files-dnsmasq-1 && docker rm files-http-1 files-dnsmasq-1`
+
+First [remove the node](#remove-a-node), then update the inventory file:
 
 ```diff title="metal/inventories/prod.yml"
 diff --git a/metal/inventories/prod.yml b/metal/inventories/prod.yml
@@ -90,7 +97,7 @@ index 123456..abcdef 100644
 +        baz: {ansible_host: 10.10.10.24, mac: '...', disk: nvme0n1, network_interface: eno1}
 ```
 
-Install the OS and join the cluster:
+After that, install the OS and join the cluster:
 
 ```
 make metal
