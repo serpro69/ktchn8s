@@ -9,7 +9,7 @@ token-file: "{{ k3s_token_file }}"
 node-ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
 advertise-address: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
 
-{% if (not cluster_exists) and (inventory_hostname == control_plane_node) %}
+{% if (not controller_exists) and (inventory_hostname == control_plane_node) %}
 cluster-init: true
 {% else %}
 server: "https://{{ control_plane_endpoint }}:6443" # Assumes kube-vip brings up control_plane_endpoint
