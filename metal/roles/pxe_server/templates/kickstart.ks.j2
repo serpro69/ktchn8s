@@ -82,7 +82,11 @@ write
 EOF
 
 # Modify grub configuration to hide the boot menu and set timeout to 0
-sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0\nGRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
+sed -i 's/^GRUB_TIMEOUT=.*$/GRUB_TIMEOUT=0\nGRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
+# Disable ASPM and PCIe MMCONF to fix some errors
+# - https://unix.stackexchange.com/a/369090
+# - https://askubuntu.com/a/863301
+sed -i 's/^\(GRUB_CMDLINE_LINUX=.*\)"$/\1 pci=nommconf pcie_aspm=off"/' /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 
 # Required for ansible since it defaults to dnf5 on fedora42
