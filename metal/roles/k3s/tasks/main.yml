@@ -131,4 +131,7 @@
         mode: "0600"
       delegate_to: localhost
       run_once: true # CRITICAL: This ensures the file is written only once using data from the first control plane node
+      when:
+        - kubeconfig_content is defined
+        - kubeconfig_content
       # End of block for control plane kubeconfig fetching
