@@ -1,4 +1,31 @@
 ---
+- name: Get a list of all node objects
+  kubernetes.core.k8s_info:
+    kind: Node
+    label_selectors:
+      - node-role.kubernetes.io/control-plane = true
+  register: node_list
+  delegate_to: localhost
+  run_once: true
+  failed_when: false
+  ignore_errors: true
+
+- name: Set cluster_exists fact
+  set_fact:
+    cluster_exists: "{{ node_list.resources | length > 0 }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Set control plane node
+  set_fact:
+    control_plane_node: |-
+      {%- if cluster_exists -%}
+        {{ (node_list.resources | first).metadata.name }}
+      {%- else -%}
+        {{ groups['control_plane'] | first }}
+      {%- endif -%}
+  run_once: true
+
 - name: Get k3s binary
   get_url:
     url: https://github.com/k3s-io/k3s/releases/download/{{ k3s_version }}/k3s
@@ -27,10 +54,10 @@
     - /etc/rancher/node
     - "{{ k3s_data_dir }}/agent/pod-manifests"
 
-- name: Check if k3s token file exists on the first node
+- name: Check if k3s token file exists on {{ control_plane_node }}
   stat:
     path: "{{ k3s_token_file }}"
-  delegate_to: "{{ groups['control_plane'] | first }}"
+  delegate_to: "{{ control_plane_node }}"
   run_once: true
   register: _token_file
 
@@ -41,7 +68,7 @@
     content: "{{ lookup('community.general.random_string', length=32) }}" # TODO: longer password length?
     dest: "{{ k3s_token_file }}"
     mode: "0600"
-  delegate_to: "{{ groups['control_plane'] | first }}"
+  delegate_to: "{{ control_plane_node }}"
   run_once: true
   when: not _token_file.stat.exists
 
@@ -49,7 +76,7 @@
   slurp:
     src: "{{ k3s_token_file }}"
   register: _token_slurped
-  delegate_to: "{{ groups['control_plane'] | first }}"
+  delegate_to: "{{ control_plane_node }}"
   run_once: true
 
 - name: Set fact for the definitive cluster token
@@ -99,11 +126,13 @@
   notify: Restart k3s # Though starting it here might make immediate restart redundant unless failed
 
 - name: Fetch kubeconfig from control plane
-  when: "'control_plane' in group_names"
+  when:
+    - not cluster_exists
+    - "'control_plane' in group_names"
   block:
-    # This task should only run ONCE on the first control plane node
-    - name: Wait for K3s API server to be ready on the first control plane node
-      when: inventory_hostname == (groups['control_plane'] | first)
+    # This task should only run ONCE on the selected control plane node
+    - name: Wait for K3s API server to be ready on {{ control_plane_node }}
+      when: inventory_hostname == control_plane_node
       wait_for:
         host: "{{ hostvars[inventory_hostname]['ansible_host'] }}" # Check the local node
         port: 6443
@@ -111,26 +140,26 @@
         timeout: 300 # 5 minutes timeout
       run_once: true # Ensures this wait_for runs only once across all control plane nodes
 
-    # This task will now run on each control plane node, but we only care about the result from the first one.
+    # This task will now run on each control plane node, but we only care about the result from the selected one.
     # The run_once: true on the copy task will handle using only one fetched result.
-    - name: Get Kubernetes config file from the first control plane node
+    - name: Get Kubernetes config file from {{ control_plane_node }}
       slurp:
         src: "{{ k3s_kubeconfig_file }}" # /etc/rancher/k3s/k3s.yaml
       register: _kubeconfig_slurped
-      when: inventory_hostname == (groups['control_plane'] | first) # Fetch ONLY from the first control plane node
+      when: inventory_hostname == control_plane_node # Fetch ONLY from the selected control plane node
 
-    - name: Set fact for kubeconfig content (to make it available to run_once delegate_to task)
+    - name: Set fact for kubeconfig content # to make it available to run_once delegate_to task
       set_fact:
         kubeconfig_content: "{{ _kubeconfig_slurped.content | b64decode | replace('127.0.0.1', control_plane_endpoint) }}"
-      when: inventory_hostname == (groups['control_plane'] | first) # Only set fact on the node that fetched it
+      when: inventory_hostname == control_plane_node # Only set fact on the node that fetched it
 
     - name: Write kubeconfig file to Ansible controller
       copy:
-        content: "{{ hostvars[groups['control_plane'] | first]['kubeconfig_content'] }}" # Get content from the first CP node's facts
+        content: "{{ hostvars[control_plane_node]['kubeconfig_content'] }}" # Get content from the selected CP node's facts
         dest: "{{ playbook_dir }}/kubeconfig.yaml" # Your Makefile uses kubeconfig.yaml
         mode: "0600"
       delegate_to: localhost
-      run_once: true # CRITICAL: This ensures the file is written only once using data from the first control plane node
+      run_once: true # CRITICAL: This ensures the file is written only once using data from the control plane node
       when:
         - kubeconfig_content is defined
         - kubeconfig_content
