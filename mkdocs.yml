@@ -159,6 +159,7 @@ nav:
           - guides/how_to_manage_domain_with_cloudflare.md
           - guides/how_to_for_media_management.md
           - guides/how_to_run_commands_on_multiple_nodes.md
+          - guides/how_to_update_dependencies.md
           - guides/how_to_update_documentation.md
           - guides/how_to_update_firmware.md
           - guides/how_to_use_both_github_and_gitea.md

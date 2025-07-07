@@ -17,6 +17,7 @@ title: Guides
 - [Manage Domains with Cloudflare](./how_to_manage_domain_with_cloudflare.md)
 - [Manage your Media](./how_to_for_media_management.md)
 - [Run Commands on Nodes](./how_to_run_commands_on_multiple_nodes.md)
+- [Update Dependencies](./how_to_update_dependencies.md)
 - [Update Documentation](./how_to_update_documentation.md)
 - [Update Device Firmware](./how_to_update_firmware.md)
 - [Use Both Github and Gitea](./how_to_use_both_github_and_gitea.md)
