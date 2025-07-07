@@ -10,17 +10,26 @@
   failed_when: false
   ignore_errors: true
 
-- name: Set cluster_exists fact
+- name: Filter for ready nodes
   set_fact:
-    cluster_exists: "{{ node_list.resources | length > 0 }}"
+    control_nodes: "{{ node_list.resources | json_query(_q) | map(attribute='metadata.name') | list }}" # noqa jinja
+  vars:
+    _q: "[?status.conditions[?type=='Ready' && status=='True']]"
+  when: node_list | length > 0
+  delegate_to: localhost
+  run_once: true
+
+- name: Set controller_exists fact
+  set_fact:
+    controller_exists: "{{ (control_nodes is defined) and (control_nodes | length > 0) }}"
   delegate_to: localhost
   run_once: true
 
 - name: Set control plane node
   set_fact:
     control_plane_node: |-
-      {%- if cluster_exists -%}
-        {{ (node_list.resources | first).metadata.name }}
+      {%- if controller_exists -%}
+        {{ control_nodes | first }}
       {%- else -%}
         {{ groups['control_plane'] | first }}
       {%- endif -%}
@@ -127,7 +136,7 @@
 
 - name: Fetch kubeconfig from control plane
   when:
-    - not cluster_exists
+    - not controller_exists
     - "'control_plane' in group_names"
   block:
     # This task should only run ONCE on the selected control plane node
