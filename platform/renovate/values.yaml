@@ -8,6 +8,7 @@ renovate:
         "platform": "gitea",
         "endpoint": "https://git.0xbad.cloud/api/v1",
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
-        "autodiscover": true
+        "autodiscover": true,
+        "automerge": false
       }
   existingSecret: renovate-secret
