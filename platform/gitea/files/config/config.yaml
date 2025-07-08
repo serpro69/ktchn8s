@@ -1,9 +1,10 @@
 ---
-users:
-  - name: renovate
-    fullName: Renovate
-    email: bot@renovateapp.com
-    tokenSecretRef: renovate-secret
+# TODO create user and access token
+# users:
+#   - name: renovate
+#     fullName: Renovate
+#     email: bot@renovateapp.com
+#     tokenSecretRef: renovate-secret # ???
 organizations:
   - name: ops
     description: Operations
