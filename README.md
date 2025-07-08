@@ -90,17 +90,20 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
 Some demo videos and screenshots are shown here.
 They can't capture all the project's features, but they are sufficient to get a concept of it.
 
-| Demo                                                                                                            |
+| Demo Showcase                                                                                                   |
 | :--:                                                                                                            |
 | Homepage powered by... [Homepage](https://gethomepage.dev)                                                      |
 | [![][homepage-demo]][homepage-demo]                                                                             |
 | Git server powered by [Gitea](https://gitea.io/en-us)                                                           |
 | [![][gitea-demo]][gitea-demo]                                                                                   |
-| Continuous deployment with [ArgoCD](https://argoproj.github.io/cd)                                              |
+| Continuous Integration with [Woodpecker CI](https://woodpecker-ci.org/)                                         |
+| [![][woodpecker-demo]][woodpecker-demo]                                                                         |
+| Continuous Deployment with [ArgoCD](https://argoproj.github.io/cd)                                              |
 | [![][argocd-demo]][argocd-demo]                                                                                 |
 
 [homepage-demo]: https://github.com/user-attachments/assets/8b2680c1-53e1-47c5-818d-08d3502f144b
 [gitea-demo]: https://github.com/user-attachments/assets/f3775815-6c55-4086-b15a-8e0562e5d6a6
+[woodpecker-demo]: https://github.com/user-attachments/assets/70b7e19f-22a3-4d95-aad1-da389d90c53e
 [argocd-demo]: https://github.com/user-attachments/assets/bdd91804-2e10-4910-8cf6-afa15e433178
 
 ## Getting Started
