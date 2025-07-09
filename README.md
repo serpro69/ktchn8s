@@ -15,7 +15,7 @@ _...there's no place like_ `~`
 
 > `/ˈkɪtʃ.ən.eɪts/` (“Kitch-en-ates”)
 
-A K8s ☸️ homelab cluster 👾
+A homelab ☸️ kubernetes cluster 👾
 <br>...right in your kitchen 🚀💥
 
 <div markdown="1" style="text-align: center; font-size: 2em;">
