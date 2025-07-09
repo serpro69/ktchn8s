@@ -66,3 +66,8 @@ Here's a suggested flow:
 - Watch on Jellyfin
 
 You may need to increase the volume size depending on your usage.
+
+---
+
+!!! info
+    See also: [self-hosting an automated jellyfin media streaming stack](../reference/external/self_host_an_automated_jellyfin_media_streaming_stack.md)
