@@ -52,18 +52,29 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
     - Cisco C3560-GS-8P Switch
     - Eero 6 Router (used as access-point for WiFi at home)
 - Servers:
-    - 3 × Lenovo Tiny M70q Gen.3
+    - 1 x NAS
+        - [Fractal Design Node 804](https://www.fractal-design.com/products/cases/node/node-804/black/) case
+        - CWWK/Topton J6413 motherboard
+        - CPU: `Intel Celeron J6413`
+        - RAM: 2x `16GB DDR4`
+        - SSD: 2x `512GB WD RED NVME` in a zfs mirror (OS)
+        - HDD: 6x `18TB Seagate Exos` (Storage)
+    - 1 × Lenovo Tiny M70q Gen.3
+        - CPU: `Intel Core i5-12400T`
+        - RAM: 2x `16GB DDR4`
+        - SSD: `256GB NVME`
+    - 2 × Lenovo Tiny M70q Gen.3
         - CPU: `Intel Core i5-12400T`
         - RAM: `16GB DDR4`
-        - SSD: `256GB`
+        - SSD: `256GB NVME`
     - 2 × Lenovo Tiny M70q Gen.2
         - CPU: `Intel Core i5-11400T`
         - RAM: `16GB DDR4`
-        - SSD: `256GB`
+        - SSD: `256GB NVME`
     - 7 × Lenovo Tiny M720q
         - CPU: `Intel Core i5-8100T`
         - RAM: `16GB`
-        - SSD: `512GB`
+        - SSD: `512GB NVME`
 
 ### Features
 
@@ -113,11 +124,6 @@ They can't capture all the project's features, but they are sufficient to get a 
 ...or simply:
 
 <pre style="margin-left: 25%; margin-right: auto;">
-<style>
-.md-clipboard.md-icon {
-  display: none;
-}
-</style>
 <code style="background-color: #070707;">
            ╭──────────────────────────────────────────────────╮
            │                        🐧                        │
