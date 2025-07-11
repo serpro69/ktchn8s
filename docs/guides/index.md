@@ -28,3 +28,4 @@ title: Guides
 ## Troubleshooting Guides
 
 - [Troubleshooting PXE Boot](./troubleshooting_pxe_boot.md)
+- [Troubleshooting Renovate](./troubleshooting_renovate.md)

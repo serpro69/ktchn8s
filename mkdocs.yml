@@ -169,6 +169,7 @@ nav:
           - guides/how_to_use_both_github_and_gitea.md
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
+          - guides/troubleshooting_renovate.md
   - "⛬ Info":
       - info/index.md
       - info/roadmap.md
