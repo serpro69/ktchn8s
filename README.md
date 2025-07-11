@@ -45,7 +45,7 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
 
 ### Hardware
 
-![PXL_20250627_134343069_21](https://github.com/user-attachments/assets/7a5c9ce3-c1de-4d23-a5a6-796e0e08a2ec)
+![PXL_20250627_134343069_21](assets/images/readme/PXL_20250627_134343069_21.jpg)
 
 - Network:
     - Cisco C1111-8P Router
@@ -101,21 +101,21 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
 Some demo videos and screenshots are shown here.
 They can't capture all the project's features, but they are sufficient to get a concept of it.
 
-| Demo Showcase                                                                                                   |
-| :--:                                                                                                            |
-| Homepage powered by... [Homepage](https://gethomepage.dev)                                                      |
-| [![][homepage-demo]][homepage-demo]                                                                             |
-| Git server powered by [Gitea](https://gitea.io/en-us)                                                           |
-| [![][gitea-demo]][gitea-demo]                                                                                   |
-| Continuous Integration with [Woodpecker CI](https://woodpecker-ci.org/)                                         |
-| [![][woodpecker-demo]][woodpecker-demo]                                                                         |
-| Continuous Deployment with [ArgoCD](https://argoproj.github.io/cd)                                              |
-| [![][argocd-demo]][argocd-demo]                                                                                 |
+| Demo Showcase                                                           |
+| :--:                                                                    |
+| Homepage powered by... [Homepage](https://gethomepage.dev)              |
+| [![][homepage-demo]][homepage-demo]                                     |
+| Git server powered by [Gitea](https://gitea.io/en-us)                   |
+| [![][gitea-demo]][gitea-demo]                                           |
+| Continuous Integration with [Woodpecker CI](https://woodpecker-ci.org/) |
+| [![][woodpecker-demo]][woodpecker-demo]                                 |
+| Continuous Deployment with [ArgoCD](https://argoproj.github.io/cd)      |
+| [![][argocd-demo]][argocd-demo]                                         |
 
-[homepage-demo]: https://github.com/user-attachments/assets/8b2680c1-53e1-47c5-818d-08d3502f144b
-[gitea-demo]: https://github.com/user-attachments/assets/f3775815-6c55-4086-b15a-8e0562e5d6a6
-[woodpecker-demo]: https://github.com/user-attachments/assets/70b7e19f-22a3-4d95-aad1-da389d90c53e
-[argocd-demo]: https://github.com/user-attachments/assets/bdd91804-2e10-4910-8cf6-afa15e433178
+[homepage-demo]: assets/images/readme/460288104-8b2680c1-53e1-47c5-818d-08d3502f144b.png
+[gitea-demo]: assets/images/readme/460288220-f3775815-6c55-4086-b15a-8e0562e5d6a6.png
+[woodpecker-demo]: assets/images/readme/463804608-70b7e19f-22a3-4d95-aad1-da389d90c53e.png
+[argocd-demo]: assets/images/readme/460288182-bdd91804-2e10-4910-8cf6-afa15e433178.png
 
 ## Getting Started
 
