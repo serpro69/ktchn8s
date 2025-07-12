@@ -21,11 +21,11 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 5.3.6
+            tag: 5.26.2
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.2
+            tag: 4.0.15
         jellyseerr:
           image:
             repository: docker.io/fallenbagel/jellyseerr
