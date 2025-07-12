@@ -6,8 +6,8 @@ title: Media Management
 # :material-crosshairs-question: HowTo do media management (the <s>right</s> wrong way)
 
 !!! warning
-    This is for educational purposes only :wink: 
-    Use at your own risk!
+    This is _**for educational purposes only**_ :wink: 
+    Use at your own risk and make sure _**delete the stack as soon as you've finished testing**_ how things work!
 
 ## Initial setup
 
