@@ -1,3 +1,4 @@
+---
 # kubectl apply -f kube-bench.yaml
 # https://github.com/aquasecurity/kube-bench/blob/main/job.yaml
 apiVersion: batch/v1
