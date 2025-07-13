@@ -1,3 +1,4 @@
+---
 when:
   branch: ${CI_REPO_DEFAULT_BRANCH}
 
@@ -13,7 +14,7 @@ steps:
   diff:
     image: nixery.dev/shell/git/python3/kubernetes-helm/diffutils/dyff # TODO replace with nix develop
     commands:
-      - ./scripts/helm-diff --repository "${CI_REPO_CLONE_URL}" --source "${CI_COMMIT_SOURCE_BRANCH}" --target "${CI_COMMIT_TARGET_BRANCH}" --subpath "${STACK}"
+      - ./scripts/helm-diff.py --repository "${CI_REPO_CLONE_URL}" --source "${CI_COMMIT_SOURCE_BRANCH}" --target "${CI_COMMIT_TARGET_BRANCH}" --subpath "${STACK}"
     when:
       - event: pull_request
         path: '${STACK}/**'
