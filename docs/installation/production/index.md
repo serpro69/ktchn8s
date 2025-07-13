@@ -25,4 +25,5 @@ If you want to have more control over the deployment (possibly to run some verif
 - [Metal provisioning](./metal.md)
 - System resources provisioning: `make system`
 - [External resources](./external.md) provisioning: `make external`
-- [Post-installation](../post_install.md)
+- Finalize the installation: `make finalize`
+    - Followed by [manual post-install steps](../post_install.md)
