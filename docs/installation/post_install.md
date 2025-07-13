@@ -44,3 +44,11 @@ make test
 
 !!! warning
     The "full" test suite is still in its early stages; any contributions are greatly appreciated.
+
+## Gitea
+
+- Create a new user account
+    - Add ssh key
+    - Add your github email if you want to associate commits made in gitea with your github account
+        - You can use the noreply email address as well, if your real email is hidden in github
+- Login with `admin` user and add your personal user to the `admins` team in `ops` organization
