@@ -39,6 +39,11 @@
 
 export KUBECONFIG = $(shell pwd)/../metal/kubeconfig.yaml
 
+### Ansible
+
+# Ansible verbosity level
+ANSIBLE_VERBOSITY ?= 1
+
 ################################################################################################
 #                                             TARGETS
 
@@ -56,6 +61,20 @@ _requirements:
 
 main: SHELL:=$(shell which bash)
 main: _requirements ## Provision resources on the kubernetes cluster
-	@ansible-playbook \
-		main.yml \
-		-v
+	@ansible_verbosity="$(ANSIBLE_VERBOSITY)"; \
+	case "$${ansible_verbosity}" in \
+		''|*[!0-9]*) \
+			printf "Warning: ANSIBLE_VERBOSITY ('$${ansible_verbosity}') is not a valid non-negative integer. Defaulting to verbosity level 1.\n" >&2; \
+			verbosity="1"; \
+			;; \
+		*) \
+			verbosity="$${ansible_verbosity}"; \
+			;; \
+	esac; \
+	cmd=("ansible-playbook" "main.yml"); \
+	if [ "$${verbosity}" -gt 0 ]; then \
+		v_opts="-"; \
+		for i in $$(seq 1 "$${verbosity}"); do v_opts+="v"; done; \
+		cmd+=("$${v_opts}"); \
+	fi; \
+	"$${cmd[@]}"
