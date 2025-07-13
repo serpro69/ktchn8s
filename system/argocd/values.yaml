@@ -36,7 +36,7 @@ argocd-apps:
       namespace: argocd
       generators:
         - git:
-            repoURL: &repoURL https://github.com/serpro69/ktchn8s
+            repoURL: &repoURL http://gitea-http.gitea:3000/ops/homelab
             revision: &revision master
             directories:
               - path: apps/*
