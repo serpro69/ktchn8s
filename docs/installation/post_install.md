@@ -11,7 +11,7 @@ Save the following files to a safe location like a password manager (if you're u
 
 - `~/.ssh/homelab_id_ed25519`
 - `~/.ssh/homelab_id_ed25519.pub`
-- `./metal/kubeconfig.yaml`
+- `./metal/kubeconfig.yaml` (optional, since you can always restore it via `scp` from one of the nodes in the cluster)
 
 ## Admin credentials
 
