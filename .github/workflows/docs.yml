@@ -28,7 +28,7 @@ jobs:
         with:
           filters: |
             docs:
-              - 'github/workflows/docs.yml'
+              - '.github/workflows/docs.yml'
               - 'docs/**'
               - 'mkdocs.yml'
               - 'LICENSE.md'
@@ -36,7 +36,7 @@ jobs:
 
   deploy:
     needs: changes
-    if: ${{ needs.changes.outputs.docs == 'true' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
