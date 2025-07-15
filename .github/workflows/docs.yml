@@ -59,7 +59,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: |-
           if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            mike deploy --push master
+            mike deploy --push latest
           else
             # use <major.minor> as version for documentation
             version_regex='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)'
