@@ -45,10 +45,19 @@ make test
 !!! warning
     The "full" test suite is still in its early stages; any contributions are greatly appreciated.
 
-## Gitea
+## Apps
+
+### Gitea
 
 - Create a new user account
-    - Add ssh key
+  _NB! you can also [onboard a new user](../guides/how_to_onboard_users.md) and login to gitea with dex (this is optional, and you can also later associate your onboarded dex user with gitea user). If you don't see "login with Dex" on the gitea page, try to re-run the [`post-install.py`](https://github.com/serpro69/ktchn8s/blob/master/scripts/post-install.py) script which adds [dex oauth to gitea](https://github.com/serpro69/ktchn8s/blob/e90594b6a6e0b0cce76f86b8d0fe9b0b90c2f16f/scripts/post-install.py#L127-L152)._
+    - (optional) Add ssh key so you can push with ssh
     - Add your github email if you want to associate commits made in gitea with your github account
         - You can use the noreply email address as well, if your real email is hidden in github
-- Login with `admin` user and add your personal user to the `admins` team in `ops` organization
+- Login with `admin` user and add your personal user to the `Owners` team in the `ops` organization
+
+### Woodpecker
+
+- Login with gitea using `gitea_admin` user
+- Authorize the application
+- Add the `ops/homelab` repository
