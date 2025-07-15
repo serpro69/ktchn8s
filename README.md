@@ -20,7 +20,7 @@ A homelab ☸️ kubernetes cluster 👾
 
 <div markdown="1" style="text-align: center; font-size: 2em;">
 
-**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#getting-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/ktchn8s)**
+**[:material-star-circle-outline: Features](#features) ⟩ [:material-rocket-launch: Getting Started](#getting-started) ⟩ [:material-file-document-multiple: Documentation](https://serpro69.github.io/ktchn8s/latest)**
 
 </div>
 
@@ -41,7 +41,7 @@ This project is still in the experimental stage. This means, among other things,
 - There might be breaking changes that may require a complete redeployment.
 - A proper upgrade path is planned for the stable release.
 
-More information can be found in the [roadmap](https://serpro69.github.io/ktchn8s/info/roadmap/).
+More information can be found in the [roadmap](https://serpro69.github.io/ktchn8s/latest/info/roadmap/).
 
 ### Hardware
 
@@ -119,7 +119,7 @@ They can't capture all the project's features, but they are sufficient to get a 
 
 ## Getting Started
 
-[Deploy on real hardware](https://serpro69.github.io/ktchn8s/installation/production) for production workload.
+[Deploy on real hardware](https://serpro69.github.io/ktchn8s/latest/installation/production) for production workload.
 
 ...or simply:
 
@@ -154,17 +154,17 @@ They can't capture all the project's features, but they are sufficient to get a 
 
 ## Roadmap
 
-See [roadmap](https://serpro69.github.io/ktchn8s/info/roadmap/) and [open issues](https://github.com/serpro69/ktchn8s/issues) for a list of proposed features and known issues.
+See [roadmap](https://serpro69.github.io/ktchn8s/latest/info/roadmap/) and [open issues](https://github.com/serpro69/ktchn8s/issues) for a list of proposed features and known issues.
 
 ## Contributing
 
 Any contributions you make are greatly appreciated.
 
-Please see [contributing guide](https://serpro69.github.io/ktchn8s/info/contributing/) for more information.
+Please see [contributing guide](https://serpro69.github.io/ktchn8s/latest/info/contributing/) for more information.
 
 ## License
 
 Copyright &copy; 2025 - present, [serpro69](https://github.com/serpro69)
 
 Distributed under the MIT License.
-See [license page](https://serpro69.github.io/ktchn8s/info/license) or [`LICENSE.md`](https://github.com/serpro69/ktchn8s/blob/master/LICENSE.md) file for more information.
+See [license page](https://serpro69.github.io/ktchn8s/latest/info/license) or [`LICENSE.md`](https://github.com/serpro69/ktchn8s/blob/master/LICENSE.md) file for more information.
