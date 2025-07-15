@@ -12,6 +12,10 @@ client.key
 *kubeconfig.yaml
 Chart.lock
 
+# docs
+
+site/
+
 # binary files
 *.iso
 *.log
