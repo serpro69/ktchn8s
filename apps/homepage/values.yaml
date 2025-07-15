@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-4.1.2/charts/other/app-template/values.schema.json
 ---
 app-template:
   controllers:
@@ -6,7 +7,11 @@ app-template:
         main:
           image:
             repository: ghcr.io/gethomepage/homepage
-            tag: v0.8.8
+            tag: v1.3
+          env:
+            # gethomepage.dev/installation/#homepage_allowed_hosts
+            - name: HOMEPAGE_ALLOWED_HOSTS
+              value: &host home.0xbad.cloud
   service:
     main:
       ports:
@@ -20,12 +25,12 @@ app-template:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
       hosts:
-        - host: &host home.0xbad.cloud
+        - host: *host
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: http
       tls:
         - hosts:
@@ -48,6 +53,7 @@ app-template:
   configMaps:
     config:
       enabled: true
+      suffix: config
       data:
         settings.yaml: |
           background: https://images.unsplash.com/photo-1708112292872-fd5612affa79?q=80&w=2109&auto=format&fit=crop

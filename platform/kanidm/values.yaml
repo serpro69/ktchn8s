@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-4.1.2/charts/other/app-template/values.schema.json
 ---
 app-template:
   controllers:
@@ -7,7 +8,7 @@ app-template:
         main:
           image:
             repository: docker.io/kanidm/server
-            tag: 1.3.3
+            tag: 1.6.4
       statefulset:
         volumeClaimTemplates:
           - name: data
@@ -18,6 +19,7 @@ app-template:
   configMaps:
     config:
       enabled: true
+      suffix: config
       data:
         server.toml: |
           bindaddress = "[::]:443"
@@ -31,8 +33,6 @@ app-template:
   service:
     main:
       ports:
-        http:
-          enabled: false
         https:
           port: 443
           protocol: HTTPS
@@ -52,7 +52,7 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: https
       tls:
         - hosts:
