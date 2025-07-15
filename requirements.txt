@@ -4,6 +4,8 @@ mkdocs-material
 # plugins
 mkdocs-minify-plugin
 mkdocs-panzoom-plugin
+# versioning
+mike
 
 ### ansible (for development outside of nix shell)
 ansible

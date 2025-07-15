@@ -64,6 +64,10 @@ theme:
     logo: material/kubernetes
   custom_dir: docs/overrides
 
+extra:
+  version:
+    provider: mike
+
 extra_css:
   - assets/stylesheets/image.css
   - assets/stylesheets/extra.css
@@ -155,11 +159,13 @@ nav:
       - guides/index.md
       - "☳ HowTo":
           - guides/how_to_add_or_remove_nodes.md
+          - guides/how_to_alternate_dns_setup.md
           - guides/how_to_backup_and_restore.md
           - guides/how_to_configure_minicom.md
           - guides/how_to_disable_dhcp_proxy_in_dnsmasq_for_pxe.md
           - guides/how_to_expose_services_to_world.md
           - guides/how_to_manage_domain_with_cloudflare.md
+          - guides/how_to_onboard_users.md
           - guides/how_to_for_media_management.md
           - guides/how_to_run_cluster_with_a_single_node.md
           - guides/how_to_run_commands_on_multiple_nodes.md
