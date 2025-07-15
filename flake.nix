@@ -98,7 +98,11 @@
             # configure python virtual environment with dependencies
             python -m venv .venv
             source .venv/bin/activate
-            pip install -r requirements.txt >/dev/null
+            # use 'git rev-parse' instead of '${self}' to get the root project dir,
+            # because while the latter seems promising, 
+            # it actually refers to the path in '/nix/store/' where the flake is copied to
+            ROOT_PATH=$(git rev-parse --show-toplevel)
+            pip install -r "$ROOT_PATH/requirements.txt" >/dev/null
 
             # kubernetes plugins
             krew install rook-ceph &>/dev/null
