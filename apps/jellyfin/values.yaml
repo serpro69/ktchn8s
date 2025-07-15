@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-4.1.2/charts/other/app-template/values.schema.json
 ---
 app-template:
   defaultPodOptions:
@@ -63,42 +64,42 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: http
         - host: &transmissionHost transmission.0xbad.cloud
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: transmission
         - host: &prowlarrHost prowlarr.0xbad.cloud
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: prowlarr
         - host: &radarrHost radarr.0xbad.cloud
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: radarr
         - host: &sonarrHost sonarr.0xbad.cloud
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: sonarr
         - host: &jellyseerrHost jellyseerr.0xbad.cloud
           paths:
             - path: /
               pathType: Prefix
               service:
-                name: main
+                identifier: main
                 port: jellyseerr
       tls:
         - secretName: jellyfin-tls-certificate

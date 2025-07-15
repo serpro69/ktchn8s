@@ -9,16 +9,13 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        # kanidm 1.2.3, lowest I find and build with nix that's <= kanidm server version (1.3.3)
-        # using client version > 1.3.3 results in incompatibilities and errors
-        # e.g. I couldn't reset a person's token because it throws an error about missing input for expiration time
         kanidm-overlay = final: prev: {
-          kanidm_1_2 = (import (builtins.fetchTarball {
+          kanidm_1_6_4 = (import (builtins.fetchTarball {
             # https://lazamar.co.uk/nix-versions/?channel=nixos-25.05&package=kanidm
-            url = "https://github.com/NixOS/nixpkgs/archive/f27b62e789ceae5531852d8a015bae05ada145de.tar.gz";
+            url = "https://github.com/NixOS/nixpkgs/archive/1c1c9b3f5ec0421eaa0f22746295466ee6a8d48f.tar.gz";
             # sha256 can be computed with:
             # nix-prefetch-url --unpack <URL>
-            sha256 = "0h5wj3bi3z01wdk62j6li5lhpac141l6sgjspszfv59nxrpan28z";
+            sha256 = "0szvq1swpzyjmyyw929ngxy1khdnd9ba96qds2bm6l6kg4iq3cq0";
           }) { inherit system; }).kanidm;
         };
 
@@ -94,7 +91,7 @@
             iproute2
             # k8s tools
             helm
-            kanidm_1_2
+            kanidm_1_6_4
           ];
 
           shellHook = ''
