@@ -170,6 +170,7 @@ nav:
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
           - guides/troubleshooting_renovate.md
+          - guides/troubleshooting_rook_ceph.md
   - "⛬ Info":
       - info/index.md
       - info/roadmap.md

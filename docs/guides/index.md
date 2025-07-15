@@ -29,3 +29,4 @@ title: Guides
 
 - [Troubleshooting PXE Boot](./troubleshooting_pxe_boot.md)
 - [Troubleshooting Renovate](./troubleshooting_renovate.md)
+- [Troubleshooting Rook-Ceph](./troubleshooting_rook_ceph.md)
