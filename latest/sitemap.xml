@@ -1,171 +1,171 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>http://localhost:8000/latest/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/concepts/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/concepts/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/concepts/certificate_management/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/concepts/certificate_management/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/concepts/development_shell/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/concepts/development_shell/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/concepts/pxe_boot/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/concepts/pxe_boot/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/concepts/secrets-management/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/concepts/secrets-management/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_add_or_remove_nodes/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_add_or_remove_nodes/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_alternate_dns_setup/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_alternate_dns_setup/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_backup_and_restore/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_backup_and_restore/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_configure_minicom/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_configure_minicom/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_disable_dhcp_proxy_in_dnsmasq_for_pxe/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_disable_dhcp_proxy_in_dnsmasq_for_pxe/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_expose_services_to_world/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_expose_services_to_world/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_for_media_management/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_for_media_management/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_manage_domain_with_cloudflare/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_manage_domain_with_cloudflare/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_onboard_users/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_onboard_users/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_run_cluster_with_a_single_node/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_run_cluster_with_a_single_node/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_run_commands_on_multiple_nodes/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_run_commands_on_multiple_nodes/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_update_dependencies/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_update_dependencies/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_update_documentation/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_update_documentation/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_update_firmware/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_update_firmware/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/how_to_use_both_github_and_gitea/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/how_to_use_both_github_and_gitea/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/troubleshooting_pxe_boot/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/troubleshooting_pxe_boot/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/troubleshooting_renovate/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/troubleshooting_renovate/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/guides/troubleshooting_rook_ceph/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/guides/troubleshooting_rook_ceph/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/changelog/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/changelog/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/contributing/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/contributing/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/license/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/license/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/roadmap/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/roadmap/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/info/todo/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/info/todo/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/installation/post_install/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/installation/post_install/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/installation/production/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/installation/production/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/installation/production/external/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/installation/production/external/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/installation/production/metal/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/installation/production/metal/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/installation/production/network/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/installation/production/network/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/architecture/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/architecture/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/architecture/decision_records/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/architecture/decision_records/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/architecture/network/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/architecture/network/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/architecture/overview/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/architecture/overview/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/external/many_cfs_one_tunnel/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/external/many_cfs_one_tunnel/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
     <url>
-         <loc>http://localhost:8000/latest/reference/external/self_host_an_automated_jellyfin_media_streaming_stack/</loc>
-         <lastmod>1980-01-01</lastmod>
+         <loc>https://serpro69.github.io/ktchn8s/latest/reference/external/self_host_an_automated_jellyfin_media_streaming_stack/</loc>
+         <lastmod>2025-07-15</lastmod>
     </url>
 </urlset>
