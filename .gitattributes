@@ -1,0 +1,46 @@
+# diff sops-encrypted  files with custom differ
+# https://github.com/getsops/sops?tab=readme-ov-file#48showing-diffs-in-cleartext-in-git
+*.sops                    diff=sopsdiffer
+metal/inventory/metal.yml diff=sopsdiffer
+terraform.tfstate         diff=sopsdiffer_json
+terraform.tfstate.backup  diff=sopsdiffer_json
+
+# Handle line endings automatically for files detected as text and leave all files detected as binary untouched.
+* text=auto
+
+# Force the following filetypes to have unix eols, so Windows does not break them
+*.* text eol=lf
+
+# Explicit windows files should use crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# These files are binary and should be left untouched
+# (binary is a macro for -text -diff)
+*.7z        binary
+*.bz2       binary
+*.catalog   binary
+*.eot       binary
+*.ez        binary
+*.fla       binary
+*.flv       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.gz        binary
+*.ico       binary
+*.mov       binary
+*.mp4       binary
+*.mp3       binary
+*.otf       binary
+*.pdf       binary
+*.png       binary
+*.pyc       binary
+*.rpd       binary
+*.swf       binary
+*.swp       binary
+*.ttf       binary
+*.woff      binary
+*.woff2     binary
+*.xlsx      binary
+*.zip       binary
