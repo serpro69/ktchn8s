@@ -173,6 +173,7 @@ nav:
           - guides/how_to_update_documentation.md
           - guides/how_to_update_firmware.md
           - guides/how_to_use_both_github_and_gitea.md
+          - guides/how_to_use_nfs_for_persistent_storage.md
       - "☶ Troubleshooting":
           - guides/troubleshooting_pxe_boot.md
           - guides/troubleshooting_renovate.md
