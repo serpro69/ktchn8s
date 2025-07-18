@@ -1,18 +1,18 @@
 all: null
 metal:
     children:
-        #ENC[AES256_GCM,data:UPMO1U/P5Zk0,iv:fvutywUYbKlce8DvkU98/BXEXBmzht8YwwK/YDkD8zA=,tag:U/yYQt3VnTzdvXbaWIcXgA==,type:comment]
-        #ENC[AES256_GCM,data:mCaok0ktA5s=,iv:Mhn0sZGxNmsB64+ZIKu2M7eqmNZdZiSHn9T4D9i96Vo=,tag:Gu00jAlituPmOqzCp4vWaw==,type:comment]
-        #ENC[AES256_GCM,data:JNFD7tt9DZBEtPBha2EGYl76o2r1FEM=,iv:xQNDDrufzlxBi14tEzPINv3KQdUZanivTR8dDmy2NmY=,tag:j6q4lYZhZGmxXT690Kyf9A==,type:comment]
-        #ENC[AES256_GCM,data:Ri64Ctp53Uv2,iv:sEP/1LO5tCk9u9JAA/DXKBzZ9sMep9ejSQWC8ThyaDQ=,tag:zZXUUfE/L8RO99QxiHmpcg==,type:comment]
-        #ENC[AES256_GCM,data:z9mn9slpDUZQVj3xdDyz,iv:4Sk41RHsyS0A4RMF5mNgXebZMQMExr5k0+TSDxzVGXc=,tag:c89hgQ3grxnyQ/2HKHlT0A==,type:comment]
-        #ENC[AES256_GCM,data:JqA2n6rNoSlqqCBkhUWg4TM=,iv:xVboqjSio4fs7eC3decSZuR3KFWP1W5VBUoIDOrdbyQ=,tag:PKnO5femxYKQtKmE51XB0Q==,type:comment]
-        #ENC[AES256_GCM,data:TP6KVbMsEgKN4HwLU1NTi9mTYbBsqQ==,iv:nfzLK/FALwwDFbbqCyzmkxmK1jOrBB9EQJvQ3BtaGDw=,tag:uhDgezbd9tLLWWREPll1pg==,type:comment]
-        #ENC[AES256_GCM,data:V28NMez5v1JEgPlKlKAgBsN7UtMkT3xDGw==,iv:xHnLJu1pOJ/uz+Z4I9jKOVAf8WxZ2dD83W24cJ0qFvI=,tag:ow3F1uTtf3a0I1FJJ61HGA==,type:comment]
-        #ENC[AES256_GCM,data:S6QtWrVi4Jq36paBzYEOFxNFl0uPSDkEvpRdEe2SLvI=,iv:F1AEKpLcRHRaANzu/7WxgpXyPzxS1/IC3nv2vq1RU4I=,tag:sbzamW9xC+V+xvyN2pXR4Q==,type:comment]
-        #ENC[AES256_GCM,data:3cCvqo4PDAvY5AB3NjdeOQ==,iv:lJlnqtQ7rskn3hYtcmPj60bLQE3jKBqRTaGiWetVrt8=,tag:ksQmlTt5eYryVEqCxyZaZA==,type:comment]
-        #ENC[AES256_GCM,data:aCZNA6LvtS0lum8wDeHJ3yGfFmA=,iv:Q1OnsEzFeURfLMgAbnGzW68XFPsCfyK7VfdbG8GD3T8=,tag:EVFvlWvrPOdTDiYL70ejUg==,type:comment]
-        #ENC[AES256_GCM,data:NTkcDEUwPqHGnZai0wKzMJt+5JitxWQZ+asR/fOa,iv:4Cbb/kxFL4dk50Nmqq5nb3Dzy76KLd+QlRAE/+x1G9g=,tag:usZepalzatxyp1htsJ3jhg==,type:comment]
+        storage:
+            vars:
+                ansible_user: ENC[AES256_GCM,data:AyUv3g==,iv:gcK4dEfW/4hmKvII9ZkJ5OgFJLqVE6J/+8dItj+X9+U=,tag:aNPv2iILJGT/ai8THhZ0sw==,type:str]
+            hosts:
+                yggdrasil:
+                    interface:
+                        host: ENC[AES256_GCM,data:1D1xfxr4bQ==,iv:ufvJZWGavl1mYuBUpVSiMfGyR9TUYVBgSR2nbv4Htvs=,tag:l8H+BI8JUq1JWTK7Z9qWQQ==,type:str]
+                        interface: ENC[AES256_GCM,data:a+R5vSE=,iv:zXxcQQnmtlQu51DrPntLHrdjpbYOHcmNkk7qtOZxTv8=,tag:4l2RG/EcawUF8C++TX4aEA==,type:str]
+                    ansible_host: ENC[AES256_GCM,data:xksinav4JCT9iNg=,iv:8LKZuoog2zvRy7N3HZGe5+wqbXaCRiVXlPPB1wFPOco=,tag:TMNijhLH/3y/WmPsj/cxLA==,type:str]
+                    mac: ENC[AES256_GCM,data:lE31VA==,iv:JZpAL2V7nocS397ulK5sE2TSHlD30iPyGXzgmVbF8zQ=,tag:0MAvMeLB3hP6pMlcWzMyAQ==,type:str]
+                    disk: ENC[AES256_GCM,data:IExdvSBElQ==,iv:lARcS0S0r8rLmOdTE+rPLvvOqH0CS0GbNOzhpygux7Y=,tag:kBmimg1dyibydTpavWhXSQ==,type:str]
+                    network_interface: ENC[AES256_GCM,data:XY+N9g==,iv:45YCl2aLIS7FK/a3plDOgi8POagTbKyu2JMdqJpmjhA=,tag:WWw4ORTXJHxIjBNqCcsKfw==,type:str]
         control_plane:
             vars:
                 ansible_user: ENC[AES256_GCM,data:M+Vzug==,iv:WkscGNy/2+Gs0MzYlX04s5kMBwsvEpomnGtb4QQHvzk=,tag:rrEBMYq/mXbzQtjv748Pvg==,type:str]
@@ -123,8 +123,8 @@ sops:
             QXhHa0NscjN3S1Nma2U5TDRsRjloMmcKemrnDZoWDcR3cPM3k4xFquoH4ta44qr6
             I3FmubiRLT6FvVfdhz2hCi7k9mhlPhf4L7zMrmF0X+dZYK2uwfiPLw==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-07-19T12:22:48Z"
-    mac: ENC[AES256_GCM,data:W1dmTD77gxTUM22YNTvagsNk5F8vcycrhATFYUk3GI7C87in9SaMKzJ+ooVhBKTfm9Vt0IerSgKb7jZXKMahFKLtss4f0gW7whznC6XzLEsMAgI6nMvNsvu1D1ccgYkJDcXVZ82HNTyYNVLZLa/yamCF/KfoqbJUObU2ZP11cYA=,iv:IM9HinF4K5UGNoWl9FYWWF+Z47diLr/CMY3QubyQf4Q=,tag:RlMxcpR0FxtgGmXtC3cd4A==,type:str]
+    lastmodified: "2025-07-20T14:01:59Z"
+    mac: ENC[AES256_GCM,data:cvJnCfH8amol+MmJMVXPsWpjsQVCegg3X2HRcYOIjSs0VT0RSQOg02Tk1E4Wc0I4X4Zs4KuDT6UMutOrDMRIfPV6CUeZ/CWTWlORhfv9UWcXMQV70ntxOna6fOm1HQx3Q34Khak6GactcgsXCeg4sjUNVn+nvvMWp5dPgvvvf+c=,iv:W3x1Ji8AroyZ7Kc/A3UwFQza/oZed1dboJ3XqlkKhF4=,tag:DNLwVBCCHISRmd6fHcVPXw==,type:str]
     pgp: []
     unencrypted_suffix: _unencrypted
     version: 3.9.3
