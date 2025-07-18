@@ -148,3 +148,21 @@ app-template:
           jellyseerr:
             - path: /app/config
               subPath: jellyseerr/config
+    dri-devices:
+      enabled: true
+      type: hostPath
+      hostPath: /dev/dri
+      advancedMounts:
+        main:
+          main:
+            - path: /dev/dri
+              readOnly: false
+    anothervideos:
+      enabled: true
+      type: persistentVolumeClaim
+      existingClaim: pvc-nfs-videos
+      advancedMounts:
+        main:
+          main:
+            - path: /media/Videos
+              readOnly: false
