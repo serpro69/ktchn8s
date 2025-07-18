@@ -24,6 +24,7 @@ title: Guides
 - [Update Documentation](./how_to_update_documentation.md)
 - [Update Device Firmware](./how_to_update_firmware.md)
 - [Use Both Github and Gitea](./how_to_use_both_github_and_gitea.md)
+- [Use NFS for Persistent Storage](./how_to_use_nfs_for_persistent_storage.md)
 
 ## Troubleshooting Guides
 
