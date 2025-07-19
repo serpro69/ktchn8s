@@ -75,6 +75,10 @@ More information can be found in the [roadmap](https://serpro69.github.io/ktchn8
         - CPU: `Intel Core i5-8100T`
         - RAM: `16GB`
         - SSD: `512GB NVME`
+    - 1 x HP EliteDesk 800 G3 Mini
+        - CPU: `Intel Core i5-7500 vPro`
+        - RAM: `16GB`
+        - SSD: `256GB SATA`
 
 ### Features
 
