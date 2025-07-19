@@ -58,25 +58,38 @@ graph TB
         C3560@{ shape: circle, label: "Cisco C3560-GS-8P<br>(bifrost)<br>(10.10.10.2)" }
 
         %% k8s devices
+        %% control plane
         A@{ shape: rect, label: "Ctrl-1<br>(odin)<br>(10.10.10.10)" }
         B@{ shape: rect, label: "Ctrl-2<br>(freyja)<br>(10.10.10.11)" }
         C@{ shape: rect, label: "Ctrl-3<br>(heimdall)<br>(10.10.10.12)" }
+        %% worker nodes
         D@{ shape: rect, label: "Wrkr-1<br>(mjolnir)<br>(10.10.10.20)" }
         E@{ shape: rect, label: "Wrkr-2<br>(gungnir)<br>(10.10.10.21)" }
         F@{ shape: rect, label: "Wrkr-3<br>(draupnir)<br>(10.10.10.22)" }
         G@{ shape: rect, label: "Wrkr-4<br>(megingjord)<br>(10.10.10.23)" }
-
-        %% nas device
+        H@{ shape: rect, label: "Wrkr-5<br>(hofund)<br>(10.10.10.24)" }
+        I@{ shape: rect, label: "Wrkr-6<br>(gjallarhorn)<br>(10.10.10.25)" }
+        J@{ shape: rect, label: "Wrkr-7<br>(gleipnir)<br>(10.10.10.26)" }
+        K@{ shape: rect, label: "Wrkr-8<br>(brisingamen)<br>(10.10.10.27)" }
+        L@{ shape: rect, label: "Wrkr-9<br>(skidbladnir)<br>(10.10.10.28)" }
+        M@{ shape: rect, label: "Wrkr-10<br>(lafnir)<br>(10.10.10.29)" }
+        %% nas devices
         S1@{ shape: rect, label: "NAS-1<br>(yggdrasil)<br>(10.10.10.30)" }
 
-        C3560 o--o |g0/1::eno1| A
-        C3560 o--o |g0/2::eno1| B
-        C3560 o--o |g0/3::eno1| C
-        C3560 o--o |g0/4::eno1| D
-        C3560 o--o |g0/5::eno1| E
-        C3560 o--o |g0/6::eno1| F
-        C3560 o--o |g0/7::eno1| G
-        C3560 o--o |g0/8::eno1| S1
+        C3560 o--o   |g0/1::eno1| A
+        C3560 o--o   |g0/2::eno1| B
+        C3560 o--o   |g0/3::eno1| C
+        C3560 o--o   |g0/4::eno1| S1
+        C3560 o--o   |g0/5::eno1| D
+        C3560 o--o   |g0/6::eno1| E
+        C3560 o--o   |g0/7::eno1| F
+        C3560 o--o   |g0/8::eno1| G
+        C1111 o--o |g0/0/3::eno1| H
+        C1111 o--o |g0/0/4::eno1| I
+        C1111 o--o |g0/0/5::eno1| J
+        C1111 o--o |g0/0/6::eno1| K
+        C1111 o--o |g0/0/7::eno1| L
+        C1111 o--o |g0/0/8::eno1| M
 
         subgraph GrKC["K8S Cluster"]
             IC@{ shape: subproc, label: "Ingress Controller" }
@@ -134,7 +147,7 @@ graph TB
     class homelab_info text
 
     class W3,CF cloud
-    class A,B,C,D,E,F,G,S1,C1111,C3560,DV,ISPM,EER device
+    class A,B,C,D,E,F,G,H,I,J,K,L,M,S1,C1111,C3560,DV,ISPM,EER device
     class IC,CFD,LB,PD pod
 
     %% legend elements separately for readability
