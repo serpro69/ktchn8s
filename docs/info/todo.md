@@ -9,6 +9,15 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Improve docs and add configuration script for new users
+    - Ansible inventory config for [metal provisioning](../installation/production/metal.md)
+        - Prompt user to edit the inventory file
+        - Update docs - add sample inventory file contents for reference
+    - Search-and-replace throughut the repo files:
+        - Domain name
+        - Github repository name
+        - ... ?
+
 - [ ] Automate [personal gitea user provisioning](../installation/post_install.md#gitea)
 
 - [ ] Add [flaresolverr](https://trash-guides.info/Prowlarr/prowlarr-setup-flaresolverr/) to [media management stack](../guides/how_to_for_media_management.md)
