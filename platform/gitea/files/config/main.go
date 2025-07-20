@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"code.gitea.io/sdk/gitea"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Organization struct {
@@ -32,7 +32,6 @@ type Config struct {
 
 func main() {
 	data, err := os.ReadFile("./config.yaml")
-
 	if err != nil {
 		log.Fatalf("Unable to read config file: %v", err)
 	}
@@ -40,7 +39,6 @@ func main() {
 	config := Config{}
 
 	err = yaml.Unmarshal([]byte(data), &config)
-
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -51,7 +49,6 @@ func main() {
 
 	options := (gitea.SetBasicAuth(gitea_user, gitea_password))
 	client, err := gitea.NewClient(gitea_host, options)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +58,6 @@ func main() {
 			Name:        org.Name,
 			Description: org.Description,
 		})
-
 		if err != nil {
 			log.Printf("Create organization %s: %v", org.Name, err)
 		}
@@ -78,7 +74,6 @@ func main() {
 				Private:        repo.Private,
 				MirrorInterval: "10m",
 			})
-
 			if err != nil {
 				log.Printf("Migrate %s/%s: %v", repo.Owner, repo.Name, err)
 			}
@@ -88,6 +83,9 @@ func main() {
 				// Description: "TODO",
 				Private: repo.Private,
 			})
+			if err != nil {
+				log.Printf("CreateRepo %s/%t: %v", repo.Name, repo.Private, err)
+			}
 		}
 	}
 }
