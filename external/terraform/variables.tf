@@ -8,6 +8,11 @@ variable "cloudflare" {
   sensitive = true
 }
 
+variable "domain_name" {
+  type        = string
+  description = "The domain name to use for the applications"
+}
+
 variable "ntfy" {
   type = object({
     url   = string
