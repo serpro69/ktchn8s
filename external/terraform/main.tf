@@ -2,6 +2,7 @@ module "cloudflare" {
   source                = "./modules/cloudflare"
   cloudflare_account_id = var.cloudflare.account_id
   cloudflare_zone_id    = var.cloudflare.zone_id
+  cloudflare_domain     = var.domain_name
 }
 
 module "ntfy" {
