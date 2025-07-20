@@ -56,8 +56,8 @@ app-template:
       suffix: config
       data:
         settings.yaml: |
-          background: https://images.unsplash.com/photo-1708112292872-fd5612affa79?q=80&w=2109&auto=format&fit=crop
-          cardBlur: md
+          background: https://git.0xbad.cloud/ops/homelab/raw/branch/master/assets/images/homepage/odin.jpg
+          cardBlur: "[2px]"
           theme: dark
           headerStyle: boxed
           hideVersion: true
