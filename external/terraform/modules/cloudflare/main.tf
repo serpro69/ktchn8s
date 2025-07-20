@@ -13,7 +13,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
 resource "cloudflare_dns_record" "tunnel" {
   zone_id = var.cloudflare_zone_id
   type    = "CNAME"
-  name    = "homelab-tunnel.0xbad.cloud"
+  name    = "homelab-tunnel.${var.cloudflare_domain}"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
   proxied = false
   ttl     = 1 # Auto
@@ -107,4 +107,18 @@ resource "cloudflare_bot_management" "main" {
   crawler_protection = "enabled"
   enable_js          = true
   fight_mode         = true
+
+  lifecycle {
+    ignore_changes = [
+      auto_update_model,
+      optimize_wordpress,
+      sbfm_definitely_automated,
+      sbfm_likely_automated,
+      sbfm_static_resource_protection,
+      sbfm_verified_bots,
+      stale_zone_configuration,
+      suppress_session_score,
+      using_latest_model,
+    ]
+  }
 }
