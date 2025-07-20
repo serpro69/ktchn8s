@@ -101,11 +101,10 @@ resource "kubernetes_secret" "cert_manager_token" {
   }
 }
 
-# TODO: Enable
-# resource "cloudflare_bot_management" "example_bot_management" {
-#   zone_id            = data.cloudflare_zone.zone.id
-#   ai_bots_protection = "block"
-#   # crawler_protection = "enabled" # TODO: enable after upgrading provider to 5.x
-#   enable_js  = true
-#   fight_mode = true
-# }
+resource "cloudflare_bot_management" "main" {
+  zone_id            = var.cloudflare_zone_id
+  ai_bots_protection = "block"
+  crawler_protection = "enabled"
+  enable_js          = true
+  fight_mode         = true
+}
