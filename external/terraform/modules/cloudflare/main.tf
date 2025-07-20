@@ -1,26 +1,19 @@
-data "cloudflare_zone" "zone" {
-  account_id = var.cloudflare_account_id
-  zone_id    = var.cloudflare_zone_id
-}
-
-data "cloudflare_api_token_permission_groups" "all" {}
-
 resource "random_password" "tunnel_secret" {
   length  = 64
   special = false
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
-  account_id = var.cloudflare_account_id
-  name       = "homelab"
-  secret     = base64encode(random_password.tunnel_secret.result)
+  account_id    = var.cloudflare_account_id
+  name          = "homelab"
+  tunnel_secret = base64encode(random_password.tunnel_secret.result)
 }
 
 # Not proxied, not accessible. Just a record for auto-created CNAMEs by external-dns.
-resource "cloudflare_record" "tunnel" {
-  zone_id = data.cloudflare_zone.zone.id
+resource "cloudflare_dns_record" "tunnel" {
+  zone_id = var.cloudflare_zone_id
   type    = "CNAME"
-  name    = "homelab-tunnel"
+  name    = "homelab-tunnel.0xbad.cloud"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
   proxied = false
   ttl     = 1 # Auto
@@ -49,15 +42,17 @@ resource "kubernetes_secret" "cloudflared_credentials" {
 resource "cloudflare_api_token" "external_dns" {
   name = "homelab_external_dns"
 
-  policy {
-    permission_groups = [
-      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
-      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
-    ]
+  policies = [{
+    effect = "allow"
+    permission_groups = [{
+      id = local.api_token_permission_groups.zone["Zone Read"],
+      }, {
+      id = local.api_token_permission_groups.zone["DNS Write"]
+    }]
     resources = {
       "com.cloudflare.api.account.zone.*" = "*"
     }
-  }
+  }]
 }
 
 resource "kubernetes_secret" "external_dns_token" {
@@ -78,15 +73,17 @@ resource "kubernetes_secret" "external_dns_token" {
 resource "cloudflare_api_token" "cert_manager" {
   name = "homelab_cert_manager"
 
-  policy {
-    permission_groups = [
-      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
-      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
-    ]
+  policies = [{
+    effect = "allow"
+    permission_groups = [{
+      id = local.api_token_permission_groups.zone["Zone Read"],
+      }, {
+      id = local.api_token_permission_groups.zone["DNS Write"]
+    }]
     resources = {
       "com.cloudflare.api.account.zone.*" = "*"
     }
-  }
+  }]
 }
 
 resource "kubernetes_secret" "cert_manager_token" {
