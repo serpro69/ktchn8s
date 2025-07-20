@@ -7,7 +7,7 @@ app-template:
         main:
           image:
             repository: ghcr.io/gethomepage/homepage
-            tag: v1.3
+            tag: v1.4
           env:
             # gethomepage.dev/installation/#homepage_allowed_hosts
             - name: HOMEPAGE_ALLOWED_HOSTS
