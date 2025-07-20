@@ -13,7 +13,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: apply
-          image: golang:1.19-alpine
+          image: golang:1.23-alpine
           env:
             - name: GITEA_HOST
               value: http://gitea-http:3000

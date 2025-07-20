@@ -11,7 +11,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: secret-generator
-          image: golang:1.19-alpine
+          image: golang:1.24-alpine
           workingDir: /go/src/secret-generator
           command:
             - sh
