@@ -78,6 +78,8 @@ app-template:
               tab: Utilities
               style: row
               columns: 3
+        kubernetes.yaml: |
+          mode: cluster
         widgets.yaml: |
           - search:
               provider: duckduckgo
