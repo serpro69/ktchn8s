@@ -115,11 +115,17 @@ They can't capture all the project's features, but they are sufficient to get a 
 | [![][woodpecker-demo]][woodpecker-demo]                                 |
 | Continuous Deployment with [ArgoCD](https://argoproj.github.io/cd)      |
 | [![][argocd-demo]][argocd-demo]                                         |
+| Identity Management with [Kanidm](https://kanidm.com/)                  |
+| [![][kanidm-demo]][kanidm-demo]                                         |
+| Monitoring with [Grafana](https://grafana.com/)                         |
+| [![][grafana-demo]][grafana-demo]                                       |
 
 [homepage-demo]: assets/images/readme/460288104-8b2680c1-53e1-47c5-818d-08d3502f144b.png
 [gitea-demo]: assets/images/readme/460288220-f3775815-6c55-4086-b15a-8e0562e5d6a6.png
 [woodpecker-demo]: assets/images/readme/463804608-70b7e19f-22a3-4d95-aad1-da389d90c53e.png
 [argocd-demo]: assets/images/readme/460288182-bdd91804-2e10-4910-8cf6-afa15e433178.png
+[kanidm-demo]: assets/images/readme/468351420-81c1da79-31ab-4120-b9e8-dc52c94b0fde.png
+[grafana-demo]: assets/images/readme/a4a53ec5-cb0d-4513-be81-fd646ae66d55.png
 
 ## Getting Started
 
