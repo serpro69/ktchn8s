@@ -78,8 +78,6 @@ app-template:
               tab: Utilities
               style: row
               columns: 3
-        kubernetes.yaml: |
-          mode: cluster
         widgets.yaml: |
           - search:
               provider: duckduckgo
@@ -92,7 +90,7 @@ app-template:
                 cpu: true
                 memory: true
                 showLabel: true
-                label: ktchn8s
+                label: "cluster"
               nodes:
                 show: true
                 cpu: true
