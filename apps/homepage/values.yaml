@@ -61,10 +61,29 @@ app-template:
           theme: dark
           headerStyle: boxed
           hideVersion: true
+          layout:
+            Popular:
+              tab: Popular
+              style: row
+              columns: 3
+            Management:
+              tab: Management
+              style: row
+              columns: 3
+            Development:
+              tab: Development
+              style: row
+              columns: 3
+            Utilities:
+              tab: Utilities
+              style: row
+              columns: 3
         widgets.yaml: |
           - search:
               provider: duckduckgo
               target: _blank
+          - logo:
+              icon: mdi-kubernetes.svg
         services.yaml: |
           - Popular:
             - Matrix:
