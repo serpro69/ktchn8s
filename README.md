@@ -125,7 +125,7 @@ They can't capture all the project's features, but they are sufficient to get a 
 [woodpecker-demo]: assets/images/readme/463804608-70b7e19f-22a3-4d95-aad1-da389d90c53e.png
 [argocd-demo]: assets/images/readme/460288182-bdd91804-2e10-4910-8cf6-afa15e433178.png
 [kanidm-demo]: assets/images/readme/468351420-81c1da79-31ab-4120-b9e8-dc52c94b0fde.png
-[grafana-demo]: assets/images/readme/a4a53ec5-cb0d-4513-be81-fd646ae66d55.png
+[grafana-demo]: assets/images/readme/468351854-a4a53ec5-cb0d-4513-be81-fd646ae66d55.png
 
 ## Getting Started
 
