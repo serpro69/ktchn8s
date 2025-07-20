@@ -84,6 +84,18 @@ app-template:
               target: _blank
           - logo:
               icon: mdi-kubernetes.svg
+          - kubernetes:
+              cluster:
+                show: true
+                cpu: true
+                memory: true
+                showLabel: true
+                label: ktchn8s
+              nodes:
+                show: true
+                cpu: true
+                memory: true
+                showLabel: true
         services.yaml: |
           - Popular:
             - Matrix:
