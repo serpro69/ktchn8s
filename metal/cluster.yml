@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook
 ---
 - name: Ensure K3s Prerequisites
-  hosts: metal
+  hosts: k3s
   roles:
     - role: prerequisites
   tags:
@@ -19,13 +19,13 @@
     - control
 
 - name: Configure K3s Worker Nodes
-  hosts: nodes
+  hosts: worker_plane
   # gather_facts: true
   roles:
     - role: k3s
   tags:
     - k3s
-    - nodes
+    - worker
 
 - name: Install Kubernetes addons
   hosts: localhost # Cilium is installed via kubectl/helm from the management node
