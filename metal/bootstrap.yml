@@ -9,7 +9,7 @@
         homelab_cidr: "{{ homelab_net_cidr }}"
 
 - name: Bootstrap bare-metal machines
-  hosts: metal
+  hosts: k3s
   gather_facts: false
   roles:
     - role: boot
