@@ -9,6 +9,22 @@ title: ToDo
   <img class="banner-image" src="https://images.unsplash.com/photo-1598791318878-10e76d178023?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" style="object-position: 50% 60%; height: 200px;">
 </div>
 
+- [ ] Apps/Services
+    - [ ] [NextCloud](https://github.com/nextcloud/server)
+    - [ ] (wip) `*arr` suite (<s>Radarr</s>, <s>Sonarr</s>, Readarr, Lidarr, Bazaar, <s>Prowlarr</s>, Profilarr)
+        - [rreading-glasses](https://github.com/blampe/rreading-glasses) as metadata service
+    - [x] Media streaming via Jellyfin / Jellyseer (shared with fam)
+    - [Vaultwarden](https://github.com/dani-garcia/vaultwarden) 
+    - [Mealie](https://github.com/mealie-recipes/mealie)
+    - Ebook/Audiobook manager via [Kavita](https://github.com/Kareadita/Kavita) + [Audiobookshelf](https://github.com/advplyr/audiobookshelf)
+        - Also evaluate [Calibre](https://github.com/kovidgoyal/calibre) vs Kavita
+    - [Actual](https://github.com/actualbudget/actual) for budget management
+    - [StirlingPDF](https://github.com/Stirling-Tools/Stirling-PDF) for PDF tools
+    - [Syncthing](https://github.com/syncthing/syncthing) to sync some files between devices
+        - Extremely useful if you own a PocketBook e-reader, which runs basically linux, so you can run Syncthing on it, meaning you... get... to... sync... your... eBooks... directly! 🤯😲😱
+    - Whatever else I have starred in 'Self-Hosted' category on github that might be useful for home-use or to play around with
+        - ... TBC
+
 - [ ] Improve docs and add configuration script for new users
     - Ansible inventory config for [metal provisioning](../installation/production/metal.md)
         - Prompt user to edit the inventory file
