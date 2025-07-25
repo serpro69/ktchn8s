@@ -18,3 +18,25 @@
           ---
           {{ hostvars[inventory_hostname] | to_yaml }}
       delegate_to: localhost
+
+    - name: Set facts
+      set_fact:
+        disk_directories: |-
+          {% set data_dirs = [] %}
+          {% for disk in data_drives_ids %}
+            {% set dir = 'data' ~ loop.index %}
+            {% do data_dirs.append(dir) %}
+          {% endfor %}
+          {{ data_dirs }}
+        parity_directories: |-
+          {% set data_dirs = [] %}
+          {% for disk in parity_drives_ids %}
+            {% set dir = 'parity' ~ loop.index %}
+            {% do data_dirs.append(dir) %}
+          {% endfor %}
+          {{ data_dirs }}
+
+    - name: Ensure mountpoint directories
+      debug:
+        # msg: "{{ item }}"
+        msg: "{{ [disk_directories, parity_directories, 'storage'] | flatten }}"
