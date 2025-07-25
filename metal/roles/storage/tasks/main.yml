@@ -17,3 +17,21 @@
 
 - include_tasks: setup_debian.yml # noqa name[missing]
   when: ansible_os_family == 'Debian'
+
+- name: Set facts
+  set_fact:
+    disk_directories: |-
+      {% for disk in data_drives_ids %}
+        data{{ loop.index }}
+      {% endfor %}
+    parity_directories: |-
+      {% for disk in parity_drives_ids %}
+        parity{{ loop.index }}
+      {% endfor %}
+
+- name: Ensure mountpoint directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: "{{ [disk_directories, parity_directories, 'storage'] | flatten(1) }}"
