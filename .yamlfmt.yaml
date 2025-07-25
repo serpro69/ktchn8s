@@ -8,7 +8,7 @@ formatter:
   retain_line_breaks: true
   retain_line_breaks_single: true
   disallow_anchors: false
-  max_line_length: 120
+  max_line_length: 160
   scan_folded_as_literal: true
   indentless_arrays: false
   drop_merge_tag: false
