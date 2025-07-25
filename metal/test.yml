@@ -1,0 +1,20 @@
+# vim: set ft=yaml.ansible:
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook
+---
+- name: Test
+  hosts:
+    - metal
+    - :&nas
+
+  gather_facts: false
+
+  tasks:
+    - name: debug
+      debug:
+        msg: |-
+          ansible_host: {{ ansible_host }}
+          ansible_user: {{ ansible_user }}
+          inventory_hostname: {{ inventory_hostname }}
+          ---
+          {{ hostvars[inventory_hostname] | to_yaml }}
+      delegate_to: localhost

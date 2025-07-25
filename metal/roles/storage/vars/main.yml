@@ -1,0 +1,7 @@
+---
+mergerfs_ver: 20.40.2
+mergerfs_url_release: https://github.com/trapexit/mergerfs/releases/download/{{ mergerfs_ver }}
+mergerfs_pkg_deb: mergerfs_{{ mergerfs_ver }}.{{ ansible_distribution }}-{{ ansible_distribution_release }}_{{ ansible_architecture }}.deb
+mergerfs_pkg_rpm: mergerfs-{{ mergerfs_ver }}.fc{{ ansible_distribution_release }}.{{ ansible_architecture }}.rpm
+mergerfs_url_deb: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_deb}}"
+mergerfs_url_rpm: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_rpm }}"
