@@ -133,7 +133,7 @@ They can't capture all the project's features, but they are sufficient to get a 
 
 ...or simply:
 
-<pre style="margin-left: 25%; margin-right: auto;">
+<pre class="no-copy" style="margin-left: 25%; margin-right: auto;">
 <code style="background-color: #070707;">
            ╭──────────────────────────────────────────────────╮
            │                        🐧                        │

@@ -2,12 +2,6 @@
 template: home.html
 ---
 
-<style>
-.md-clipboard.md-icon {
-  display: none;
-}
-</style>
-
 <!-- markdownlint-disable-next-line MD041 -->
 --8<--
 README.md
