@@ -118,3 +118,14 @@ nettools @ 2.10 : ifconfig arp dnsdomainname ...
 inetutils @ 2.6 : ifconfig dnsdomainname ftp ...
 busybox @ 1.36.1 : ifconfig [ [[ acpid add-shell ...
 ```
+
+!!! info
+    You may wonder why you're seeing `/nix/store/.../bin/bash` when running `echo $SHELL` within the nix development environment, even though we've set the default shell to use `zsh`.
+    ```bash
+    ➜ which $SHELL
+    /nix/store/xy4jjgw87sbgwylm5kn047d9gkbhsr9x-bash-5.2p37/bin/bash
+    ```
+    In nix, `SHELL` variable seems to point to the shell that the package derivation uses as its shell (which usually is `bash`).
+    There's some more details about this behavior in this [comment](https://github.com/NixOS/nix/pull/8043#issuecomment-1814009237)
+
+
