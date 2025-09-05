@@ -44,6 +44,7 @@
             sops
             tmux
             yq
+            zsh
             # provisioning/configuration tools
             ansible
             ansible-lint
