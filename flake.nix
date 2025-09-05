@@ -38,7 +38,6 @@
             git
             gnumake
             jq
-            mise
             neovim
             nix-search-cli
             sops
