@@ -8,6 +8,9 @@ woodpecker:
       # Kubernetes backend instead of running them directly on
       # the agent pod, so we can run many workflows per agent.
       WOODPECKER_MAX_WORKFLOWS: 10
+    mapAgentSecret: false
+    extraSecretNamesForEnvFrom:
+      - woodpecker-secret
   server:
     env:
       WOODPECKER_HOST: https://ci.0xbad.cloud
@@ -32,3 +35,15 @@ woodpecker:
     createAgentSecret: false
     extraSecretNamesForEnvFrom:
       - woodpecker-secret
+    prometheus:
+      podmonitor:
+        enabled: true
+      rules:
+        enabled: true
+    grafana:
+      dashboards:
+        enabled: true
+        labels:
+          grafana_dashboard: "1"
+    metrics:
+      enabled: true
