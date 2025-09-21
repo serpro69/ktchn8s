@@ -1,1 +1,6 @@
 ---
+# Default network CIDR for homelab
+homelab_net_cidr: "10.10.10.0/24"
+
+# Default NFS export options
+default_nfs_options: "rw,sync,no_subtree_check,no_root_squash,insecure"
