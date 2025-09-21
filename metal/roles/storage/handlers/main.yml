@@ -1,0 +1,37 @@
+---
+- name: mount data drives # noqa: command-instead-of-module no-changed-when
+  command: mount -a
+  listen: mount data drives
+
+- name: mount parity drives # noqa: command-instead-of-module no-changed-when
+  command: mount -a
+  listen: mount parity drives
+
+- name: reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: restart nfs-kernel-server
+  service:
+    name: nfs-kernel-server
+    state: restarted
+
+- name: restart snapraid-runner
+  service:
+    name: snapraid-runner.timer
+    state: restarted
+    enabled: true
+
+- name: mount mergerfs # noqa: command-instead-of-module no-changed-when
+  command: mount /mnt/storage
+  listen: mount mergerfs
+
+- name: initial snapraid sync # noqa: no-changed-when
+  command: /usr/local/bin/snapraid sync
+  listen: initial snapraid sync
+  async: 3600
+  poll: 0
+
+- name: reload nfs exports # noqa: no-changed-when
+  command: exportfs -ra
+  listen: reload nfs exports

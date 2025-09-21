@@ -1,0 +1,11 @@
+---
+# vim: set ft=yaml.ansible:
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook
+- name: Configure NAS Storage Server
+  hosts: nas
+  gather_facts: true
+  roles:
+    - role: storage
+  tags:
+    - storage
+    - nas

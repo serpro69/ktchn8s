@@ -17,3 +17,50 @@
 
 - include_tasks: setup_debian.yml # noqa name[missing]
   when: ansible_os_family == 'Debian'
+
+- name: Set facts for mount directories
+  set_fact:
+    disk_directories: |-
+      {% set dirs = [] %}
+      {% for disk in data_drives_ids %}
+        {% set dir = '/mnt/data' + loop.index|string %}
+        {% do dirs.append(dir) %}
+      {% endfor %}
+      {{ dirs }}
+    parity_directories: |-
+      {% set dirs = [] %}
+      {% for disk in parity_drives_ids %}
+        {% set dir = '/mnt/parity' + loop.index|string %}
+        {% do dirs.append(dir) %}
+      {% endfor %}
+      {{ dirs }}
+
+- name: Include disk management tasks
+  include_tasks: disks.yml
+  when: data_drives_ids is defined and data_drives_ids | length > 0
+
+- name: Ensure storage mountpoint directory
+  file:
+    path: /mnt/storage
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Include mergerfs configuration
+  include_tasks: mergerfs.yml
+  when:
+    - data_drives_ids is defined
+    - data_drives_ids | length > 0
+    - disk_directories is defined
+
+- name: Include snapraid configuration
+  include_tasks: snapraid.yml
+  when:
+    - parity_drives_ids is defined
+    - parity_drives_ids | length > 0
+    - data_drives_ids is defined
+    - data_drives_ids | length > 0
+
+- name: Include NFS server configuration
+  include_tasks: nfs.yml
