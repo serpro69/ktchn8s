@@ -1,0 +1,127 @@
+---
+- name: Identify disk devices by ID
+  set_fact:
+    data_devices: |-
+      {% set devices = [] %}
+      {% for disk_id in data_drives_ids %}
+        {% set device_path = '/dev/disk/by-id/' + disk_id %}
+        {% do devices.append(device_path) %}
+      {% endfor %}
+      {{ devices }}
+    parity_devices: |-
+      {% set devices = [] %}
+      {% for disk_id in parity_drives_ids %}
+        {% set device_path = '/dev/disk/by-id/' + disk_id %}
+        {% do devices.append(device_path) %}
+      {% endfor %}
+      {{ devices }}
+
+- name: Verify disk devices exist
+  stat:
+    path: "{{ item }}"
+  loop: "{{ data_devices + parity_devices }}"
+  register: disk_check
+  failed_when: not disk_check.stat.exists
+
+- name: Display discovered drives
+  debug:
+    msg:
+      - "Data drives: {{ data_devices }}"
+      - "Parity drives: {{ parity_devices }}"
+
+- name: Check if drives are already partitioned
+  command: "lsblk -n {{ item }}"
+  loop: "{{ data_devices + parity_devices }}"
+  register: partition_check
+  changed_when: false
+  failed_when: false
+
+- name: Partition drives (create single GPT partition)
+  parted:
+    device: "{{ item }}"
+    number: 1
+    state: present
+    part_type: primary
+    part_start: 2048s
+    part_end: 100%
+    label: gpt
+  loop: "{{ data_devices + parity_devices }}"
+  when:
+    - partition_check.results[ansible_loop.index0].stdout_lines | length == 1
+  register: partition_result
+
+- name: Wait for partition devices to be available
+  wait_for:
+    path: "{{ item }}1"
+    timeout: 30
+  loop: "{{ data_devices + parity_devices }}"
+  when: partition_result is changed
+
+- name: Format data drives with ext4
+  filesystem:
+    fstype: ext4
+    dev: "{{ item }}1"
+    opts: -L "data{{ ansible_loop.index }}"
+  loop: "{{ data_devices }}"
+  when: partition_result is changed
+
+- name: Format parity drives with ext4
+  filesystem:
+    fstype: ext4
+    dev: "{{ item }}1"
+    opts: -L "parity{{ ansible_loop.index }}"
+  loop: "{{ parity_devices }}"
+  when: partition_result is changed
+
+- name: Create mount point directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop: "{{ disk_directories + parity_directories }}"
+
+- name: Generate fstab entries for data drives
+  set_fact:
+    data_fstab_entries: |-
+      {% set entries = [] %}
+      {% for device in data_devices %}
+        {% set mount_point = '/mnt/data' + (loop.index | string) %}
+        {% set entry = device + '1 ' + mount_point + ' ext4 defaults,noatime 0 2' %}
+        {% do entries.append(entry) %}
+      {% endfor %}
+      {{ entries }}
+
+- name: Generate fstab entries for parity drives
+  set_fact:
+    parity_fstab_entries: |-
+      {% set entries = [] %}
+      {% for device in parity_devices %}
+        {% set mount_point = '/mnt/parity' + (loop.index | string) %}
+        {% set entry = device + '1 ' + mount_point + ' ext4 defaults,noatime 0 2' %}
+        {% do entries.append(entry) %}
+      {% endfor %}
+      {{ entries }}
+
+- name: Add data drives to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ item }}"
+    state: present
+    backup: true
+  loop: "{{ data_fstab_entries }}"
+  notify: mount data drives
+
+- name: Add parity drives to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ item }}"
+    state: present
+    backup: true
+  loop: "{{ parity_fstab_entries }}"
+  notify: mount parity drives
+
+- name: Mount all drives
+  command: mount -a
+  changed_when: false
