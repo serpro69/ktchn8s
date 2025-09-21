@@ -1,0 +1,107 @@
+---
+- name: Install snapraid dependencies
+  package:
+    name:
+      - build-essential
+      - git
+      - wget
+    state: present
+
+- name: Create snapraid build directory
+  tempfile:
+    state: directory
+  register: snapraid_build_dir
+
+- name: Download snapraid source
+  get_url:
+    url: "{{ snapraid_url }}"
+    dest: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract snapraid source
+  unarchive:
+    src: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}.tar.gz"
+    dest: "{{ snapraid_build_dir.path }}"
+    remote_src: true
+    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
+
+- name: Configure snapraid build
+  command: ./configure
+  args:
+    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
+    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}/Makefile"
+
+- name: Build snapraid
+  command: make -j{{ ansible_processor_vcpus }}
+  args:
+    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
+    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}/snapraid"
+
+- name: Install snapraid
+  command: make install
+  args:
+    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
+    creates: /usr/local/bin/snapraid
+  become: true
+
+- name: Create snapraid configuration
+  template:
+    src: snapraid.conf.j2
+    dest: /etc/snapraid.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: initial snapraid sync
+
+- name: Create snapraid-runner script directory
+  file:
+    path: /opt/snapraid-runner
+    state: directory
+    mode: '0755'
+
+- name: Download snapraid-runner
+  get_url:
+    url: "{{ snapraid_runner_url }}"
+    dest: /opt/snapraid-runner/snapraid-runner.py
+    mode: '0755'
+
+- name: Create snapraid-runner config
+  template:
+    src: snapraid-runner.conf.j2
+    dest: /opt/snapraid-runner/snapraid-runner.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create snapraid-runner systemd service
+  template:
+    src: snapraid-runner.service.j2
+    dest: /etc/systemd/system/snapraid-runner.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+
+- name: Create snapraid-runner systemd timer
+  template:
+    src: snapraid-runner.timer.j2
+    dest: /etc/systemd/system/snapraid-runner.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart snapraid-runner
+
+- name: Enable snapraid-runner timer
+  systemd:
+    name: snapraid-runner.timer
+    enabled: true
+    daemon_reload: true
+
+- name: Cleanup build directory
+  file:
+    path: "{{ snapraid_build_dir.path }}"
+    state: absent
