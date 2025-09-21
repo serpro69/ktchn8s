@@ -55,3 +55,7 @@ Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 - Add your ssh public key to `/root/.ssh/authorized_keys`
 - Make sure you have the following line `AuthorizedKeysFile      .ssh/authorized_keys` in `/etc/ssh/ssh_config` file
 - Then restart ssh service with `systemctl restart ssh` and check that it has "active (running)" status with `systemctl status ssh`
+
+### Remove the temporary user
+
+Debian does not allow to skip user creation step during installation process. If you don't plan to use that user, or just made a temporary user to "skip" that installation step, remember to remove the user with `deluser 'temp' --remove-all-files`, where `temp` is the username you specified during installation process.

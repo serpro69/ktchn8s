@@ -18,6 +18,7 @@ title: Guides
 - [Manage Domains with Cloudflare](./how_to_manage_domain_with_cloudflare.md)
 - [Mount RAID disk in Debian](./how_to_mount_raid_disk_in_debian.md)
 - [Onboarding Users](./how_to_onboard_users.md)
+- [Prepare Seagate EXOS Drives](./how_to_prepare_seagate_exos_drives.md)
 - [Running the Cluster on a Single Node](./how_to_run_cluster_with_a_single_node.md)
 - [Manage your Media](./how_to_for_media_management.md)
 - [Install Debian on Storage Node](./how_to_install_debian_on_storage_node.md)
