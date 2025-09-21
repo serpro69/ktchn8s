@@ -1,0 +1,39 @@
+---
+- name: Create mergerfs mount configuration
+  set_fact:
+    mergerfs_branches: |-
+      {% set branches = [] %}
+      {% for dir in disk_directories %}
+        {% do branches.append(dir) %}
+      {% endfor %}
+      {{ branches | join(':') }}
+    mergerfs_options: "defaults,nonempty,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
+
+- name: Add mergerfs mount to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ mergerfs_branches }} /mnt/storage fuse.mergerfs {{ mergerfs_options }} 0 0"
+    state: present
+    backup: true
+  notify: mount mergerfs
+
+- name: Create NFS export directories
+  file:
+    path: "/mnt/storage/{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop:
+    - Videos
+    - Documents
+    - Pictures
+    - Music
+    - Backups
+  when: mergerfs_branches is defined
+
+- name: Mount mergerfs pool
+  command: mount /mnt/storage
+  args:
+    creates: /mnt/storage/.mergerfs
+  changed_when: false

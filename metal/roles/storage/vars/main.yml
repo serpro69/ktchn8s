@@ -5,3 +5,7 @@ mergerfs_pkg_deb: mergerfs_{{ mergerfs_ver }}.{{ ansible_distribution }}-{{ ansi
 mergerfs_pkg_rpm: mergerfs-{{ mergerfs_ver }}.fc{{ ansible_distribution_release }}.{{ ansible_architecture }}.rpm
 mergerfs_url_deb: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_deb}}"
 mergerfs_url_rpm: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_rpm }}"
+
+snapraid_version: "12.3"
+snapraid_url: "https://github.com/amadvance/snapraid/releases/download/v{{ snapraid_version }}/snapraid-{{ snapraid_version }}.tar.gz"
+snapraid_runner_url: "https://raw.githubusercontent.com/Chronial/snapraid-runner/master/snapraid-runner.py"

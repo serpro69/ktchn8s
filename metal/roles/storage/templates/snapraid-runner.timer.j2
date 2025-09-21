@@ -1,0 +1,12 @@
+[Unit]
+Description=Run SnapRAID sync and scrub
+Requires=snapraid-runner.service
+
+[Timer]
+# Run daily at 3:00 AM
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target
