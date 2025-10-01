@@ -19,6 +19,8 @@ nas:
                 - ENC[AES256_GCM,data:U4vaNC9GHl1EKMB9gANNPGjojhPFOj/+CCLmoWEdc9BJzd2PtaT1,iv:cwma9IkeepgzDEBqfOxWUa5szP/myZNBzs6lHaBWP2w=,tag:1P+oL661GhUmUrUy+yAHbw==,type:str]
                 - ENC[AES256_GCM,data:h1fRWtv2ufO2WGfp3mqmd2CV8hCt5AMNaaXUgV+tbxnNUdl02LjU,iv:MxtFSpBbD/SHcRuu1EJqeX8HXd81PBKh4fAubGre6vA=,tag:Vur5ofhfltJ52ayvQhjnwg==,type:str]
             parity_drives_ids: []
+            #ENC[AES256_GCM,data:zDWPE90JHqG5PxefYoG1RUmDNjkkn5+9fWuKKBwLPnNQY9ZjTCpN95A8,iv:0zBNBbLlnLoN+OnS3azSTWx1BDOZ5OtHkT8u+Kb5Uro=,tag:1PIWrhX4e8TW+C0Cjao8Ug==,type:comment]
+            #ENC[AES256_GCM,data:HPK2d6Ie6LQm2MXoPtISwZvRLKq00ga+QKSb7Hbq4e6HHGG2tccrIvVu,iv:RnFKasMbvdM+z9YObTeqF7tHaHsRJyUX2O92Uyq85pk=,tag:iiExsvzzz7Q/hln1hN0PWw==,type:comment]
             network_interface: ENC[AES256_GCM,data:ql1AaM0g,iv:8NA+Gg1APsFj3I74CoQslwcngPMlllaJ50n8fY8Y0Nc=,tag:2brCfUVjh1EI3GD6+JK7QQ==,type:str]
 k3s:
     children:
@@ -128,8 +130,8 @@ sops:
             RDZxUExvSEVWZVNCYnhnNnhxYk5nTDQK5QLn98L1sWXV6T5jlEbdrfneyGngBkkQ
             kJZiYg/H9ISoLNo6BG46tFfzLyJuzaQqGbaYVXX3N13E54oBZEkDZg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-09-21T10:38:57Z"
-    mac: ENC[AES256_GCM,data:M7+0+ol1FJHH2ZTURz6JthLUYdokNdBLc0Cy/fPUi89rm4CuvIE7SWFRYH+JoDitCmsAi9JPigPpxE0uIwbQD9tbGTzNLDNhcXnCw3qSveHeuzKdIHyiLomOucdy6SNqMK0Bd68fRcspnFGr153BnpnE+0kYtVb7bLPpJk+3DSc=,iv:NuMZlNCnfatvGe0G7BG8RUEou03/ApLpCffImLAuFCQ=,tag:N6IOussCwCVuM5Nm6+rVdQ==,type:str]
+    lastmodified: "2025-10-01T17:06:18Z"
+    mac: ENC[AES256_GCM,data:QDkMh7fZ2RS4o8Ao15zdESC1i1cIK392TlG/0A6uUJpxkudgDSEVfE+N7NTb6R0CsdeKGsNQtNwiLLxpc/beChbYPd8J9bPDm+1Df8+dd/FSnQeFyhkZV4LsbOZSfbPyo+XSamK41RnfZ+fgHnOIQeVAELZ+3FoJxf4V3lu3GQc=,iv:vtb9DqF9s9H55wfSbK9VnaJh5apR7IK/EzDj8I4kRX4=,tag:tUNI5+P+SWj3sV1hX+31kQ==,type:str]
     pgp: []
     unencrypted_suffix: _unencrypted
     version: 3.9.3
