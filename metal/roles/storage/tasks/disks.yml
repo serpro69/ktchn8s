@@ -58,21 +58,36 @@
   loop: "{{ data_devices + parity_devices }}"
   when: partition_result is changed
 
+- name: Check for existing filesystems on partitions
+  command: "blkid {{ item }}1"
+  loop: "{{ data_devices + parity_devices }}"
+  register: filesystem_check
+  changed_when: false
+  failed_when: false
+
 - name: Format data drives with ext4
   filesystem:
     fstype: ext4
     dev: "{{ item }}1"
     opts: -L "data{{ ansible_loop.index }}"
+    force: no
   loop: "{{ data_devices }}"
-  when: partition_result is changed
+  # Format only if: partition exists AND no filesystem detected
+  when:
+    - filesystem_check.results[ansible_loop.index0].rc != 0
+  register: data_format_result
 
 - name: Format parity drives with ext4
   filesystem:
     fstype: ext4
     dev: "{{ item }}1"
     opts: -L "parity{{ ansible_loop.index }}"
+    force: no
   loop: "{{ parity_devices }}"
-  when: partition_result is changed
+  # Format only if: partition exists AND no filesystem detected
+  when:
+    - filesystem_check.results[data_devices | length + ansible_loop.index0].rc != 0
+  register: parity_format_result
 
 - name: Create mount point directories
   file:
