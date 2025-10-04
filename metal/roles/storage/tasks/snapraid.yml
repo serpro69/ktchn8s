@@ -1,4 +1,14 @@
 ---
+- name: Validate parity drives configuration
+  assert:
+    that:
+      - parity_drives_ids is defined
+      - parity_drives_ids | length > 0
+      - data_drives_ids is defined
+      - data_drives_ids | length > 0
+    fail_msg: "Cannot configure snapraid: parity_drives_ids or data_drives_ids is empty or undefined"
+    success_msg: "Parity drives validation passed: {{ parity_drives_ids | length }} parity drive(s), {{ data_drives_ids | length }} data drive(s)"
+
 - name: Install snapraid dependencies
   package:
     name:
