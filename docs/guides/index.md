@@ -16,6 +16,7 @@ title: Guides
 - [Disable DHCP Proxy in Dnsmasq for PXE](./how_to_disable_dhcp_proxy_in_dnsmasq_for_pxe.md)
 - [Expose Services to the World](./how_to_expose_services_to_world.md)
 - [Manage Domains with Cloudflare](./how_to_manage_domain_with_cloudflare.md)
+- [Mount RAID disk in Debian](./how_to_mount_raid_disk_in_debian.md)
 - [Onboarding Users](./how_to_onboard_users.md)
 - [Running the Cluster on a Single Node](./how_to_run_cluster_with_a_single_node.md)
 - [Manage your Media](./how_to_for_media_management.md)
