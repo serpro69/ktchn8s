@@ -228,3 +228,7 @@ The project uses PXE boot for automated OS installation:
 - The project assumes specific network configuration (VLANs, IP ranges) - adjust as needed
 - PXE server containers must be stopped with `make clean` after provisioning
 - Test deployments thoroughly before production use
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md
