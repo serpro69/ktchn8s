@@ -54,6 +54,13 @@
     - data_drives_ids | length > 0
     - disk_directories is defined
 
+- name: Check snapraid prerequisites
+  debug:
+    msg: "Skipping snapraid configuration: requires both parity_drives_ids and data_drives_ids to be populated"
+  when: >
+    (parity_drives_ids is not defined or parity_drives_ids | length == 0) or
+    (data_drives_ids is not defined or data_drives_ids | length == 0)
+
 - name: Include snapraid configuration
   include_tasks: snapraid.yml
   when:
