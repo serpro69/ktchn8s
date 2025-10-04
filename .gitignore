@@ -20,3 +20,15 @@ site/
 *.iso
 *.log
 *.tgz
+
+# AI tools
+.claude
+.serena
+.taskmaster/*
+!.taskmaster/CLAUDE.md
+!.taskmaster/config.json
+.mcp.json
+
+# Taskmaster task files
+# tasks.json
+# tasks/
