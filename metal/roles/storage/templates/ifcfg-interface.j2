@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Network configuration for {{ inventory_hostname }}
+
+TYPE=Ethernet
+BOOTPROTO=none
+NAME={{ storage_network.interface }}
+DEVICE={{ storage_network.interface }}
+ONBOOT=yes
+IPADDR={{ storage_network.address }}
+NETMASK={{ storage_network.netmask }}
+GATEWAY={{ storage_network.gateway }}
+DNS1={{ storage_network.dns_nameservers[0] }}
+{% if storage_network.dns_nameservers | length > 1 %}
+DNS2={{ storage_network.dns_nameservers[1] }}
+{% endif %}
