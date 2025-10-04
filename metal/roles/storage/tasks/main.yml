@@ -1,4 +1,8 @@
 ---
+- name: Include network configuration
+  include_tasks: network.yml
+  when: configure_network | default(false)
+
 - name: Ensure base packages
   package:
     name:

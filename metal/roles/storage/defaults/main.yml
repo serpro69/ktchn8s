@@ -4,3 +4,14 @@ homelab_net_cidr: "10.10.10.0/24"
 
 # Default NFS export options
 default_nfs_options: "rw,sync,no_subtree_check,no_root_squash,insecure"
+
+# Network configuration (optional)
+configure_network: false
+storage_network:
+  interface: "{{ network_interface | default('eth0') }}"
+  address: "{{ ansible_host }}"
+  netmask: "255.255.255.0"
+  gateway: "10.10.10.1"
+  dns_nameservers:
+    - "10.10.10.1"
+    - "1.1.1.1"

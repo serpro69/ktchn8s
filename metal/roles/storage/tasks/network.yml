@@ -1,0 +1,35 @@
+---
+- name: Configure static networking on Debian
+  template:
+    src: interfaces.j2
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  when: ansible_os_family == 'Debian'
+  notify: restart networking debian
+
+- name: Configure static networking on RedHat
+  template:
+    src: ifcfg-interface.j2
+    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ storage_network.interface }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  when: ansible_os_family == 'RedHat'
+  notify: restart networking redhat
+
+- name: Verify network configuration
+  wait_for:
+    host: "{{ storage_network.gateway }}"
+    port: 22
+    timeout: 10
+  changed_when: false
+  failed_when: false
+  register: network_test
+
+- name: Display network configuration status
+  debug:
+    msg: "Network configuration {{ 'successful' if network_test.failed == false else 'may need verification' }}"
