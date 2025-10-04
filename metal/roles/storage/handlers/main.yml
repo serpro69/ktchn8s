@@ -35,3 +35,15 @@
 - name: reload nfs exports # noqa: no-changed-when
   command: exportfs -ra
   listen: reload nfs exports
+
+- name: restart networking debian
+  service:
+    name: networking
+    state: restarted
+  listen: restart networking debian
+
+- name: restart networking redhat
+  service:
+    name: NetworkManager
+    state: restarted
+  listen: restart networking redhat
