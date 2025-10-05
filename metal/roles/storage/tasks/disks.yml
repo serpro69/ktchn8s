@@ -3,15 +3,15 @@
   set_fact:
     data_devices: |-
       {% set devices = [] %}
-      {% for disk_id in data_drives_ids %}
-        {% set device_path = '/dev/disk/by-id/' + disk_id %}
+      {% for drive in data_drives %}
+        {% set device_path = '/dev/disk/by-id/' + drive.id %}
         {% do devices.append(device_path) %}
       {% endfor %}
       {{ devices }}
     parity_devices: |-
       {% set devices = [] %}
-      {% for disk_id in parity_drives_ids %}
-        {% set device_path = '/dev/disk/by-id/' + disk_id %}
+      {% for drive in parity_drives %}
+        {% set device_path = '/dev/disk/by-id/' + drive.id %}
         {% do devices.append(device_path) %}
       {% endfor %}
       {{ devices }}
