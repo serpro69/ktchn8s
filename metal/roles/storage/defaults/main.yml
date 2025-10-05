@@ -5,6 +5,12 @@ homelab_net_cidr: "10.10.10.0/24"
 # Default NFS export options
 default_nfs_options: "rw,sync,no_subtree_check,no_root_squash,insecure"
 
+# Firewall configuration
+manage_firewall: true  # Set to false to skip firewall configuration
+install_ufw: true      # Install UFW if not present (only when manage_firewall=true)
+nfs_allowed_networks:
+  - "{{ homelab_net_cidr }}"
+
 # Network configuration (optional)
 configure_network: false
 storage_network:
