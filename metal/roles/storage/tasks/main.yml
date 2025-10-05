@@ -26,14 +26,14 @@
   set_fact:
     disk_directories: |-
       {% set dirs = [] %}
-      {% for disk in data_drives_ids %}
+      {% for drive in data_drives %}
         {% set dir = '/mnt/data' + loop.index|string %}
         {% do dirs.append(dir) %}
       {% endfor %}
       {{ dirs }}
     parity_directories: |-
       {% set dirs = [] %}
-      {% for disk in parity_drives_ids %}
+      {% for drive in parity_drives %}
         {% set dir = '/mnt/parity' + loop.index|string %}
         {% do dirs.append(dir) %}
       {% endfor %}
@@ -41,7 +41,7 @@
 
 - name: Include disk management tasks
   include_tasks: disks.yml
-  when: data_drives_ids is defined and data_drives_ids | length > 0
+  when: data_drives is defined and data_drives | length > 0
 
 - name: Ensure storage mountpoint directory
   file:
@@ -54,24 +54,24 @@
 - name: Include mergerfs configuration
   include_tasks: mergerfs.yml
   when:
-    - data_drives_ids is defined
-    - data_drives_ids | length > 0
+    - data_drives is defined
+    - data_drives | length > 0
     - disk_directories is defined
 
 - name: Check snapraid prerequisites
   debug:
-    msg: "Skipping snapraid configuration: requires both parity_drives_ids and data_drives_ids to be populated"
+    msg: "Skipping snapraid configuration: requires both parity_drives and data_drives to be populated"
   when: >
-    (parity_drives_ids is not defined or parity_drives_ids | length == 0) or
-    (data_drives_ids is not defined or data_drives_ids | length == 0)
+    (parity_drives is not defined or parity_drives | length == 0) or
+    (data_drives is not defined or data_drives | length == 0)
 
 - name: Include snapraid configuration
   include_tasks: snapraid.yml
   when:
-    - parity_drives_ids is defined
-    - parity_drives_ids | length > 0
-    - data_drives_ids is defined
-    - data_drives_ids | length > 0
+    - parity_drives is defined
+    - parity_drives | length > 0
+    - data_drives is defined
+    - data_drives | length > 0
 
 - name: Include NFS server configuration
   include_tasks: nfs.yml
