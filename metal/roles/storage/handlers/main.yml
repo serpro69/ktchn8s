@@ -3,9 +3,21 @@
   command: mount -a
   listen: mount data drives
 
+- name: verify data drives mounted # noqa: no-changed-when
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ disk_directories }}"
+  listen: mount data drives
+  when: disk_directories is defined
+
 - name: mount parity drives # noqa: command-instead-of-module no-changed-when
   command: mount -a
   listen: mount parity drives
+
+- name: verify parity drives mounted # noqa: no-changed-when
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ parity_directories }}"
+  listen: mount parity drives
+  when: parity_directories is defined and parity_directories | length > 0
 
 - name: reload systemd
   systemd:
@@ -24,6 +36,10 @@
 
 - name: mount mergerfs # noqa: command-instead-of-module no-changed-when
   command: mount /mnt/storage
+  listen: mount mergerfs
+
+- name: verify mergerfs mounted # noqa: no-changed-when
+  command: mountpoint -q /mnt/storage
   listen: mount mergerfs
 
 - name: initial snapraid sync # noqa: no-changed-when
