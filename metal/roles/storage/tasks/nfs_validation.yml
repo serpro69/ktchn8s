@@ -1,0 +1,257 @@
+---
+# NFS Export Validation
+# Verifies NFS exports are properly configured and accessible
+
+# =================================================================
+# LOCAL NFS VALIDATION
+# =================================================================
+
+- name: Check NFS server service status
+  systemd:
+    name: nfs-kernel-server
+  register: nfs_service_status
+  failed_when: false
+
+- name: Verify NFS service is running
+  assert:
+    that:
+      - nfs_service_status.status.ActiveState == "active"
+    fail_msg: "NFS server service is not running"
+    success_msg: "NFS server service is active"
+
+- name: Check rpcbind service status
+  systemd:
+    name: rpcbind
+  register: rpcbind_status
+  failed_when: false
+
+- name: Verify rpcbind service is running
+  assert:
+    that:
+      - rpcbind_status.status.ActiveState == "active"
+    fail_msg: "rpcbind service is not running"
+    success_msg: "rpcbind service is active"
+
+- name: Verify NFS exports are visible
+  command: showmount -e localhost
+  register: showmount_result
+  changed_when: false
+  failed_when: showmount_result.rc != 0
+
+- name: Parse exported directories
+  set_fact:
+    exported_dirs: "{{ showmount_result.stdout_lines[1:] | map('regex_replace', '^(/\\S+).*', '\\1') | list }}"
+  when: showmount_result.stdout_lines | length > 1
+
+- name: Display exported directories
+  debug:
+    msg: "Exported NFS directories: {{ exported_dirs | join(', ') }}"
+  when: exported_dirs is defined
+
+- name: Verify expected exports are present
+  assert:
+    that:
+      - "'/mnt/storage/Videos' in exported_dirs"
+      - "'/mnt/storage/Documents' in exported_dirs"
+      - "'/mnt/storage/Pictures' in exported_dirs"
+      - "'/mnt/storage/Music' in exported_dirs"
+      - "'/mnt/storage/Backups' in exported_dirs"
+    fail_msg: "Not all expected NFS exports are present"
+    success_msg: "All expected NFS exports are configured"
+  when: exported_dirs is defined
+
+- name: Check if ufw firewall is active
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Verify NFS firewall rules (if ufw is active)
+  block:
+    - name: Check NFS port firewall rules
+      shell: ufw status numbered | grep -E '(111|2049|20048)'
+      register: firewall_rules
+      changed_when: false
+      failed_when: false
+
+    - name: Display firewall status
+      debug:
+        msg: "NFS firewall rules are configured"
+      when: firewall_rules.rc == 0
+
+    - name: Warn if firewall rules missing
+      debug:
+        msg: "WARNING: NFS firewall rules may not be configured correctly"
+      when: firewall_rules.rc != 0
+  when: "'Status: active' in ufw_status.stdout"
+
+- name: Test local NFS mount capability
+  block:
+    - name: Create test mount point
+      file:
+        path: /tmp/nfs_test_mount
+        state: directory
+        mode: '0755'
+
+    - name: Test mount NFS export locally
+      command: mount -t nfs localhost:/mnt/storage/Backups /tmp/nfs_test_mount
+      register: test_mount
+      changed_when: false
+      failed_when: false
+
+    - name: Test write to NFS mount
+      copy:
+        content: "NFS validation test - {{ ansible_date_time.iso8601 }}"
+        dest: /tmp/nfs_test_mount/.nfs_test_file
+        mode: '0644'
+      when: test_mount.rc == 0
+      register: test_write
+
+    - name: Test read from NFS mount
+      command: cat /tmp/nfs_test_mount/.nfs_test_file
+      when: test_write is succeeded
+      register: test_read
+      changed_when: false
+
+    - name: Cleanup test file
+      file:
+        path: /tmp/nfs_test_mount/.nfs_test_file
+        state: absent
+      when: test_write is succeeded
+
+    - name: Unmount test NFS share
+      command: umount /tmp/nfs_test_mount
+      when: test_mount.rc == 0
+      changed_when: false
+
+    - name: Remove test mount point
+      file:
+        path: /tmp/nfs_test_mount
+        state: absent
+
+    - name: Verify local NFS mount test succeeded
+      assert:
+        that:
+          - test_mount.rc == 0
+          - test_write is succeeded
+          - test_read is succeeded
+        success_msg: "Local NFS mount test passed"
+        fail_msg: "Local NFS mount test failed"
+
+# =================================================================
+# KUBERNETES CONNECTIVITY TEST (Optional)
+# =================================================================
+
+- name: Check if kubectl is available
+  command: which kubectl
+  register: kubectl_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if kubeconfig exists
+  stat:
+    path: "{{ lookup('env', 'KUBECONFIG') | default('/etc/rancher/k3s/k3s.yaml', true) }}"
+  register: kubeconfig_check
+  when: kubectl_check.rc == 0
+
+- name: Kubernetes NFS validation
+  block:
+    - name: Create NFS test namespace
+      command: kubectl create namespace nfs-validation-test --dry-run=client -o yaml
+      register: namespace_yaml
+      changed_when: false
+
+    - name: Apply NFS test namespace
+      shell: echo '{{ namespace_yaml.stdout }}' | kubectl apply -f -
+      changed_when: true
+
+    - name: Create NFS test pod manifest
+      copy:
+        content: |
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: nfs-test-pod
+            namespace: nfs-validation-test
+          spec:
+            containers:
+            - name: nfs-test
+              image: busybox:latest
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  echo "Testing NFS mount..." &&
+                  echo "NFS test from Kubernetes - $(date)" > /mnt/nfs/.k8s_nfs_test &&
+                  cat /mnt/nfs/.k8s_nfs_test &&
+                  rm /mnt/nfs/.k8s_nfs_test &&
+                  echo "NFS test passed!" &&
+                  sleep 10
+              volumeMounts:
+              - name: nfs-volume
+                mountPath: /mnt/nfs
+            volumes:
+            - name: nfs-volume
+              nfs:
+                server: {{ ansible_host }}
+                path: /mnt/storage/Backups
+            restartPolicy: Never
+        dest: /tmp/nfs-test-pod.yaml
+        mode: '0644'
+
+    - name: Deploy NFS test pod
+      command: kubectl apply -f /tmp/nfs-test-pod.yaml
+      changed_when: true
+
+    - name: Wait for NFS test pod to complete
+      command: kubectl wait --for=condition=Ready pod/nfs-test-pod -n nfs-validation-test --timeout=60s
+      register: pod_wait
+      failed_when: false
+      changed_when: false
+
+    - name: Get NFS test pod logs
+      command: kubectl logs nfs-test-pod -n nfs-validation-test
+      register: pod_logs
+      failed_when: false
+      changed_when: false
+
+    - name: Display NFS test pod logs
+      debug:
+        msg: "{{ pod_logs.stdout_lines }}"
+      when: pod_logs.rc == 0
+
+    - name: Cleanup NFS test pod
+      command: kubectl delete pod nfs-test-pod -n nfs-validation-test --ignore-not-found
+      changed_when: false
+      failed_when: false
+
+    - name: Cleanup NFS test namespace
+      command: kubectl delete namespace nfs-validation-test --ignore-not-found
+      changed_when: false
+      failed_when: false
+
+    - name: Remove test pod manifest
+      file:
+        path: /tmp/nfs-test-pod.yaml
+        state: absent
+
+    - name: Verify Kubernetes NFS test succeeded
+      assert:
+        that:
+          - pod_logs.rc == 0
+          - "'NFS test passed!' in pod_logs.stdout"
+        success_msg: "Kubernetes NFS connectivity test passed"
+        fail_msg: "Kubernetes NFS connectivity test failed"
+      when: pod_logs.rc == 0
+
+  when:
+    - kubectl_check.rc == 0
+    - kubeconfig_check.stat.exists | default(false)
+
+- name: Skip Kubernetes test if kubectl not available
+  debug:
+    msg: "Skipping Kubernetes NFS validation - kubectl not available or kubeconfig not found"
+  when: kubectl_check.rc != 0 or not (kubeconfig_check.stat.exists | default(false))
+
+- name: NFS validation complete
+  debug:
+    msg: "NFS export validation completed successfully"
