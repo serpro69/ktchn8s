@@ -4,40 +4,60 @@ executable = /usr/local/bin/snapraid
 ; path to the snapraid config to be used
 config = /etc/snapraid.conf
 ; abort operation if there are more than this many deleted files
-deletethreshold = 40
+deletethreshold = {{ snapraid_maintenance.delete_threshold }}
+; abort operation if there are more than this many updated files
+updatethreshold = {{ snapraid_maintenance.update_threshold }}
 ; if you want touch to be ran each time
 touch = false
 
 [logging]
 ; logfile to write to, leave empty to disable
-file = /var/log/snapraid-runner.log
+file = /var/log/snapraid/snapraid-runner.log
 ; maximum logfile size in KiB, leave empty for unlimited.
-maxsize = 5000
+maxsize = {{ (snapraid_maintenance.log_max_size_mb * 1024) | int }}
 
 [email]
 ; when to send an email, comma-separated list of [success, error]
-sendon = error
+{% if snapraid_maintenance.email_enabled %}
+sendon = {{ snapraid_maintenance.email_on }}
+{% else %}
+sendon =
+{% endif %}
 ; set to false to get full programm output via email
-short = true
+short = {{ snapraid_maintenance.email_short | lower }}
 subject = [SnapRAID] Status Report:
-from = snapraid@{{ inventory_hostname }}.{{ ansible_domain | default('local') }}
+from = {{ snapraid_maintenance.email_from }}
+{% if snapraid_maintenance.email_to %}
+to = {{ snapraid_maintenance.email_to }}
+{% endif %}
 ; maximum email size in KiB
 maxsize = 500
 
 [smtp]
+{% if snapraid_maintenance.email_enabled and snapraid_maintenance.smtp_host %}
+host = {{ snapraid_maintenance.smtp_host }}
+port = {{ snapraid_maintenance.smtp_port }}
+ssl = false
+tls = {{ snapraid_maintenance.smtp_tls | lower }}
+{% if snapraid_maintenance.smtp_user %}
+user = {{ snapraid_maintenance.smtp_user }}
+{% endif %}
+{% if snapraid_maintenance.smtp_password %}
+password = {{ snapraid_maintenance.smtp_password }}
+{% endif %}
+{% else %}
 host = localhost
-; leave empty for default port
 port =
-; set to "true" to activate
 ssl = false
 tls = false
 user =
 password =
+{% endif %}
 
 [scrub]
-; set to true to run scrub after sync
-enabled = true
+; set to true to run scrub after sync (disabled for separate monthly scrub timer)
+enabled = false
 ; scrub plan - either a percentage, "bad", or "new"; default is 10
-plan = 10
+plan = {{ snapraid_maintenance.scrub_percentage }}
 ; minimum block age (in days) for scrubbing. Default is 10
-older-than = 10
+older-than = {{ snapraid_maintenance.scrub_older_than_days }}

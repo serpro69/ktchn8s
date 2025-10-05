@@ -108,8 +108,164 @@
 - name: Enable snapraid-runner timer
   systemd:
     name: snapraid-runner.timer
-    enabled: true
+    enabled: "{{ snapraid_maintenance.sync_enabled }}"
     daemon_reload: true
+
+# =================================================================
+# MAINTENANCE AND LOGGING CONFIGURATION
+# =================================================================
+
+- name: Create snapraid log directory
+  file:
+    path: /var/log/snapraid
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Install msmtp for email notifications
+  package:
+    name: msmtp
+    state: present
+  when: snapraid_maintenance.email_enabled
+
+- name: Create msmtp configuration
+  template:
+    src: msmtprc.j2
+    dest: /etc/msmtprc
+    owner: root
+    group: root
+    mode: '0600'
+    backup: true
+  when: snapraid_maintenance.email_enabled
+
+- name: Configure logrotate for snapraid logs
+  template:
+    src: snapraid-logrotate.j2
+    dest: /etc/logrotate.d/snapraid
+    owner: root
+    group: root
+    mode: '0644'
+
+# =================================================================
+# MONTHLY SCRUB CONFIGURATION
+# =================================================================
+
+- name: Create snapraid-scrub systemd service
+  template:
+    src: snapraid-scrub.service.j2
+    dest: /etc/systemd/system/snapraid-scrub.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+  when: snapraid_maintenance.scrub_enabled
+
+- name: Create snapraid-scrub systemd timer
+  template:
+    src: snapraid-scrub.timer.j2
+    dest: /etc/systemd/system/snapraid-scrub.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+  when: snapraid_maintenance.scrub_enabled
+
+- name: Enable snapraid-scrub timer
+  systemd:
+    name: snapraid-scrub.timer
+    enabled: "{{ snapraid_maintenance.scrub_enabled }}"
+    daemon_reload: true
+  when: snapraid_maintenance.scrub_enabled
+
+# =================================================================
+# CONTENT FILE BACKUP
+# =================================================================
+
+- name: Create content file backup directory
+  file:
+    path: /var/backups/snapraid
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when: snapraid_maintenance.content_backup_enabled
+
+- name: Create content file backup script
+  copy:
+    content: |
+      #!/bin/bash
+      # SnapRAID content file backup script
+      BACKUP_DIR="/var/backups/snapraid"
+      BACKUP_COUNT={{ snapraid_maintenance.content_backup_count }}
+      TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+      # Backup all content files
+      for content_file in $(grep -E '^content ' /etc/snapraid.conf | awk '{print $2}'); do
+        if [ -f "$content_file" ]; then
+          filename=$(basename "$content_file")
+          cp -p "$content_file" "$BACKUP_DIR/${filename}.${TIMESTAMP}"
+        fi
+      done
+
+      # Keep only last N backups
+      for content_file in $(grep -E '^content ' /etc/snapraid.conf | awk '{print $2}'); do
+        filename=$(basename "$content_file")
+        ls -t "$BACKUP_DIR/${filename}".* 2>/dev/null | tail -n +$((BACKUP_COUNT + 1)) | xargs -r rm -f
+      done
+    dest: /usr/local/bin/snapraid-content-backup.sh
+    mode: '0755'
+    owner: root
+    group: root
+  when: snapraid_maintenance.content_backup_enabled
+
+- name: Create content backup systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Backup SnapRAID content files
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/snapraid-content-backup.sh
+      User=root
+      Group=root
+    dest: /etc/systemd/system/snapraid-content-backup.service
+    mode: '0644'
+    owner: root
+    group: root
+  notify:
+    - reload systemd
+  when: snapraid_maintenance.content_backup_enabled
+
+- name: Create content backup systemd timer
+  copy:
+    content: |
+      [Unit]
+      Description=Backup SnapRAID content files daily
+
+      [Timer]
+      OnCalendar=daily
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/snapraid-content-backup.timer
+    mode: '0644'
+    owner: root
+    group: root
+  notify:
+    - reload systemd
+  when: snapraid_maintenance.content_backup_enabled
+
+- name: Enable content backup timer
+  systemd:
+    name: snapraid-content-backup.timer
+    enabled: "{{ snapraid_maintenance.content_backup_enabled }}"
+    daemon_reload: true
+  when: snapraid_maintenance.content_backup_enabled
 
 - name: Cleanup build directory
   file:

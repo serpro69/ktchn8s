@@ -26,3 +26,41 @@ disk_health_thresholds:
   max_reallocated_sectors: 50
   max_pending_sectors: 0
   max_uncorrectable_errors: 0
+
+# Snapraid maintenance configuration
+snapraid_maintenance:
+  # Daily sync schedule (systemd timer format)
+  sync_time: "02:00"  # 2 AM daily
+  sync_enabled: true
+
+  # Monthly scrub configuration
+  scrub_enabled: true
+  scrub_schedule: "Sun *-*-1..7 03:00:00"  # First Sunday of month at 3 AM
+  scrub_percentage: 10
+  scrub_older_than_days: 10
+
+  # Thresholds before sync/scrub operations
+  delete_threshold: 40  # Abort if more than X files deleted
+  update_threshold: 500  # Abort if more than X files updated
+
+  # Email notifications
+  email_enabled: false  # Set to true to enable email notifications
+  email_on: "error"  # Comma-separated: success,error
+  email_short: true  # Short or full output
+  email_from: "snapraid@{{ inventory_hostname }}.{{ ansible_domain | default('local') }}"
+  email_to: ""  # Set recipient email address
+
+  # SMTP configuration (for msmtp)
+  smtp_host: ""  # e.g., smtp.gmail.com
+  smtp_port: 587
+  smtp_tls: true
+  smtp_user: ""  # SMTP username
+  smtp_password: ""  # SMTP password (use vault!)
+
+  # Logging
+  log_retention_days: 30
+  log_max_size_mb: 50
+
+  # Content file backups
+  content_backup_enabled: true
+  content_backup_count: 5  # Keep last N backups

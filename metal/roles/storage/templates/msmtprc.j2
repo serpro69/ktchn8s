@@ -1,0 +1,26 @@
+# msmtp configuration for SnapRAID notifications
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+{% if snapraid_maintenance.email_enabled and snapraid_maintenance.smtp_host %}
+# SnapRAID notification account
+account        snapraid
+host           {{ snapraid_maintenance.smtp_host }}
+port           {{ snapraid_maintenance.smtp_port }}
+from           {{ snapraid_maintenance.email_from }}
+{% if snapraid_maintenance.smtp_user %}
+user           {{ snapraid_maintenance.smtp_user }}
+{% endif %}
+{% if snapraid_maintenance.smtp_password %}
+password       {{ snapraid_maintenance.smtp_password }}
+{% endif %}
+{% if not snapraid_maintenance.smtp_tls %}
+tls            off
+{% endif %}
+
+# Set default account
+account default : snapraid
+{% endif %}
