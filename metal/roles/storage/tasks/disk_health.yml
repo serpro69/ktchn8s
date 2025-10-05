@@ -1,0 +1,135 @@
+---
+# Disk Health Validation
+# Checks SMART data for all drives before using them in storage pool
+
+- name: Ensure smartmontools is installed
+  package:
+    name: smartmontools
+    state: present
+  when: not (prefer_native_utils | default(false))
+
+- name: Create drive brand mapping
+  set_fact:
+    drive_brands: "{{ drive_brands | default({}) | combine({item.id: item.brand}) }}"
+  loop: "{{ data_drives + (parity_drives | default([])) }}"
+  when: item.id is defined and item.brand is defined
+
+- name: Build list of all device paths for health checks
+  set_fact:
+    all_health_check_devices: "{{ (data_devices | default([])) + (parity_devices | default([])) }}"
+
+- name: Group Seagate drives when using native utils
+  set_fact:
+    seagate_drives: "{{ (data_drives + (parity_drives | default([]))) | selectattr('brand', 'equalto', 'seagate') | map(attribute='id') | list }}"
+  when: prefer_native_utils | default(false)
+
+- name: Build Seagate device paths
+  set_fact:
+    seagate_device_paths: "{{ seagate_device_paths | default([]) + ['/dev/disk/by-id/' + item] }}"
+  loop: "{{ seagate_drives | default([]) }}"
+  when: prefer_native_utils | default(false)
+
+- name: Run Seagate native health checks
+  include_tasks: seachest_utils.yml
+  when:
+    - prefer_native_utils | default(false)
+    - seagate_drives is defined
+    - seagate_drives | length > 0
+
+- name: Run smartctl health checks
+  command: "smartctl -H -A --json=c {{ item }}"
+  loop: "{{ all_health_check_devices }}"
+  register: smartctl_results
+  failed_when: false
+  changed_when: false
+  when: not (prefer_native_utils | default(false))
+
+- name: Initialize disk health report
+  set_fact:
+    disk_health_report: []
+
+- name: Parse SMART data from smartctl
+  set_fact:
+    disk_health_report: "{{ disk_health_report + [parsed_entry] }}"
+  loop: "{{ smartctl_results.results }}"
+  when:
+    - not (prefer_native_utils | default(false))
+    - item.rc == 0
+    - item.stdout is defined
+  vars:
+    smart_json: "{{ item.stdout | from_json }}"
+    parsed_entry:
+      device: "{{ item.item }}"
+      tool: "smartctl"
+      overall_health: "{{ smart_json.smart_status.passed | default(false) }}"
+      temperature: "{{ smart_json.temperature.current | default(-1) }}"
+      reallocated_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 5) | map(attribute='raw.value') | first) | default(0) }}"
+      pending_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 197) | map(attribute='raw.value') | first) | default(0) }}"
+      uncorrectable_errors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 187) | map(attribute='raw.value') | first) | default(0) }}"
+      power_on_hours: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 9) | map(attribute='raw.value') | first) | default('N/A') }}"
+      model: "{{ smart_json.model_name | default('Unknown') }}"
+      serial: "{{ smart_json.serial_number | default('Unknown') }}"
+
+- name: Display health check summary
+  debug:
+    msg: "Health check completed for {{ disk_health_report | length }} drive(s)"
+
+- name: Check for unhealthy drives
+  set_fact:
+    unhealthy_drives: "{{ disk_health_report | selectattr('overall_health', 'equalto', false) | list }}"
+
+- name: Check for drives exceeding temperature threshold
+  set_fact:
+    overheated_drives: "{{ disk_health_report | selectattr('temperature', 'gt', disk_health_thresholds.max_temperature_celsius) | list }}"
+
+- name: Check for drives with excessive reallocated sectors
+  set_fact:
+    reallocated_sector_warnings: "{{ disk_health_report | selectattr('reallocated_sectors', 'gt', disk_health_thresholds.max_reallocated_sectors) | list }}"
+
+- name: Check for drives with pending sectors
+  set_fact:
+    pending_sector_warnings: "{{ disk_health_report | selectattr('pending_sectors', 'gt', disk_health_thresholds.max_pending_sectors) | list }}"
+
+- name: Check for drives with uncorrectable errors
+  set_fact:
+    uncorrectable_error_warnings: "{{ disk_health_report | selectattr('uncorrectable_errors', 'gt', disk_health_thresholds.max_uncorrectable_errors) | list }}"
+
+- name: Display warnings for problematic drives
+  debug:
+    msg:
+      - "Unhealthy drives: {{ unhealthy_drives | map(attribute='device') | list | join(', ') if unhealthy_drives | length > 0 else 'None' }}"
+      - "Overheated drives: {{ overheated_drives | map(attribute='device') | list | join(', ') if overheated_drives | length > 0 else 'None' }}"
+      - "Drives with reallocated sectors: {{ reallocated_sector_warnings | map(attribute='device') | list | join(', ') if reallocated_sector_warnings | length > 0 else 'None' }}"
+      - "Drives with pending sectors: {{ pending_sector_warnings | map(attribute='device') | list | join(', ') if pending_sector_warnings | length > 0 else 'None' }}"
+      - "Drives with uncorrectable errors: {{ uncorrectable_error_warnings | map(attribute='device') | list | join(', ') if uncorrectable_error_warnings | length > 0 else 'None' }}"
+
+- name: Create storage log directory
+  file:
+    path: /var/log/storage
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Generate health report
+  template:
+    src: disk_health_report.j2
+    dest: "/var/log/storage/disk-health-{{ ansible_date_time.date }}.log"
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Fail if unhealthy drives detected
+  assert:
+    that:
+      - unhealthy_drives | length == 0
+      - overheated_drives | length == 0
+      - pending_sector_warnings | length == 0
+      - uncorrectable_error_warnings | length == 0
+    fail_msg: "Unhealthy drives detected! Check /var/log/storage/disk-health-{{ ansible_date_time.date }}.log for details"
+    success_msg: "All drives passed health checks"
+  when: fail_on_unhealthy_drives | default(false)
+
+- name: Display health report location
+  debug:
+    msg: "Health report saved to: /var/log/storage/disk-health-{{ ansible_date_time.date }}.log"
