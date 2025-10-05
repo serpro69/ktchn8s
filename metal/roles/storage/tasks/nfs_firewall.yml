@@ -1,0 +1,111 @@
+---
+# NFS Firewall Configuration
+# Configures UFW firewall rules for NFS services
+
+# =================================================================
+# FIREWALL DETECTION AND SETUP
+# =================================================================
+
+- name: Check if UFW is installed
+  command: which ufw
+  register: ufw_check
+  changed_when: false
+  failed_when: false
+
+- name: Install UFW if requested
+  package:
+    name: ufw
+    state: present
+  when:
+    - install_ufw
+    - ufw_check.rc != 0
+
+- name: Re-check UFW availability after installation
+  command: which ufw
+  register: ufw_available
+  changed_when: false
+  failed_when: false
+
+- name: Display firewall status
+  debug:
+    msg: "UFW is {{ 'available' if ufw_available.rc == 0 else 'not available' }}"
+
+# =================================================================
+# UFW CONFIGURATION
+# =================================================================
+
+- name: Configure UFW firewall rules
+  block:
+    - name: Check UFW status
+      command: ufw status
+      register: ufw_status
+      changed_when: false
+      failed_when: false
+
+    - name: Enable UFW if not active
+      ufw:
+        state: enabled
+      when: "'Status: active' not in ufw_status.stdout"
+      register: ufw_enable
+
+    - name: Configure NFS TCP ports in firewall
+      ufw:
+        rule: allow
+        src: "{{ item.0 }}"
+        port: "{{ item.1 }}"
+        proto: tcp
+        comment: "NFS {{ item.1 }}/tcp"
+      loop: "{{ nfs_allowed_networks | product(['111', '2049', '20048']) | list }}"
+      loop_control:
+        label: "{{ item.0 }} -> {{ item.1 }}/tcp"
+
+    - name: Configure NFS UDP ports in firewall
+      ufw:
+        rule: allow
+        src: "{{ item }}"
+        port: "111"
+        proto: udp
+        comment: "NFS rpcbind UDP"
+      loop: "{{ nfs_allowed_networks }}"
+      loop_control:
+        label: "{{ item }} -> 111/udp"
+
+    - name: Display firewall rules
+      command: ufw status numbered
+      register: ufw_rules
+      changed_when: false
+
+    - name: Show configured firewall rules
+      debug:
+        msg: "{{ ufw_rules.stdout_lines }}"
+      when: ufw_rules.stdout_lines is defined
+
+  when: ufw_available.rc == 0
+
+# =================================================================
+# FIREWALL VALIDATION
+# =================================================================
+
+- name: Validate firewall allows NFS traffic
+  block:
+    - name: Check if NFS ports are allowed
+      shell: ufw status | grep -E '(111|2049|20048)'
+      register: nfs_ports_check
+      changed_when: false
+      failed_when: false
+
+    - name: Verify NFS firewall rules
+      assert:
+        that:
+          - nfs_ports_check.rc == 0
+          - "'111' in nfs_ports_check.stdout"
+          - "'2049' in nfs_ports_check.stdout"
+        success_msg: "NFS firewall rules are properly configured"
+        fail_msg: "NFS firewall rules are missing or incomplete"
+
+  when: ufw_available.rc == 0
+
+- name: Warn if UFW is not available
+  debug:
+    msg: "WARNING: UFW is not installed. NFS ports may be blocked by firewall."
+  when: ufw_available.rc != 0
