@@ -42,11 +42,9 @@
   command: mountpoint -q /mnt/storage
   listen: mount mergerfs
 
-- name: initial snapraid sync # noqa: no-changed-when
-  command: /usr/local/bin/snapraid sync
+- name: initial snapraid sync
+  include_tasks: snapraid_initial_sync.yml
   listen: initial snapraid sync
-  async: 3600
-  poll: 0
 
 - name: reload nfs exports # noqa: no-changed-when
   command: exportfs -ra
