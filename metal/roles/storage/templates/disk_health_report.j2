@@ -1,0 +1,70 @@
+=====================================================================
+               DISK HEALTH REPORT
+=====================================================================
+
+Date: {{ ansible_date_time.iso8601 }}
+Host: {{ inventory_hostname }}
+Tool: {{ 'Native Utils (Brand-specific)' if prefer_native_utils else 'smartctl (Universal)' }}
+
+Configuration:
+  - Max Temperature: {{ disk_health_thresholds.max_temperature_celsius }}°C
+  - Max Reallocated Sectors: {{ disk_health_thresholds.max_reallocated_sectors }}
+  - Max Pending Sectors: {{ disk_health_thresholds.max_pending_sectors }}
+  - Max Uncorrectable Errors: {{ disk_health_thresholds.max_uncorrectable_errors }}
+  - Fail on Unhealthy: {{ fail_on_unhealthy_drives }}
+
+=====================================================================
+               SUMMARY
+=====================================================================
+
+Total Drives Checked: {{ disk_health_report | length }}
+Healthy Drives: {{ disk_health_report | selectattr('overall_health', 'equalto', true) | list | length }}
+Unhealthy Drives: {{ disk_health_report | selectattr('overall_health', 'equalto', false) | list | length }}
+
+{% if overheated_drives | length > 0 %}
+WARNING: {{ overheated_drives | length }} drive(s) exceeding temperature threshold
+{% endif %}
+{% if reallocated_sector_warnings | length > 0 %}
+WARNING: {{ reallocated_sector_warnings | length }} drive(s) with excessive reallocated sectors
+{% endif %}
+{% if pending_sector_warnings | length > 0 %}
+CRITICAL: {{ pending_sector_warnings | length }} drive(s) with pending sectors
+{% endif %}
+{% if uncorrectable_error_warnings | length > 0 %}
+CRITICAL: {{ uncorrectable_error_warnings | length }} drive(s) with uncorrectable errors
+{% endif %}
+
+=====================================================================
+               DETAILED DRIVE INFORMATION
+=====================================================================
+
+{% for drive in disk_health_report %}
+-------------------------------------------------------------------
+Drive: {{ drive.device }}
+{% if drive.sg_device is defined %}SG Device: {{ drive.sg_device }}{% endif %}
+
+Model: {{ drive.model | default('Unknown') }}
+Serial: {{ drive.serial | default('Unknown') }}
+Tool: {{ drive.tool }}
+
+Health Status: {{ 'PASSED' if drive.overall_health else 'FAILED' }}
+  {% if not drive.overall_health %}*** ATTENTION: Drive is reporting failures ***{% endif %}
+
+Temperature: {{ drive.temperature }}°C
+  {% if drive.temperature > disk_health_thresholds.max_temperature_celsius %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_temperature_celsius }}°C{% endif %}
+
+Reallocated Sectors: {{ drive.reallocated_sectors }}
+  {% if drive.reallocated_sectors > disk_health_thresholds.max_reallocated_sectors %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_reallocated_sectors }}{% endif %}
+
+Pending Sectors: {{ drive.pending_sectors }}
+  {% if drive.pending_sectors > disk_health_thresholds.max_pending_sectors %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_pending_sectors }}{% endif %}
+
+Uncorrectable Errors: {{ drive.uncorrectable_errors }}
+  {% if drive.uncorrectable_errors > disk_health_thresholds.max_uncorrectable_errors %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_uncorrectable_errors }}{% endif %}
+
+Power On Hours: {{ drive.power_on_hours }}
+
+{% endfor %}
+=====================================================================
+               END OF REPORT
+=====================================================================
