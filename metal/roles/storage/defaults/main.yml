@@ -15,3 +15,14 @@ storage_network:
   dns_nameservers:
     - "10.10.10.1"
     - "1.1.1.1"
+
+# Disk health validation
+enable_disk_health_checks: true
+prefer_native_utils: false  # Use smartctl by default, set true for brand-specific tools
+fail_on_unhealthy_drives: false  # Warning only by default
+
+disk_health_thresholds:
+  max_temperature_celsius: 60
+  max_reallocated_sectors: 50
+  max_pending_sectors: 0
+  max_uncorrectable_errors: 0
