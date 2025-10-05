@@ -141,3 +141,18 @@
 - name: Mount all drives
   command: mount -a
   changed_when: false
+
+- name: Verify data drive mounts
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ disk_directories }}"
+  register: data_mount_verification
+  failed_when: data_mount_verification.rc != 0
+  changed_when: false
+
+- name: Verify parity drive mounts
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ parity_directories }}"
+  register: parity_mount_verification
+  failed_when: parity_mount_verification.rc != 0
+  changed_when: false
+  when: parity_directories is defined and parity_directories | length > 0

@@ -1,0 +1,55 @@
+---
+- name: Verify individual data drive mounts
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ disk_directories }}"
+  register: data_mount_check
+  failed_when: data_mount_check.rc != 0
+  changed_when: false
+
+- name: Verify individual parity drive mounts
+  command: "mountpoint -q {{ item }}"
+  loop: "{{ parity_directories }}"
+  register: parity_mount_check
+  failed_when: parity_mount_check.rc != 0
+  changed_when: false
+  when: parity_directories is defined and parity_directories | length > 0
+
+- name: Verify mergerfs pool mount
+  command: mountpoint -q /mnt/storage
+  register: mergerfs_mount_check
+  failed_when: mergerfs_mount_check.rc != 0
+  changed_when: false
+
+- name: Get detailed mount information
+  command: findmnt --json /mnt/storage
+  register: mergerfs_mount_info
+  changed_when: false
+  failed_when: false
+
+- name: Display mergerfs mount details
+  debug:
+    msg: "{{ mergerfs_mount_info.stdout | from_json }}"
+  when: mergerfs_mount_info.rc == 0
+
+- name: Test write capability to mergerfs pool
+  tempfile:
+    state: file
+    path: /mnt/storage
+    prefix: .mount_test_
+    suffix: .tmp
+  register: write_test
+  changed_when: false
+
+- name: Remove write test file
+  file:
+    path: "{{ write_test.path }}"
+    state: absent
+  when: write_test.path is defined
+  changed_when: false
+
+- name: Verify write test succeeded
+  assert:
+    that:
+      - write_test is succeeded
+    success_msg: "Mergerfs pool is writable"
+    fail_msg: "Mergerfs pool is not writable - check permissions and mount status"
