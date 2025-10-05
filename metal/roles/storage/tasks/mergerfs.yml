@@ -32,8 +32,17 @@
     - Backups
   when: mergerfs_branches is defined
 
+- name: Check if mergerfs is already mounted
+  command: mountpoint -q /mnt/storage
+  register: mergerfs_already_mounted
+  failed_when: false
+  changed_when: false
+
 - name: Mount mergerfs pool
   command: mount /mnt/storage
-  args:
-    creates: /mnt/storage/.mergerfs
-  changed_when: false
+  when: mergerfs_already_mounted.rc != 0
+  register: mergerfs_mount_result
+
+- name: Validate mergerfs mount
+  include_tasks: mount_validation.yml
+  when: mergerfs_mount_result is changed or mergerfs_already_mounted.rc == 0
