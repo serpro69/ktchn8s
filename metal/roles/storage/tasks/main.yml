@@ -39,6 +39,12 @@
       {% endfor %}
       {{ dirs }}
 
+- name: Validate disk health
+  include_tasks: disk_health.yml
+  when:
+    - enable_disk_health_checks | default(true)
+    - (data_drives is defined and data_drives | length > 0) or (parity_drives is defined and parity_drives | length > 0)
+
 - name: Include disk management tasks
   include_tasks: disks.yml
   when: data_drives is defined and data_drives | length > 0
