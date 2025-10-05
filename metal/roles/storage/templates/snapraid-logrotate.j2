@@ -1,0 +1,14 @@
+# Logrotate configuration for SnapRAID logs
+/var/log/snapraid/*.log {
+    daily
+    rotate {{ snapraid_maintenance.log_retention_days }}
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    size {{ snapraid_maintenance.log_max_size_mb }}M
+    postrotate
+        # Optional: Send signal to services if needed
+    endscript
+}
