@@ -1,0 +1,14 @@
+[Unit]
+Description=SnapRAID Scrub
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/snapraid scrub -p {{ snapraid_maintenance.scrub_percentage }} -o {{ snapraid_maintenance.scrub_older_than_days }}
+User=root
+Group=root
+StandardOutput=append:/var/log/snapraid/snapraid-scrub.log
+StandardError=append:/var/log/snapraid/snapraid-scrub.log
+
+[Install]
+WantedBy=multi-user.target
