@@ -41,27 +41,9 @@
     - nfs-kernel-server
     - rpcbind
 
-- name: Configure firewall for NFS (if ufw is present)
-  ufw:
-    rule: allow
-    src: "{{ homelab_net_cidr | default('10.10.10.0/24') }}"
-    port: "{{ item }}"
-    proto: tcp
-  loop:
-    - "111"    # rpcbind
-    - "2049"   # nfs
-    - "20048"  # mountd
-  when: ansible_facts.packages['ufw'] is defined
-  ignore_errors: true
-
-- name: Configure firewall for NFS UDP (if ufw is present)
-  ufw:
-    rule: allow
-    src: "{{ homelab_net_cidr | default('10.10.10.0/24') }}"
-    port: "111"
-    proto: udp
-  when: ansible_facts.packages['ufw'] is defined
-  ignore_errors: true
+- name: Configure firewall for NFS
+  include_tasks: nfs_firewall.yml
+  when: manage_firewall
 
 - name: Validate NFS exports
   include_tasks: nfs_validation.yml
