@@ -62,3 +62,6 @@
     proto: udp
   when: ansible_facts.packages['ufw'] is defined
   ignore_errors: true
+
+- name: Validate NFS exports
+  include_tasks: nfs_validation.yml
