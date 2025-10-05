@@ -1,0 +1,35 @@
+---
+# Universal SMART checks using smartmontools (smartctl)
+
+- name: Ensure smartmontools is installed
+  package:
+    name: smartmontools
+    state: present
+
+- name: Run smartctl health checks
+  command: "smartctl -H -A --json=c {{ item }}"
+  loop: "{{ all_health_check_devices }}"
+  register: smartctl_results
+  failed_when: false
+  changed_when: false
+
+- name: Parse SMART data from smartctl
+  set_fact:
+    disk_health_report: "{{ disk_health_report + [parsed_entry] }}"
+  loop: "{{ smartctl_results.results }}"
+  when:
+    - item.rc == 0
+    - item.stdout is defined
+  vars:
+    smart_json: "{{ item.stdout | from_json }}"
+    parsed_entry:
+      device: "{{ item.item }}"
+      tool: "smartctl"
+      overall_health: "{{ smart_json.smart_status.passed | default(false) }}"
+      temperature: "{{ smart_json.temperature.current | default(-1) }}"
+      reallocated_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 5) | map(attribute='raw.value') | first) | default(0) }}"
+      pending_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 197) | map(attribute='raw.value') | first) | default(0) }}"
+      uncorrectable_errors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 187) | map(attribute='raw.value') | first) | default(0) }}"
+      power_on_hours: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 9) | map(attribute='raw.value') | first) | default('N/A') }}"
+      model: "{{ smart_json.model_name | default('Unknown') }}"
+      serial: "{{ smart_json.serial_number | default('Unknown') }}"
