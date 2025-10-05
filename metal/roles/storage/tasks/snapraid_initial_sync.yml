@@ -1,0 +1,134 @@
+---
+# Snapraid Initial Sync
+# Performs initial parity sync with validation, logging, and monitoring
+
+# =================================================================
+# PRE-SYNC VALIDATION
+# =================================================================
+
+- name: Validate snapraid configuration exists
+  stat:
+    path: /etc/snapraid.conf
+  register: snapraid_conf
+  failed_when: not snapraid_conf.stat.exists
+
+- name: Test snapraid configuration
+  command: /usr/local/bin/snapraid status
+  register: snapraid_status_check
+  changed_when: false
+  failed_when: snapraid_status_check.rc not in [0, 2]
+  # rc=2 means no parity file yet, which is expected for initial sync
+
+- name: Display snapraid status
+  debug:
+    msg: "Snapraid configuration is valid. Proceeding with initial sync."
+
+- name: Create snapraid log directory
+  file:
+    path: /var/log/snapraid
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+# =================================================================
+# INITIAL SYNC EXECUTION
+# =================================================================
+
+- name: Display sync start message
+  debug:
+    msg: "Starting initial snapraid sync. This may take several hours for large arrays."
+
+- name: Run initial snapraid sync (async)
+  shell: |
+    /usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
+    exit ${PIPESTATUS[0]}
+  async: 43200  # 12 hours timeout
+  poll: 0
+  register: snapraid_sync_job
+  changed_when: true
+
+- name: Save sync job ID
+  set_fact:
+    snapraid_sync_jid: "{{ snapraid_sync_job.ansible_job_id }}"
+
+# =================================================================
+# ASYNC STATUS MONITORING
+# =================================================================
+
+- name: Monitor snapraid sync progress
+  async_status:
+    jid: "{{ snapraid_sync_jid }}"
+  register: snapraid_sync_result
+  until: snapraid_sync_result.finished
+  retries: 1440  # Check every 30 seconds for up to 12 hours
+  delay: 30
+  failed_when: false
+
+- name: Check if sync completed successfully
+  set_fact:
+    sync_succeeded: "{{ snapraid_sync_result.rc == 0 }}"
+
+# =================================================================
+# POST-SYNC VALIDATION AND REPORTING
+# =================================================================
+
+- name: Display sync completion status
+  debug:
+    msg: "Snapraid initial sync {{ 'completed successfully' if sync_succeeded else 'failed' }}"
+
+- name: Read sync log file
+  slurp:
+    src: "/var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log"
+  register: sync_log_content
+  failed_when: false
+
+- name: Parse sync summary from log
+  set_fact:
+    sync_summary: "{{ (sync_log_content.content | b64decode).split('\n') | select('search', '(Completed|Error|Warning|Syncing|Parity)') | list | last | default('No summary available') }}"
+  when: sync_log_content is succeeded
+
+- name: Display sync summary
+  debug:
+    msg: "Sync summary: {{ sync_summary }}"
+  when: sync_summary is defined
+
+- name: Create sync status file
+  copy:
+    content: |
+      Snapraid Initial Sync Status
+      =============================
+      Date: {{ ansible_date_time.iso8601 }}
+      Host: {{ inventory_hostname }}
+      Status: {{ 'SUCCESS' if sync_succeeded else 'FAILED' }}
+      Return Code: {{ snapraid_sync_result.rc }}
+
+      Summary:
+      {{ sync_summary | default('No summary available') }}
+
+      Full log: /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
+    dest: /var/log/snapraid/initial-sync-status.txt
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Display log file location
+  debug:
+    msg:
+      - "Snapraid sync log: /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log"
+      - "Status file: /var/log/snapraid/initial-sync-status.txt"
+
+# =================================================================
+# ERROR HANDLING
+# =================================================================
+
+- name: Fail if sync was unsuccessful
+  fail:
+    msg: |
+      Snapraid initial sync failed with return code {{ snapraid_sync_result.rc }}.
+      Check /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log for details.
+  when: not sync_succeeded
+
+- name: Sync completed successfully
+  debug:
+    msg: "Snapraid initial sync completed successfully. Parity data is now protected."
