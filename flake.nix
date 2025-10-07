@@ -95,13 +95,14 @@
           ];
 
           shellHook = ''
-            # configure python virtual environment with dependencies
-            python -m venv .venv
-            source .venv/bin/activate
             # use 'git rev-parse' instead of '${self}' to get the root project dir,
             # because while the latter seems promising, 
             # it actually refers to the path in '/nix/store/' where the flake is copied to
             ROOT_PATH=$(git rev-parse --show-toplevel)
+
+            # configure python virtual environment with dependencies
+            python -m venv "$ROOT_PATH/.venv"
+            source "$ROOT_PATH/.venv/bin/activate"
             pip install -r "$ROOT_PATH/requirements.txt" >/dev/null
 
             # kubernetes plugins
