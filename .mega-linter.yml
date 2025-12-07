@@ -8,6 +8,8 @@ LINTER_RULES_PATH: .
 # exclude gitignored files from being linted
 IGNORE_GITIGNORED_FILES: true
 
+FILTER_REGEX_EXCLUDE: (.claude|.serena|.taskmaster)
+
 # Do not suggest other megalinter flavors
 FLAVOR_SUGGESTIONS: false
 

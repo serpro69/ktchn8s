@@ -1,14 +1,15 @@
+---
 # language of the project (csharp, python, rust, java, typescript, go, cpp, or ruby)
 #  * For C, use cpp
 #  * For JavaScript, use typescript
 # Special requirements:
 #  * csharp: Requires the presence of a .sln file in the project folder.
 languages:
-- terraform
-- bash
-- go
-- python
-- nix
+  - terraform
+  - bash
+  - go
+  - python
+  - nix
 
 encoding: utf-8
 
