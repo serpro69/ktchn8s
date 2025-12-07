@@ -4,6 +4,8 @@
 
 ### Core Workflow Commands
 
+**IMPORTANT: Always prefer MCP over command-line interfaces when interacting with task-master!**
+
 ```bash
 # Project Setup
 task-master init                                    # Initialize Task Master in current project
