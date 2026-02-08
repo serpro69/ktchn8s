@@ -1,0 +1,19 @@
+---
+- name: Ensure base packages
+  package:
+    name:
+      - xz-utils
+      # hardware monitoring
+      - lm_sensors
+      - hddtemp
+      - smartmontools
+
+- name: Detect sensors
+  command: sensors-detect --auto
+  changed_when: true
+
+- include_tasks: setup_redhat.yml # noqa name[missing]
+  when: ansible_os_family == 'RedHat'
+
+- include_tasks: setup_debian.yml # noqa name[missing]
+  when: ansible_os_family == 'Debian'
