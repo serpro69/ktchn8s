@@ -33,14 +33,13 @@
       "WebSearch"
     ],
     "deny": [
+      "Bash(rm:*)",
       "Bash(task-master:*)",
+      "Read(./examples)",
       "Read(./**/consensus*.md)",
       "Read(./**/review*.md)",
       "Read(./**/.env)",
       "Read(./**/service-account-key.json)",
-      "Read(./**/kubeconfig.yml)",
-      "Read(./**/kubeconfig.yaml)",
-      "Read(./**/*.tfstate)",
       "Read(*.csv)",
       "Read(*.log)",
       "Read(*.pyc)",
@@ -79,5 +78,9 @@
       }
     ]
   },
-  "model": "claude-opus-4.5"
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "bash $CLAUDE_PROJECT_DIR/.claude/scripts/statusline.sh"
+  }
 }
