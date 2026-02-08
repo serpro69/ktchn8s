@@ -33,7 +33,9 @@
       "WebSearch"
     ],
     "deny": [
+      "Bash(rm:*)",
       "Bash(task-master:*)",
+      "Read(./examples)",
       "Read(./**/consensus*.md)",
       "Read(./**/review*.md)",
       "Read(./**/.env)",
@@ -79,5 +81,9 @@
       }
     ]
   },
-  "model": "claude-opus-4.5"
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "bash $CLAUDE_PROJECT_DIR/.claude/scripts/statusline.sh"
+  }
 }
