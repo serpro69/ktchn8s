@@ -8,6 +8,7 @@
   apt:
     name:
       - xz-utils
+      - lm-sensors
 
 - name: Install mergerfs
   apt:

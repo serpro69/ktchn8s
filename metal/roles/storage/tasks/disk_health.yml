@@ -21,10 +21,10 @@
     disk_health_report: []
 
 # =================================================================
-# TOOL SELECTION PHASE: Run brand-specific or universal checks
-# =================================================================
+# TOOL SELECTION PHASE: Run brand-specific or universal checks =================================================================
 
 - name: Native utils health checks (brand-specific tools)
+  when: prefer_native_utils | default(false)
   block:
     - name: Group Seagate drives when using native utils
       set_fact:
@@ -40,7 +40,6 @@
       when:
         - seagate_drives is defined
         - seagate_drives | length > 0
-  when: prefer_native_utils | default(false)
 
 - name: Universal smartctl health checks
   include_tasks: smartctl_utils.yml
@@ -79,15 +78,15 @@
     msg:
       - "Unhealthy drives: {{ unhealthy_drives | map(attribute='device') | list | join(', ') if unhealthy_drives | length > 0 else 'None' }}"
       - "Overheated drives: {{ overheated_drives | map(attribute='device') | list | join(', ') if overheated_drives | length > 0 else 'None' }}"
-      - "Drives with reallocated sectors: {{ reallocated_sector_warnings | map(attribute='device') | list | join(', ') if reallocated_sector_warnings | length > 0 else 'None' }}"
-      - "Drives with pending sectors: {{ pending_sector_warnings | map(attribute='device') | list | join(', ') if pending_sector_warnings | length > 0 else 'None' }}"
-      - "Drives with uncorrectable errors: {{ uncorrectable_error_warnings | map(attribute='device') | list | join(', ') if uncorrectable_error_warnings | length > 0 else 'None' }}"
+      - "Drives with reallocated sectors: {{ reallocated_sector_warnings | map(attribute='device') | list | join(', ') if reallocated_sector_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
+      - "Drives with pending sectors: {{ pending_sector_warnings | map(attribute='device') | list | join(', ') if pending_sector_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
+      - "Drives with uncorrectable errors: {{ uncorrectable_error_warnings | map(attribute='device') | list | join(', ') if uncorrectable_error_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
 
 - name: Create storage log directory
   file:
     path: /var/log/storage
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: root
     group: root
 
@@ -95,7 +94,7 @@
   template:
     src: disk_health_report.j2
     dest: "/var/log/storage/disk-health-{{ ansible_date_time.date }}.log"
-    mode: '0644'
+    mode: "0644"
     owner: root
     group: root
 

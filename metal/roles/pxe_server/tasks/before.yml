@@ -28,7 +28,7 @@
 - name: Ensure correct permissions on TFTP boot files
   file:
     path: "{{ item }}"
-    mode: '0644'
+    mode: "0644"
   loop:
     - "{{ role_path }}/files/data/os/EFI/BOOT/grubx64.efi"
     - "{{ role_path }}/files/data/os/images/pxeboot/vmlinuz"
@@ -51,4 +51,4 @@
     src: kickstart.ks.j2
     dest: "{{ role_path }}/files/data/init-config/{{ hostvars[item]['mac'] }}.ks"
     mode: "0644"
-  loop: "{{ groups['metal'] }}"
+  loop: "{{ groups['k3s'] }}"
