@@ -26,7 +26,7 @@
   get_url:
     url: "{{ snapraid_url }}"
     dest: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}.tar.gz"
-    mode: '0644'
+    mode: "0644"
 
 - name: Extract snapraid source
   unarchive:
@@ -60,7 +60,7 @@
     dest: /etc/snapraid.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
     backup: true
   notify: initial snapraid sync
 
@@ -68,13 +68,13 @@
   file:
     path: /opt/snapraid-runner
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download snapraid-runner
   get_url:
     url: "{{ snapraid_runner_url }}"
     dest: /opt/snapraid-runner/snapraid-runner.py
-    mode: '0755'
+    mode: "0755"
 
 - name: Create snapraid-runner config
   template:
@@ -82,7 +82,7 @@
     dest: /opt/snapraid-runner/snapraid-runner.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
 
 - name: Create snapraid-runner systemd service
   template:
@@ -90,7 +90,7 @@
     dest: /etc/systemd/system/snapraid-runner.service
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify:
     - reload systemd
 
@@ -100,7 +100,7 @@
     dest: /etc/systemd/system/snapraid-runner.timer
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify:
     - reload systemd
     - restart snapraid-runner
@@ -119,7 +119,7 @@
   file:
     path: /var/log/snapraid
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: root
     group: root
 
@@ -135,7 +135,7 @@
     dest: /etc/msmtprc
     owner: root
     group: root
-    mode: '0600'
+    mode: "0600"
     backup: true
   when: snapraid_maintenance.email_enabled
 
@@ -145,7 +145,7 @@
     dest: /etc/logrotate.d/snapraid
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
 
 # =================================================================
 # MONTHLY SCRUB CONFIGURATION
@@ -157,7 +157,7 @@
     dest: /etc/systemd/system/snapraid-scrub.service
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify:
     - reload systemd
   when: snapraid_maintenance.scrub_enabled
@@ -168,7 +168,7 @@
     dest: /etc/systemd/system/snapraid-scrub.timer
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify:
     - reload systemd
   when: snapraid_maintenance.scrub_enabled
@@ -188,7 +188,7 @@
   file:
     path: /var/backups/snapraid
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: root
     group: root
   when: snapraid_maintenance.content_backup_enabled
@@ -216,7 +216,7 @@
         ls -t "$BACKUP_DIR/${filename}".* 2>/dev/null | tail -n +$((BACKUP_COUNT + 1)) | xargs -r rm -f
       done
     dest: /usr/local/bin/snapraid-content-backup.sh
-    mode: '0755'
+    mode: "0755"
     owner: root
     group: root
   when: snapraid_maintenance.content_backup_enabled
@@ -233,7 +233,7 @@
       User=root
       Group=root
     dest: /etc/systemd/system/snapraid-content-backup.service
-    mode: '0644'
+    mode: "0644"
     owner: root
     group: root
   notify:
@@ -253,7 +253,7 @@
       [Install]
       WantedBy=timers.target
     dest: /etc/systemd/system/snapraid-content-backup.timer
-    mode: '0644'
+    mode: "0644"
     owner: root
     group: root
   notify:

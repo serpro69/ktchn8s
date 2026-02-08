@@ -8,8 +8,16 @@
         pxe_state: present
         homelab_cidr: "{{ homelab_net_cidr }}"
 
-- name: Bootstrap bare-metal machines
+- name: Bootstrap bare-metal compute machines
   hosts: k3s
   gather_facts: false
   roles:
     - role: boot
+
+# TODO: move playbook code here instead of importing?
+# NB! It was done like this initially to be able to test storage provisioning in isolation
+- name: Bootstrap storage machines
+  import_playbook: storage.yml
+  tags:
+    - storage
+    - nas

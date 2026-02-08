@@ -41,7 +41,7 @@
     device: "{{ item }}"
     number: 1
     state: present
-    part_type: primary
+    # part_type: primary
     part_start: 2048s
     part_end: 100%
     label: gpt
@@ -70,7 +70,7 @@
     fstype: ext4
     dev: "{{ item }}1"
     opts: -L "data{{ ansible_loop.index }}"
-    force: no
+    force: false
   loop: "{{ data_devices }}"
   # Format only if: partition exists AND no filesystem detected
   when:
@@ -82,7 +82,7 @@
     fstype: ext4
     dev: "{{ item }}1"
     opts: -L "parity{{ ansible_loop.index }}"
-    force: no
+    force: false
   loop: "{{ parity_devices }}"
   # Format only if: partition exists AND no filesystem detected
   when:
@@ -138,7 +138,7 @@
   loop: "{{ parity_fstab_entries }}"
   notify: mount parity drives
 
-- name: Mount all drives
+- name: Mount all drives # noqa command-instead-of-module
   command: mount -a
   changed_when: false
 

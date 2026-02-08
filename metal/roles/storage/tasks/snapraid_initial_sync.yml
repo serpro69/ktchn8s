@@ -27,7 +27,7 @@
   file:
     path: /var/log/snapraid
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: root
     group: root
 
@@ -40,10 +40,13 @@
     msg: "Starting initial snapraid sync. This may take several hours for large arrays."
 
 - name: Run initial snapraid sync (async)
-  shell: |
-    /usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
-    exit ${PIPESTATUS[0]}
-  async: 43200  # 12 hours timeout
+  shell:
+    cmd: |-
+      set -o pipefail
+      /usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
+      exit ${PIPESTATUS[0]}
+    executable: /bin/bash
+  async: 43200 # 12 hours timeout
   poll: 0
   register: snapraid_sync_job
   changed_when: true
@@ -61,7 +64,7 @@
     jid: "{{ snapraid_sync_jid }}"
   register: snapraid_sync_result
   until: snapraid_sync_result.finished
-  retries: 1440  # Check every 30 seconds for up to 12 hours
+  retries: 1440 # Check every 30 seconds for up to 12 hours
   delay: 30
   failed_when: false
 
@@ -85,7 +88,7 @@
 
 - name: Parse sync summary from log
   set_fact:
-    sync_summary: "{{ (sync_log_content.content | b64decode).split('\n') | select('search', '(Completed|Error|Warning|Syncing|Parity)') | list | last | default('No summary available') }}"
+    sync_summary: "{{ (sync_log_content.content | b64decode).split('\n') | select('search', '(Completed|Error|Warning|Syncing|Parity)') | list | last | default('No summary available') }}" # noqa yaml[line-length]
   when: sync_log_content is succeeded
 
 - name: Display sync summary
@@ -108,7 +111,7 @@
 
       Full log: /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
     dest: /var/log/snapraid/initial-sync-status.txt
-    mode: '0644'
+    mode: "0644"
     owner: root
     group: root
 
