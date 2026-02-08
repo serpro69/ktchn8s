@@ -18,7 +18,7 @@ After completing [Debian Installation](/docs/guides/how_to_install_debian_on_sto
     Feel free to create a PR with documentation for your specific drives, if you think it might be helpful to others.
 
 !!! tip
-    You can download necessary binaries and firmware files from [ktchn8s-files](https://github.com/serpro69/ktcnh8s-files) repo.
+    You can download necessary binaries and firmware files from [ktchn8s-files](https://github.com/serpro69/ktchn8s-files) repo.
 
 ## Updating Firmware
 
@@ -41,7 +41,7 @@ Then inside the box update the firmware:
 #root@yggdrasil:~#
 cd $(mktemp -d)
 mv ~/ExosX18-EvansBP-STD-SATA-512E-SN06.zip .
-unzip ExosX18-EvansBP-STD-SATA-512E-SN06.zip 
+unzip ExosX18-EvansBP-STD-SATA-512E-SN06.zip
 
 # copy the seachest-firmware to current directory and make sure it works
 cp command\ line\ tools/SeaChest/x86_64/SeaChest_Firmware_linux_x86_64 firmware/.
@@ -53,12 +53,12 @@ chmod +x SeaChest_Firmware_linux_x86_64
 ./SeaChest_Firmware_x86_64-alpine-linux-musl_static --scan
 
 # update firmware
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg0 --fwdlConfig ENBP-SN06.CFS 
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg1 --fwdlConfig ENBP-SN06.CFS 
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg2 --fwdlConfig ENBP-SN06.CFS 
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg3 --fwdlConfig ENBP-SN06.CFS 
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg4 --fwdlConfig ENBP-SN06.CFS 
-./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg5 --fwdlConfig ENBP-SN06.CFS 
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg0 --fwdlConfig ENBP-SN06.CFS
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg1 --fwdlConfig ENBP-SN06.CFS
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg2 --fwdlConfig ENBP-SN06.CFS
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg3 --fwdlConfig ENBP-SN06.CFS
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg4 --fwdlConfig ENBP-SN06.CFS
+./SeaChest_Firmware_x86_64-alpine-linux-musl_static -d /dev/sg5 --fwdlConfig ENBP-SN06.CFS
 
 # scan and check fw was updated
 ./SeaChest_Firmware_x86_64-alpine-linux-musl_static --scan
@@ -218,4 +218,3 @@ SMART Version: 10
 !!! info
     More details on why this can be a smart thing to do can be found in the following thread:<br/>
     https://www.truenas.com/community/threads/exos-x16-high-head-cycle-count-due-to-toggle-between-epc-idle_a-and-idle_b-power-states.90751/
-

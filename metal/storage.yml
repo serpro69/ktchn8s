@@ -4,6 +4,7 @@
 - name: Configure NAS Storage Server
   hosts: nas
   gather_facts: true
+  become: true
   roles:
     - role: storage
   tags:
