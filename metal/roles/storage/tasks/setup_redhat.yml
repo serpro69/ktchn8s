@@ -13,9 +13,15 @@
 
 - name: Update all packages # noqa package-latest
   dnf:
-    name: '*'
+    name: "*"
     update_cache: true
     state: latest
+
+- name: Ensure base packages
+  dnf:
+    name:
+      - xz
+      - lm_sensors
 
 - name: Install mergerfs
   dnf:
