@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "upstream_repo": "serpro69/claude-starter-kit",
+  "template_version": "0b458a59d0320ecf71d4cf57f5acbeb2da939893",
+  "synced_at": "1970-01-01T00:00:00Z",
+  "variables": {
+    "PROJECT_NAME": "ktchn8s",
+    "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
+    "CC_MODEL": "opus",
+    "SERENA_INITIAL_PROMPT": "",
+    "TM_CUSTOM_SYSTEM_PROMPT": "You are an experienced Kubernetes developer.",
+    "TM_APPEND_SYSTEM_PROMPT": "Always follow coding and kubernetes best practices. Use context7 MCP to lookup specific libraries and manifests documentation when needed.",
+    "TM_PERMISSION_MODE": "default"
+  }
+}
