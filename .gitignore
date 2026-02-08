@@ -13,6 +13,7 @@ client.key
 Chart.lock
 
 # docs
+.todo.txt
 
 site/
 
