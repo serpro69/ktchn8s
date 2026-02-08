@@ -1,4 +1,5 @@
 ---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master/persistentvolume.json
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -21,4 +22,4 @@ spec:
     volumeHandle: 10.10.10.30/share/Videos
     volumeAttributes:
       server: 10.10.10.30
-      share: /Videos
+      share: /mnt/storage/Videos

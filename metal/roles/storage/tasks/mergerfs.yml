@@ -1,13 +1,10 @@
 ---
 - name: Create mergerfs mount configuration
   set_fact:
-    mergerfs_branches: |-
-      {% set branches = [] %}
-      {% for dir in disk_directories %}
-        {% do branches.append(dir) %}
-      {% endfor %}
-      {{ branches | join(':') }}
-    mergerfs_options: "defaults,nonempty,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
+    mergerfs_branches: "{{ disk_directories | join(':') }}"
+    mergerfs_options: "defaults,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
+    # TODO: I think nonempty is removed in FUSE3?
+    # mergerfs_options: "defaults,nonempty,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
 
 - name: Add mergerfs mount to fstab
   lineinfile:
@@ -24,12 +21,7 @@
     mode: "0755"
     owner: root
     group: root
-  loop:
-    - Videos
-    - Documents
-    - Pictures
-    - Music
-    - Backups
+  loop: "{{ storage_dirs }}"
   when: mergerfs_branches is defined
 
 - name: Check if mergerfs is already mounted
@@ -38,7 +30,7 @@
   failed_when: false
   changed_when: false
 
-- name: Mount mergerfs pool
+- name: Mount mergerfs pool # noqa command-instead-of-module no-changed-when
   command: mount /mnt/storage
   when: mergerfs_already_mounted.rc != 0
   register: mergerfs_mount_result

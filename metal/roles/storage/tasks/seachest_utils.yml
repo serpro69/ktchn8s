@@ -1,6 +1,11 @@
 ---
 # Seagate-specific health checks using seachest utilities
 
+- name: Ensure dependencies
+  package:
+    name:
+      - lsscsi
+
 - name: Check seachest_SMART availability
   command: which seachest_SMART
   register: seachest_check
@@ -15,6 +20,7 @@
 - name: Convert by-id paths to sg device paths for seachest
   shell: |
     set -e
+    set -o pipefail
     DEVICE="{{ item }}"
     # Get the real device name
     REAL_DEV=$(readlink -f "$DEVICE" | sed 's|/dev/||')

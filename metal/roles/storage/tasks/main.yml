@@ -6,11 +6,18 @@
 - name: Ensure base packages
   package:
     name:
-      - xz-utils
       # hardware monitoring
-      - lm_sensors
-      - hddtemp
       - smartmontools
+
+- name: Load drivetemp module
+  command: modprobe drivetemp
+  changed_when: true
+
+- name: Persist drivetemp across reboots
+  copy:
+    content: "drivetemp\n"
+    dest: /etc/modules-load.d/drivetemp.conf
+    mode: "0644"
 
 - name: Detect sensors
   command: sensors-detect --auto
@@ -23,7 +30,7 @@
   when: ansible_os_family == 'Debian'
 
 - name: Set facts for mount directories
-  set_fact:
+  set_fact: # noqa jinja[spacing]
     disk_directories: |-
       {% set dirs = [] %}
       {% for drive in data_drives %}
