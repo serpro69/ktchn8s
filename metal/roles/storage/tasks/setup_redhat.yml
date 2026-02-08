@@ -1,0 +1,23 @@
+---
+- name: Download rpm
+  get_url:
+    url: "{{ mergerfs_url_rpm }}"
+    dest: "/tmp/mergerfs-{{ mergerfs_ver }}.rpm"
+    mode: "0755"
+
+- name: Set fastestmirror=True for dnf
+  lineinfile:
+    path: /etc/dnf/dnf.conf
+    search_string: fastestmirror
+    line: fastestmirror=True
+
+- name: Update all packages # noqa package-latest
+  dnf:
+    name: '*'
+    update_cache: true
+    state: latest
+
+- name: Install mergerfs
+  dnf:
+    name: "/tmp/mergerfs-{{ mergerfs_ver }}.rpm"
+    state: present
