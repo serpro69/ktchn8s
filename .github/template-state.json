@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "upstream_repo": "serpro69/claude-starter-kit",
-  "template_version": "0b458a59d0320ecf71d4cf57f5acbeb2da939893",
-  "synced_at": "1970-01-01T00:00:00Z",
+  "template_version": "26af43ece64706c4f6c0ba5949732ac87400bfd6",
+  "synced_at": "2026-02-08T15:06:34Z",
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
