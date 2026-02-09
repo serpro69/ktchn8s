@@ -57,7 +57,7 @@
             volumes:
             - name: nfs-volume
               nfs:
-                server: {{ ansible_host }}
+                server: "{{ ansible_host }}"
                 path: /mnt/storage/Temp
             restartPolicy: Never
         dest: /tmp/nfs-test-pod.yaml
