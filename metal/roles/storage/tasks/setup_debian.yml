@@ -20,6 +20,7 @@
       - git
       - wget
     state: present
+    update_cache: true
 
 - name: Install mergerfs
   apt:
