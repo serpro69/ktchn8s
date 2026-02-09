@@ -36,6 +36,8 @@
 #   # Only partition if no 'part' type found in lsblk output (disk is unpartitioned)
 #   when:
 #     - "'part' not in partition_check.results[ansible_loop.index0].stdout"
+#   loop_control:
+#     extended: true
 #   register: partition_result
 #
 # - name: Wait for partition devices to be available
@@ -59,6 +61,8 @@
     opts: -L "data{{ ansible_loop.index }}"
     force: false
   loop: "{{ data_devices }}"
+  loop_control:
+    extended: true
   # Format only if: partition exists AND no filesystem detected
   when:
     - filesystem_check.results[ansible_loop.index0].rc != 0
@@ -71,6 +75,8 @@
     opts: -L "parity{{ ansible_loop.index }}"
     force: false
   loop: "{{ parity_devices }}"
+  loop_control:
+    extended: true
   # Format only if: partition exists AND no filesystem detected
   when:
     - filesystem_check.results[data_devices | length + ansible_loop.index0].rc != 0
