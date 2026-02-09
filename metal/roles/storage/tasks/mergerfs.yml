@@ -14,16 +14,6 @@
     backup: true
   notify: mount mergerfs
 
-- name: Create NFS export directories
-  file:
-    path: "/mnt/storage/{{ item }}"
-    state: directory
-    mode: "0755"
-    owner: root
-    group: root
-  loop: "{{ storage_dirs }}"
-  when: mergerfs_branches is defined
-
 - name: Check if mergerfs is already mounted
   command: mountpoint -q /mnt/storage
   register: mergerfs_already_mounted
