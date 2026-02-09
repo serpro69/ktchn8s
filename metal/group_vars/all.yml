@@ -13,4 +13,4 @@ load_balancer_ip_pool:
   - 10.10.10.64/30
   - 10.10.10.68/31
 
-homelab_net_cidr: 10.10.10.1/24
+homelab_net_cidr: 10.10.10.0/24
