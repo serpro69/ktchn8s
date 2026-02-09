@@ -23,9 +23,9 @@
   systemd:
     daemon_reload: true
 
-- name: restart nfs-kernel-server
+- name: restart nfs server
   service:
-    name: nfs-kernel-server
+    name: "{{ nfs_server_service }}"
     state: restarted
 
 - name: restart snapraid-runner
