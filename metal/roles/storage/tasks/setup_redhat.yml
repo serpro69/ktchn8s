@@ -22,6 +22,16 @@
     name:
       - xz
       - lm_sensors
+      - nfs-utils
+
+- name: Install snapraid build dependencies
+  dnf:
+    name:
+      - gcc
+      - make
+      - git
+      - wget
+    state: present
 
 - name: Install mergerfs
   dnf:

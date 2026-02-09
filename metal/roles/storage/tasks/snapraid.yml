@@ -9,14 +9,6 @@
     fail_msg: "Cannot configure snapraid: parity_drives or data_drives is empty or undefined"
     success_msg: "Parity drives validation passed: {{ parity_drives | length }} parity drive(s), {{ data_drives | length }} data drive(s)"
 
-- name: Install snapraid dependencies
-  package:
-    name:
-      - build-essential
-      - git
-      - wget
-    state: present
-
 - name: Create snapraid build directory
   tempfile:
     state: directory
