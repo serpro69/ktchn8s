@@ -7,8 +7,9 @@ default_nfs_options: "rw,sync,no_subtree_check,no_root_squash,insecure"
 
 # Firewall configuration
 manage_firewall: true # Set to false to skip firewall configuration
+# TODO: should use nftables on Debian (+ firewalld equivalent if we trully want to support redhat OSes)
 install_ufw: true # Install UFW if not present (only when manage_firewall=true)
-nfs_allowed_networks:
+firewall_allowed_networks: # NB! The default will only allow connections (including SSH) from homelab network
   - "{{ homelab_net_cidr }}"
 
 # Network configuration (optional)
