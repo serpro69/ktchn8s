@@ -93,7 +93,7 @@
         mode: "0755"
 
     - name: Test mount NFS export locally # noqa command-instead-of-module
-      command: "mount -t nfs localhost:/mnt/storage/{{ storage_dirs | first }} /tmp/nfs_test_mount"
+      command: "mount -t nfs localhost:/mnt/storage/Temp /tmp/nfs_test_mount"
       register: test_mount
       changed_when: false
       failed_when: false
