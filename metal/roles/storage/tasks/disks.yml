@@ -1,9 +1,4 @@
 ---
-- name: Identify disk devices by ID
-  set_fact:
-    data_devices: "{{ data_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"
-    parity_devices: "{{ parity_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"
-
 - name: Verify disk devices exist
   stat:
     path: "{{ item }}"
