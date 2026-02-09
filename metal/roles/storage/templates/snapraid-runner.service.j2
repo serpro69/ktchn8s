@@ -1,6 +1,7 @@
 [Unit]
 Description=SnapRAID Runner
 After=multi-user.target
+Conflicts=snapraid-scrub.service
 
 [Service]
 Type=oneshot
