@@ -26,10 +26,10 @@
       device: "{{ item.item }}"
       tool: "smartctl"
       overall_health: "{{ smart_json.smart_status.passed | default(false) }}"
-      temperature: "{{ smart_json.temperature.current | default(-1) }}"
-      reallocated_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 5) | map(attribute='raw.value') | first) | default(0) }}"
-      pending_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 197) | map(attribute='raw.value') | first) | default(0) }}"
-      uncorrectable_errors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 187) | map(attribute='raw.value') | first) | default(0) }}"
+      temperature: "{{ smart_json.temperature.current | default(-1) | int }}"
+      reallocated_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 5) | map(attribute='raw.value') | first) | default(0) | int }}" # noqa yaml[line-length]
+      pending_sectors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 197) | map(attribute='raw.value') | first) | default(0) | int }}" # noqa yaml[line-length]
+      uncorrectable_errors: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 187) | map(attribute='raw.value') | first) | default(0) | int }}" # noqa yaml[line-length]
       power_on_hours: "{{ (smart_json.ata_smart_attributes.table | selectattr('id', 'equalto', 9) | map(attribute='raw.value') | first) | default('N/A') }}"
       model: "{{ smart_json.model_name | default('Unknown') }}"
       serial: "{{ smart_json.serial_number | default('Unknown') }}"
