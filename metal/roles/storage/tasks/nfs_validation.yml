@@ -8,7 +8,7 @@
 
 - name: Check NFS server service status
   systemd:
-    name: nfs-kernel-server
+    name: "{{ nfs_server_service }}"
   register: nfs_service_status
   failed_when: false
 

@@ -1,11 +1,4 @@
 ---
-- name: Install NFS server packages
-  package:
-    name:
-      - nfs-kernel-server
-      - nfs-common
-    state: present
-
 - name: Create NFS export configuration
   template:
     src: exports.j2
@@ -16,7 +9,7 @@
     backup: true
   notify:
     - reload nfs exports
-    - restart nfs-kernel-server
+    - restart nfs server
 
 - name: Set proper ownership for NFS shares
   file:
@@ -33,7 +26,7 @@
     state: started
     enabled: true
   loop:
-    - nfs-kernel-server
+    - "{{ nfs_server_service }}"
     - rpcbind
 
 - name: Configure firewall for NFS
