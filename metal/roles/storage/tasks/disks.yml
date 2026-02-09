@@ -53,13 +53,13 @@
 
 - name: Wait for partition devices to be available
   wait_for:
-    path: "{{ item }}1"
+    path: "{{ item }}"
     timeout: 30
   loop: "{{ data_devices + parity_devices }}"
   when: partition_result is changed
 
 - name: Check for existing filesystems on partitions
-  command: "blkid {{ item }}1"
+  command: "blkid {{ item }}"
   loop: "{{ data_devices + parity_devices }}"
   register: filesystem_check
   changed_when: false
@@ -68,7 +68,7 @@
 - name: Format data drives with ext4
   filesystem:
     fstype: ext4
-    dev: "{{ item }}1"
+    dev: "{{ item }}"
     opts: -L "data{{ ansible_loop.index }}"
     force: false
   loop: "{{ data_devices }}"
@@ -80,7 +80,7 @@
 - name: Format parity drives with ext4
   filesystem:
     fstype: ext4
-    dev: "{{ item }}1"
+    dev: "{{ item }}"
     opts: -L "parity{{ ansible_loop.index }}"
     force: false
   loop: "{{ parity_devices }}"
@@ -104,7 +104,7 @@
       {% set entries = [] %}
       {% for device in data_devices %}
         {% set mount_point = '/mnt/data' + (loop.index | string) %}
-        {% set entry = device + '1 ' + mount_point + ' ext4 defaults,noatime 0 2' %}
+        {% set entry = device + mount_point + ' ext4 defaults,noatime 0 2' %}
         {% do entries.append(entry) %}
       {% endfor %}
       {{ entries }}
@@ -115,7 +115,7 @@
       {% set entries = [] %}
       {% for device in parity_devices %}
         {% set mount_point = '/mnt/parity' + (loop.index | string) %}
-        {% set entry = device + '1 ' + mount_point + ' ext4 defaults,noatime 0 2' %}
+        {% set entry = device + mount_point + ' ext4 defaults,noatime 0 2' %}
         {% do entries.append(entry) %}
       {% endfor %}
       {{ entries }}

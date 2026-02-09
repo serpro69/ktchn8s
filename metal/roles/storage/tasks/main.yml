@@ -19,15 +19,15 @@
     dest: /etc/modules-load.d/drivetemp.conf
     mode: "0644"
 
-- name: Detect sensors
-  command: sensors-detect --auto
-  changed_when: true
-
 - include_tasks: setup_redhat.yml # noqa name[missing]
   when: ansible_os_family == 'RedHat'
 
 - include_tasks: setup_debian.yml # noqa name[missing]
   when: ansible_os_family == 'Debian'
+
+- name: Detect sensors
+  command: sensors-detect --auto
+  changed_when: true
 
 - name: Set facts for mount directories
   set_fact: # noqa jinja[spacing]
