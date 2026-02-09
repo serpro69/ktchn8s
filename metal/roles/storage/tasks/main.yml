@@ -80,3 +80,7 @@
 
 - name: Include NFS server configuration
   include_tasks: nfs.yml
+  when:
+    - data_drives is defined
+    - data_drives | length > 0
+    - disk_directories is defined
