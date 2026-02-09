@@ -137,6 +137,82 @@
         success_msg: "Local NFS mount test passed"
         fail_msg: "Local NFS mount test failed"
 
+# =================================================================
+# REMOTE NFS VALIDATION (from controller)
+# =================================================================
+
+- name: Test NFS access from controller
+  delegate_to: localhost
+  become: false
+  block:
+    - name: Verify NFS exports visible from controller
+      command: "showmount -e {{ ansible_host }}"
+      register: remote_showmount
+      changed_when: false
+      failed_when: false
+
+    - name: Verify remote showmount succeeded
+      assert:
+        that:
+          - remote_showmount.rc == 0
+        fail_msg: "Cannot reach NFS exports from controller - check firewall and network connectivity"
+        success_msg: "NFS exports visible from controller"
+
+    - name: Create remote test mount point
+      file:
+        path: /tmp/nfs_remote_test_mount
+        state: directory
+        mode: "0755"
+
+    - name: Test mount NFS export from controller # noqa command-instead-of-module
+      command: "mount -t nfs {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_remote_test_mount"
+      register: remote_test_mount
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Test write to remote NFS mount
+      copy:
+        content: "NFS remote validation test - {{ ansible_date_time.iso8601 }}"
+        dest: /tmp/nfs_remote_test_mount/.nfs_remote_test_file
+        mode: "0644"
+      when: remote_test_mount.rc == 0
+      register: remote_test_write
+      become: true
+
+    - name: Test read from remote NFS mount
+      command: cat /tmp/nfs_remote_test_mount/.nfs_remote_test_file
+      when: remote_test_write is succeeded
+      register: remote_test_read
+      changed_when: false
+
+    - name: Cleanup remote test file
+      file:
+        path: /tmp/nfs_remote_test_mount/.nfs_remote_test_file
+        state: absent
+      when: remote_test_write is succeeded
+      become: true
+
+    - name: Unmount remote test NFS share
+      command: umount /tmp/nfs_remote_test_mount
+      when: remote_test_mount.rc == 0
+      changed_when: false
+      become: true
+
+    - name: Remove remote test mount point
+      file:
+        path: /tmp/nfs_remote_test_mount
+        state: absent
+
+    - name: Verify remote NFS mount test succeeded
+      assert:
+        that:
+          - remote_test_mount.rc == 0
+          - remote_test_write is succeeded
+          - remote_test_read is succeeded
+        success_msg: "Remote NFS mount test from controller passed"
+        fail_msg: "Remote NFS mount test from controller failed"
+
 - name: NFS validation complete
   debug:
-    msg: "NFS export validation completed successfully"
+    msg: "NFS export validation completed successfully (local and remote)"
