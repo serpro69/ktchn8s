@@ -59,19 +59,19 @@
 
 - name: Check for drives exceeding temperature threshold
   set_fact:
-    overheated_drives: "{{ disk_health_report | selectattr('temperature', 'gt', disk_health_thresholds.max_temperature_celsius) | list }}"
+    overheated_drives: "{{ disk_health_report | rejectattr('temperature', 'equalto', -1) | selectattr('temperature', 'defined') | list | json_query('[?to_number(temperature) > `' + (disk_health_thresholds.max_temperature_celsius | string) + '`]') }}" # noqa yaml[line-length]
 
 - name: Check for drives with excessive reallocated sectors
   set_fact:
-    reallocated_sector_warnings: "{{ disk_health_report | selectattr('reallocated_sectors', 'gt', disk_health_thresholds.max_reallocated_sectors) | list }}"
+    reallocated_sector_warnings: "{{ disk_health_report | json_query('[?to_number(reallocated_sectors) > `' + (disk_health_thresholds.max_reallocated_sectors | string) + '`]') }}" # noqa yaml[line-length]
 
 - name: Check for drives with pending sectors
   set_fact:
-    pending_sector_warnings: "{{ disk_health_report | selectattr('pending_sectors', 'gt', disk_health_thresholds.max_pending_sectors) | list }}"
+    pending_sector_warnings: "{{ disk_health_report | json_query('[?to_number(pending_sectors) > `' + (disk_health_thresholds.max_pending_sectors | string) + '`]') }}" # noqa yaml[line-length]
 
 - name: Check for drives with uncorrectable errors
   set_fact:
-    uncorrectable_error_warnings: "{{ disk_health_report | selectattr('uncorrectable_errors', 'gt', disk_health_thresholds.max_uncorrectable_errors) | list }}"
+    uncorrectable_error_warnings: "{{ disk_health_report | json_query('[?to_number(uncorrectable_errors) > `' + (disk_health_thresholds.max_uncorrectable_errors | string) + '`]') }}" # noqa yaml[line-length]
 
 - name: Display warnings for problematic drives
   debug:

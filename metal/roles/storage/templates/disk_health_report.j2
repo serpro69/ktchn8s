@@ -51,16 +51,16 @@ Health Status: {{ 'PASSED' if drive.overall_health else 'FAILED' }}
   {% if not drive.overall_health %}*** ATTENTION: Drive is reporting failures ***{% endif %}
 
 Temperature: {{ drive.temperature }}°C
-  {% if drive.temperature > disk_health_thresholds.max_temperature_celsius %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_temperature_celsius }}°C{% endif %}
+  {% if (drive.temperature | int) > (disk_health_thresholds.max_temperature_celsius | int) %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_temperature_celsius }}°C{% endif %}
 
 Reallocated Sectors: {{ drive.reallocated_sectors }}
-  {% if drive.reallocated_sectors > disk_health_thresholds.max_reallocated_sectors %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_reallocated_sectors }}{% endif %}
+  {% if (drive.reallocated_sectors | int) > (disk_health_thresholds.max_reallocated_sectors | int) %}WARNING: Exceeds threshold of {{ disk_health_thresholds.max_reallocated_sectors }}{% endif %}
 
 Pending Sectors: {{ drive.pending_sectors }}
-  {% if drive.pending_sectors > disk_health_thresholds.max_pending_sectors %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_pending_sectors }}{% endif %}
+  {% if (drive.pending_sectors | int) > (disk_health_thresholds.max_pending_sectors | int) %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_pending_sectors }}{% endif %}
 
 Uncorrectable Errors: {{ drive.uncorrectable_errors }}
-  {% if drive.uncorrectable_errors > disk_health_thresholds.max_uncorrectable_errors %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_uncorrectable_errors }}{% endif %}
+  {% if (drive.uncorrectable_errors | int) > (disk_health_thresholds.max_uncorrectable_errors | int) %}CRITICAL: Exceeds threshold of {{ disk_health_thresholds.max_uncorrectable_errors }}{% endif %}
 
 Power On Hours: {{ drive.power_on_hours }}
 
