@@ -51,13 +51,10 @@
 - name: Verify expected exports are present
   assert:
     that:
-      - "'/mnt/storage/Videos' in exported_dirs"
-      - "'/mnt/storage/Documents' in exported_dirs"
-      - "'/mnt/storage/Pictures' in exported_dirs"
-      - "'/mnt/storage/Music' in exported_dirs"
-      - "'/mnt/storage/Backups' in exported_dirs"
-    fail_msg: "Not all expected NFS exports are present"
-    success_msg: "All expected NFS exports are configured"
+      - "'/mnt/storage/' + item in exported_dirs"
+    fail_msg: "NFS export missing: /mnt/storage/{{ item }}"
+    success_msg: "NFS export present: /mnt/storage/{{ item }}"
+  loop: "{{ storage_dirs }}"
   when: exported_dirs is defined
 
 - name: Check if ufw firewall is active
@@ -96,7 +93,7 @@
         mode: "0755"
 
     - name: Test mount NFS export locally # noqa command-instead-of-module
-      command: mount -t nfs localhost:/mnt/storage/Backups /tmp/nfs_test_mount
+      command: "mount -t nfs localhost:/mnt/storage/{{ storage_dirs | first }} /tmp/nfs_test_mount"
       register: test_mount
       changed_when: false
       failed_when: false
