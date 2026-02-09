@@ -23,7 +23,7 @@ storage_network:
     - "1.1.1.1"
 
 # Disk health validation
-enable_disk_health_checks: true
+enable_disk_health_checks: false
 prefer_native_utils: false # Use smartctl by default, set true for brand-specific tools
 fail_on_unhealthy_drives: false # Warning only by default
 
