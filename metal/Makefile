@@ -42,6 +42,8 @@ export KUBECONFIG = $(shell pwd)/kubeconfig.yaml
 
 ### Ansible
 
+# List of coma-separated ansible-playbook arguments
+ANSIBLE_ARGS      ?=
 # List of coma-separated ansible-playbook tags
 ANSIBLE_TAGS      ?=
 # A coma-separated list of target hosts to limit the playbook execution to
@@ -209,15 +211,15 @@ _requirements:
 
 bootstrap: SHELL:=$(shell which bash)
 bootstrap: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
-	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
+	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 storage: SHELL:=$(shell which bash)
 storage: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
-	@$(call play,storage.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
+	@$(call play,storage.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 cluster: SHELL:=$(shell which bash)
 cluster: ~/.ssh/homelab_id_ed25519 _requirements ## Create kubernetes cluster on provisioned servers
-	@$(call play,cluster.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
+	@$(call play,cluster.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 console: SHELL:=$(shell which bash)
 console: ## Start the Ansible console
@@ -230,7 +232,7 @@ inventory: ## List hosts from the ansible inventory
 
 main: SHELL:=$(shell which bash)
 main: ~/.ssh/homelab_id_ed25519 _requirements ## Provision kubernetes cluster
-	@$(call play,main.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
+	@$(call play,main.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 wake: SHELL:=$(shell which bash)
 wake: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up the servers without re-provisioning them
