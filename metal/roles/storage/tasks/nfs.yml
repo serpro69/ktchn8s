@@ -33,6 +33,9 @@
   include_tasks: nfs_firewall.yml
   when: manage_firewall
 
+- name: Flush handlers before validation
+  meta: flush_handlers
+
 - name: Validate NFS exports
   include_tasks: nfs_validation.yml
 
@@ -42,4 +45,3 @@
     apply:
       become: false
       delegate_to: localhost
-  delegate_to: localhost
