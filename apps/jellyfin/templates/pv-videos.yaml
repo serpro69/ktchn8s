@@ -19,7 +19,7 @@ spec:
     driver: nfs.csi.k8s.io
     # volumeHandle format: {nfs-server-address}#{sub-dir-name}#{share-name}
     # make sure this value is unique for every share in the cluster
-    volumeHandle: 10.10.10.30/share/Videos
+    volumeHandle: {{ .Values.nfs.server }}/share/Videos
     volumeAttributes:
-      server: 10.10.10.30
-      share: /mnt/storage/Videos
+      server: {{ .Values.nfs.server }}
+      share: {{ .Values.nfs.basePath }}/Videos
