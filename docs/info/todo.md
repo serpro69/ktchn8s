@@ -189,3 +189,16 @@ title: ToDo
     - Seems like adding `fastestmirror=True` to `/etc/dnf/dnf.conf` helps at least to some degree
 
 - [ ] Setup pi-hole on the cluster
+
+- [ ] NFS Optimizations
+  - NFS mount monitoring/health check on K8s side
+    There's no monitoring or alerting for NFS mount failures on the K8s side. If the NAS goes down, pods will hang on NFS operations. This is a common NFS issue. Consider adding:
+    - NFS mount soft option (instead of default hard) for timeout behavior
+    - A health check pod or monitoring rule
+  - NFS server tuning
+    For a 4-drive array serving media to a K8s cluster, you might want to tune:
+    - NFS thread count (/proc/fs/nfsd/threads, default is 8)
+    - Read/write size in mount options
+    This is optional and premature optimization, but should be kept in mind.
+  - fstab entry cleanup
+    - If you remove a data drive from inventory, the fstab entry persists (uses lineinfile with state: present, never absent). Not a concern for initial deployment.
