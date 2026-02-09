@@ -1,0 +1,13 @@
+[Unit]
+Description=SnapRAID Initial Parity Sync
+After=multi-user.target
+Conflicts=snapraid-runner.service snapraid-scrub.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '/usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync.log'
+User=root
+Group=root
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=43200
