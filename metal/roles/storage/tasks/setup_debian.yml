@@ -3,18 +3,19 @@
   apt:
     update_cache: true
     upgrade: dist
+  when: upgrade_packages
 
 - name: Ensure base packages
   apt:
     name:
+      # base utils
       - xz-utils
+      # hardware monitoring
       - lm-sensors
+      # nfs
       - nfs-kernel-server
       - nfs-common
-
-- name: Install snapraid build dependencies
-  apt:
-    name:
+      # snapraid build dependencies
       - build-essential
       - git
       - wget
