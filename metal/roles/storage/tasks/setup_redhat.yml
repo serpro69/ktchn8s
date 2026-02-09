@@ -16,17 +16,18 @@
     name: "*"
     update_cache: true
     state: latest
+  when: upgrade_packages
 
-- name: Ensure base packages
+- name: Ensure required packages
   dnf:
     name:
+      # base utils
       - xz
+      # hardware monitoring
       - lm_sensors
+      # nfs
       - nfs-utils
-
-- name: Install snapraid build dependencies
-  dnf:
-    name:
+      # snapraid build dependencies
       - gcc
       - make
       - git
