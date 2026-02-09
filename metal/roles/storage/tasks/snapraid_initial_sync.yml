@@ -1,6 +1,7 @@
 ---
 # Snapraid Initial Sync
-# Performs initial parity sync with validation, logging, and monitoring
+# Starts the initial parity sync as a systemd service and returns immediately.
+# The sync runs independently on the NAS - no need for the controller to stay connected.
 
 # =================================================================
 # PRE-SYNC VALIDATION
@@ -19,119 +20,79 @@
   failed_when: snapraid_status_check.rc not in [0, 2]
   # rc=2 means no parity file yet, which is expected for initial sync
 
-- name: Display snapraid status
-  debug:
-    msg: "Snapraid configuration is valid. Proceeding with initial sync."
-
-- name: Create snapraid log directory
-  file:
-    path: /var/log/snapraid
-    state: directory
-    mode: "0755"
-    owner: root
-    group: root
-
 # =================================================================
-# INITIAL SYNC EXECUTION
+# CHECK IF SYNC ALREADY COMPLETED
 # =================================================================
 
-- name: Display sync start message
-  debug:
-    msg: "Starting initial snapraid sync. This may take several hours for large arrays."
+- name: Check if parity file already exists
+  stat:
+    path: "{{ parity_directories[0] }}/snapraid.parity"
+  register: parity_file_check
 
-- name: Run initial snapraid sync (async)
-  shell:
-    cmd: |-
-      set -o pipefail
-      /usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
-      exit ${PIPESTATUS[0]}
-    executable: /bin/bash
-  async: 43200 # 12 hours timeout
-  poll: 0
-  register: snapraid_sync_job
-  changed_when: true
-
-- name: Save sync job ID
-  set_fact:
-    snapraid_sync_jid: "{{ snapraid_sync_job.ansible_job_id }}"
-
-# =================================================================
-# ASYNC STATUS MONITORING
-# =================================================================
-
-- name: Monitor snapraid sync progress
-  async_status:
-    jid: "{{ snapraid_sync_jid }}"
-  register: snapraid_sync_result
-  until: snapraid_sync_result.finished
-  retries: 1440 # Check every 30 seconds for up to 12 hours
-  delay: 30
+- name: Check if initial sync service is currently running
+  systemd:
+    name: snapraid-initial-sync.service
+  register: initial_sync_service_status
   failed_when: false
 
-- name: Check if sync completed successfully
-  set_fact:
-    sync_succeeded: "{{ snapraid_sync_result.rc == 0 }}"
+- name: Skip sync if parity already exists
+  debug:
+    msg: "Parity file already exists - initial sync was already completed. Skipping."
+  when: parity_file_check.stat.exists
+
+- name: Skip sync if already running
+  debug:
+    msg: "Initial sync service is already running. Monitor with: journalctl -u snapraid-initial-sync -f"
+  when:
+    - not parity_file_check.stat.exists
+    - initial_sync_service_status.status.ActiveState | default('inactive') == 'active'
 
 # =================================================================
-# POST-SYNC VALIDATION AND REPORTING
+# START INITIAL SYNC
 # =================================================================
 
-- name: Display sync completion status
-  debug:
-    msg: "Snapraid initial sync {{ 'completed successfully' if sync_succeeded else 'failed' }}"
+- name: Run initial sync
+  when:
+    - not parity_file_check.stat.exists
+    - initial_sync_service_status.status.ActiveState | default('inactive') != 'active'
+  block:
+    - name: Create snapraid log directory
+      file:
+        path: /var/log/snapraid
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
 
-- name: Read sync log file
-  slurp:
-    src: "/var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log"
-  register: sync_log_content
-  failed_when: false
+    - name: Deploy initial sync systemd service
+      template:
+        src: snapraid-initial-sync.service.j2
+        dest: /etc/systemd/system/snapraid-initial-sync.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: reload systemd
 
-- name: Parse sync summary from log
-  set_fact:
-    sync_summary: "{{ (sync_log_content.content | b64decode).split('\n') | select('search', '(Completed|Error|Warning|Syncing|Parity)') | list | last | default('No summary available') }}" # noqa yaml[line-length]
-  when: sync_log_content is succeeded
+    - name: Reload systemd immediately
+      systemd:
+        daemon_reload: true
 
-- name: Display sync summary
-  debug:
-    msg: "Sync summary: {{ sync_summary }}"
-  when: sync_summary is defined
+    - name: Start initial snapraid sync service
+      systemd:
+        name: snapraid-initial-sync.service
+        state: started
 
-- name: Create sync status file
-  copy:
-    content: |
-      Snapraid Initial Sync Status
-      =============================
-      Date: {{ ansible_date_time.iso8601 }}
-      Host: {{ inventory_hostname }}
-      Status: {{ 'SUCCESS' if sync_succeeded else 'FAILED' }}
-      Return Code: {{ snapraid_sync_result.rc }}
-
-      Summary:
-      {{ sync_summary | default('No summary available') }}
-
-      Full log: /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log
-    dest: /var/log/snapraid/initial-sync-status.txt
-    mode: "0644"
-    owner: root
-    group: root
-
-- name: Display log file location
-  debug:
-    msg:
-      - "Snapraid sync log: /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log"
-      - "Status file: /var/log/snapraid/initial-sync-status.txt"
-
-# =================================================================
-# ERROR HANDLING
-# =================================================================
-
-- name: Fail if sync was unsuccessful
-  fail:
-    msg: |
-      Snapraid initial sync failed with return code {{ snapraid_sync_result.rc }}.
-      Check /var/log/snapraid/initial-sync-{{ ansible_date_time.date }}.log for details.
-  when: not sync_succeeded
-
-- name: Sync completed successfully
-  debug:
-    msg: "Snapraid initial sync completed successfully. Parity data is now protected."
+    - name: Display sync monitoring instructions
+      debug:
+        msg:
+          - "Initial snapraid sync started as a systemd service on {{ inventory_hostname }}."
+          - "The controller can now disconnect safely."
+          - ""
+          - "Monitor progress:"
+          - "  ssh {{ ansible_host }} journalctl -u snapraid-initial-sync -f"
+          - "  ssh {{ ansible_host }} tail -f /var/log/snapraid/initial-sync.log"
+          - ""
+          - "Check status:"
+          - "  ssh {{ ansible_host }} systemctl status snapraid-initial-sync"
+          - ""
+          - "On next playbook run, this step will be skipped if parity file exists."
