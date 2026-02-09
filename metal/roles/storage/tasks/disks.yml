@@ -12,34 +12,38 @@
       - "Data drives: {{ data_devices }}"
       - "Parity drives: {{ parity_devices }}"
 
-- name: Check if drives are already partitioned
-  command: "lsblk -no TYPE {{ item }}"
-  loop: "{{ data_devices + parity_devices }}"
-  register: partition_check
-  changed_when: false
-  failed_when: false
-
-- name: Partition drives (create single GPT partition)
-  parted:
-    device: "{{ item }}"
-    number: 1
-    state: present
-    # part_type: primary
-    part_start: 2048s
-    part_end: 100%
-    label: gpt
-  loop: "{{ data_devices + parity_devices }}"
-  # Only partition if no 'part' type found in lsblk output (disk is unpartitioned)
-  when:
-    - "'part' not in partition_check.results[ansible_loop.index0].stdout"
-  register: partition_result
-
-- name: Wait for partition devices to be available
-  wait_for:
-    path: "{{ item }}"
-    timeout: 30
-  loop: "{{ data_devices + parity_devices }}"
-  when: partition_result is changed
+# TODO: should partitioning tasks be removed altogether?
+# The inventory currently contains partition IDs (the drives are pre-partitioned), so this code technically does nothing.
+# The question is, do we want to pre-partition the drives manually, or via this role? What are the downsides of each approach?
+#
+# - name: Check if drives are already partitioned
+#   command: "lsblk -no TYPE {{ item }}"
+#   loop: "{{ data_devices + parity_devices }}"
+#   register: partition_check
+#   changed_when: false
+#   failed_when: false
+#
+# - name: Partition drives (create single GPT partition)
+#   parted:
+#     device: "{{ item }}"
+#     number: 1
+#     state: present
+#     # part_type: primary
+#     part_start: 2048s
+#     part_end: 100%
+#     label: gpt
+#   loop: "{{ data_devices + parity_devices }}"
+#   # Only partition if no 'part' type found in lsblk output (disk is unpartitioned)
+#   when:
+#     - "'part' not in partition_check.results[ansible_loop.index0].stdout"
+#   register: partition_result
+#
+# - name: Wait for partition devices to be available
+#   wait_for:
+#     path: "{{ item }}"
+#     timeout: 30
+#   loop: "{{ data_devices + parity_devices }}"
+#   when: partition_result is changed
 
 - name: Check for existing filesystems on partitions
   command: "blkid {{ item }}"
