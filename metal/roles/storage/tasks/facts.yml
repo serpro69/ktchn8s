@@ -1,0 +1,15 @@
+# Global facts needed by several tasks
+
+- name: Set NFS service name
+  set_fact:
+    nfs_server_service: "{{ 'nfs-kernel-server' if ansible_os_family == 'Debian' else 'nfs-server' }}"
+
+- name: Set facts for mount directories
+  set_fact:
+    disk_directories: "{{ range(1, data_drives | length + 1) | map('regex_replace', '^', '/mnt/data') | list }}"
+    parity_directories: "{{ range(1, parity_drives | length + 1) | map('regex_replace', '^', '/mnt/parity') | list }}"
+
+- name: Identify disk devices by ID
+  set_fact:
+    data_devices: "{{ data_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"
+    parity_devices: "{{ parity_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"

@@ -31,7 +31,7 @@
 .ONESHELL:
 .SHELL 			:= $(shell which bash)
 .SHELLFLAGS := -ec
-.PHONY: _requirements bootstrap cluster console help inventory main wake wipe
+.PHONY: _requirements bootstrap cluster console help inventory main storage wake wipe
 # https://stackoverflow.com/a/63771055
 __MAKE_DIR=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
@@ -210,6 +210,10 @@ _requirements:
 bootstrap: SHELL:=$(shell which bash)
 bootstrap: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
 	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
+
+storage: SHELL:=$(shell which bash)
+storage: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
+	@$(call play,storage.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),)
 
 cluster: SHELL:=$(shell which bash)
 cluster: ~/.ssh/homelab_id_ed25519 _requirements ## Create kubernetes cluster on provisioned servers
