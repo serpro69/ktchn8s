@@ -1,20 +1,8 @@
 ---
 - name: Identify disk devices by ID
   set_fact:
-    data_devices: |-
-      {% set devices = [] %}
-      {% for drive in data_drives %}
-        {% set device_path = '/dev/disk/by-id/' + drive.id %}
-        {% do devices.append(device_path) %}
-      {% endfor %}
-      {{ devices }}
-    parity_devices: |-
-      {% set devices = [] %}
-      {% for drive in parity_drives %}
-        {% set device_path = '/dev/disk/by-id/' + drive.id %}
-        {% do devices.append(device_path) %}
-      {% endfor %}
-      {{ devices }}
+    data_devices: "{{ data_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"
+    parity_devices: "{{ parity_drives | map(attribute='id') | map('regex_replace', '^', '/dev/disk/by-id/') | list }}"
 
 - name: Verify disk devices exist
   stat:
@@ -100,25 +88,11 @@
 
 - name: Generate fstab entries for data drives
   set_fact:
-    data_fstab_entries: |-
-      {% set entries = [] %}
-      {% for device in data_devices %}
-        {% set mount_point = '/mnt/data' + (loop.index | string) %}
-        {% set entry = device + mount_point + ' ext4 defaults,noatime 0 2' %}
-        {% do entries.append(entry) %}
-      {% endfor %}
-      {{ entries }}
+    data_fstab_entries: "{{ data_devices | zip(disk_directories) | map('join', ' ') | map('regex_replace', '$', ' ext4 defaults,noatime 0 2') | list }}"
 
 - name: Generate fstab entries for parity drives
   set_fact:
-    parity_fstab_entries: |-
-      {% set entries = [] %}
-      {% for device in parity_devices %}
-        {% set mount_point = '/mnt/parity' + (loop.index | string) %}
-        {% set entry = device + mount_point + ' ext4 defaults,noatime 0 2' %}
-        {% do entries.append(entry) %}
-      {% endfor %}
-      {{ entries }}
+    parity_fstab_entries: "{{ parity_devices | zip(parity_directories) | map('join', ' ') | map('regex_replace', '$', ' ext4 defaults,noatime 0 2') | list }}"
 
 - name: Add data drives to fstab
   lineinfile:
