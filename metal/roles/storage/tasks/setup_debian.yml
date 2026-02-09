@@ -9,6 +9,16 @@
     name:
       - xz-utils
       - lm-sensors
+      - nfs-kernel-server
+      - nfs-common
+
+- name: Install snapraid build dependencies
+  apt:
+    name:
+      - build-essential
+      - git
+      - wget
+    state: present
 
 - name: Install mergerfs
   apt:

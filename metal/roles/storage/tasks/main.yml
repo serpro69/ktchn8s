@@ -25,6 +25,10 @@
 - include_tasks: setup_debian.yml # noqa name[missing]
   when: ansible_os_family == 'Debian'
 
+- name: Set NFS service name
+  set_fact:
+    nfs_server_service: "{{ 'nfs-kernel-server' if ansible_os_family == 'Debian' else 'nfs-server' }}"
+
 - name: Detect sensors
   command: sensors-detect --auto
   changed_when: true
