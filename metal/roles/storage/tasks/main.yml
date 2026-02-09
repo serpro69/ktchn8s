@@ -30,21 +30,9 @@
   changed_when: true
 
 - name: Set facts for mount directories
-  set_fact: # noqa jinja[spacing]
-    disk_directories: |-
-      {% set dirs = [] %}
-      {% for drive in data_drives %}
-        {% set dir = '/mnt/data' + loop.index|string %}
-        {% do dirs.append(dir) %}
-      {% endfor %}
-      {{ dirs }}
-    parity_directories: |-
-      {% set dirs = [] %}
-      {% for drive in parity_drives %}
-        {% set dir = '/mnt/parity' + loop.index|string %}
-        {% do dirs.append(dir) %}
-      {% endfor %}
-      {{ dirs }}
+  set_fact:
+    disk_directories: "{{ range(1, data_drives | length + 1) | map('regex_replace', '^', '/mnt/data') | list }}"
+    parity_directories: "{{ range(1, parity_drives | length + 1) | map('regex_replace', '^', '/mnt/parity') | list }}"
 
 - name: Validate disk health
   include_tasks: disk_health.yml
