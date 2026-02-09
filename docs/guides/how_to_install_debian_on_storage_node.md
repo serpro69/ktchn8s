@@ -115,3 +115,16 @@ Before running the storage playbook (`ansible-playbook -i inventory.sh storage.y
 - [ ] APT sources configured (for package installation)
 - [ ] Data drives are physically installed and visible: `lsblk` shows the expected disks
 - [ ] Data drives are partitioned (partition IDs match the inventory in `metal/inventory/metal.yml`)
+- [ ] Controller is reachable from the homelab network (see firewall warning below)
+
+!!! warning "Firewall: SSH lockout risk"
+    The storage playbook configures UFW with a **default deny incoming** policy. Only networks listed in `firewall_allowed_networks` (defaults to `10.10.10.0/24`) are allowed SSH and NFS access. If your Ansible controller is on a different subnet (e.g. `192.168.1.0/24`), **UFW will block SSH and you will be locked out** of the storage node.
+
+    To avoid this, either:
+
+    - Run the playbook from a machine on the `10.10.10.0/24` network, **or**
+    - Add your controller's subnet to `firewall_allowed_networks` when running the playbook:
+
+        ```bash
+        make -C metal storage ANSIBLE_ARGS='-e "firewall_allowed_networks=[\"10.10.10.0/24\",\"192.168.1.0/24\"]"'
+        ```
