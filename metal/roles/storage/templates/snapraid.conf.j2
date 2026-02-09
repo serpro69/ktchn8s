@@ -44,5 +44,7 @@ exclude .AppleDB
 # Autosave
 autosave 500
 
-# Pool directory (mergerfs mount)
-pool /mnt/storage
+# Pool directory for 'snapraid pool' command (creates read-only symlink view).
+# Disabled because mergerfs already provides a unified read-write view at /mnt/storage.
+# Uncomment and run 'snapraid pool' manually if you need a separate read-only view.
+# pool /mnt/snapraid-pool
