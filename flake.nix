@@ -2,7 +2,7 @@
   description = "ktchn8s Lab Shell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -60,7 +60,7 @@
             # k8s tools
             dyff
             k9s
-            kube3d
+            k3d
             kubectl
             kubernetes-helm
             kustomize
