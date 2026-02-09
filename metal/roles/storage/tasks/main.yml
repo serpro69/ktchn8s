@@ -12,15 +12,17 @@
       # hardware monitoring
       - smartmontools
 
-- name: Load drivetemp module
-  command: modprobe drivetemp
-  changed_when: true
-
 - name: Persist drivetemp across reboots
   copy:
     content: "drivetemp\n"
     dest: /etc/modules-load.d/drivetemp.conf
     mode: "0644"
+  register: drivetemp
+
+- name: Load drivetemp module
+  command: modprobe drivetemp
+  changed_when: true
+  when: drivetemp is changed
 
 - include_tasks: setup_redhat.yml # noqa name[missing]
   when: ansible_os_family == 'RedHat'

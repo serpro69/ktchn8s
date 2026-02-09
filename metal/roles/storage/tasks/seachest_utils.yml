@@ -43,6 +43,8 @@
   set_fact:
     disk_health_report: "{{ disk_health_report + [parsed_entry] }}"
   loop: "{{ seachest_results.results }}"
+  loop_control:
+    extended: true
   when: item.rc == 0
   vars:
     # Parse the seachest output format (text-based)
