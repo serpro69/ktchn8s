@@ -70,3 +70,6 @@ snapraid_maintenance:
   # Content file backups
   content_backup_enabled: true
   content_backup_count: 5 # Keep last N backups
+
+# Set to true (e.g. via cli: '-e upgrade_packages=true') to upgrade all packages on the host
+upgrade_packages: false
