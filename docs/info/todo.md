@@ -190,7 +190,7 @@ title: ToDo
 
 - [ ] Setup pi-hole on the cluster
 
-- [ ] NFS Optimizations
+- [ ] Storage Node / NFS Optimizations
   - NFS mount monitoring/health check on K8s side
     There's no monitoring or alerting for NFS mount failures on the K8s side. If the NAS goes down, pods will hang on NFS operations. This is a common NFS issue. Consider adding:
     - NFS mount soft option (instead of default hard) for timeout behavior
@@ -202,3 +202,5 @@ title: ToDo
     This is optional and premature optimization, but should be kept in mind.
   - fstab entry cleanup
     - If you remove a data drive from inventory, the fstab entry persists (uses lineinfile with state: present, never absent). Not a concern for initial deployment.
+  - Use `nftables` instead of `ufw` on Debian
+    - Add equivalent `firewalld` tasks to properly support RedHat

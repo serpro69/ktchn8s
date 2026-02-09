@@ -43,6 +43,17 @@
       changed_when: false
       failed_when: false
 
+    - name: Configure TCP ports in firewall
+      ufw:
+        rule: allow
+        src: "{{ item.0 }}"
+        port: "{{ item.1 }}"
+        proto: tcp
+        comment: "{{ item.1 }}/tcp"
+      loop: "{{ firewall_allowed_networks | product(['22']) | list }}"
+      loop_control:
+        label: "{{ item.0 }} -> {{ item.1 }}/tcp"
+
     - name: Configure NFS TCP ports in firewall
       ufw:
         rule: allow
@@ -50,7 +61,7 @@
         port: "{{ item.1 }}"
         proto: tcp
         comment: "NFS {{ item.1 }}/tcp"
-      loop: "{{ nfs_allowed_networks | product(['22', '111', '2049', '20048']) | list }}"
+      loop: "{{ firewall_allowed_networks | product(['111', '2049', '20048']) | list }}"
       loop_control:
         label: "{{ item.0 }} -> {{ item.1 }}/tcp"
 
@@ -62,7 +73,7 @@
         proto: udp
         comment: "NFS {{ item.1 }}/udp"
       # UDP 2049 to support potential NFSv3 clients
-      loop: "{{ nfs_allowed_networks | product(['111', '2049']) | list }}"
+      loop: "{{ firewall_allowed_networks | product(['111', '2049']) | list }}"
       loop_control:
         label: "{{ item.0 }} -> {{ item.1 }}/udp"
 
