@@ -8,7 +8,7 @@
 - name: Ensure base packages
   apt:
     name:
-      # base utils
+      # temp 'apt' module dependency for installing .deb
       - xz-utils
       # hardware monitoring
       - lm-sensors
@@ -35,3 +35,9 @@
   apt:
     deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
     state: present
+
+- name: Clean up temporary packages
+  apt:
+    name:
+      - xz-utils
+    state: absent
