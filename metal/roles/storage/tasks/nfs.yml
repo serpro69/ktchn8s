@@ -20,14 +20,38 @@
     state: directory
   loop: "{{ storage_dirs }}"
 
-- name: Enable and start NFS services
+- name: Ensure nfs.conf.d include directory exists
+  file:
+    path: /etc/nfs.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Disable NFSv3 (serve NFSv4 only)
+  copy:
+    content: |
+      [nfsd]
+      vers3=n
+      vers4=y
+      vers4.1=y
+      vers4.2=y
+    dest: /etc/nfs.conf.d/local.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nfs server
+
+- name: Disable rpcbind (not needed for NFSv4-only)
   service:
-    name: "{{ item }}"
+    name: rpcbind
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Enable and start NFS server
+  service:
+    name: "{{ nfs_server_service }}"
     state: started
     enabled: true
-  loop:
-    - "{{ nfs_server_service }}"
-    - rpcbind
 
 - name: Configure firewall for NFS
   include_tasks: nfs_firewall.yml

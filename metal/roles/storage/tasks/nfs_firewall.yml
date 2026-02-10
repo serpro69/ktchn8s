@@ -56,27 +56,16 @@
       loop_control:
         label: "{{ item }} -> 22/tcp"
 
-    - name: Allow NFS TCP ports
+    - name: Allow NFSv4 port
       ufw:
         rule: allow
-        src: "{{ item.0 }}"
-        port: "{{ item.1 }}"
+        src: "{{ item }}"
+        port: "2049"
         proto: tcp
-        comment: "NFS {{ item.1 }}/tcp"
-      loop: "{{ firewall_allowed_networks | product(['111', '2049', '20048']) | list }}"
+        comment: "NFSv4 2049/tcp"
+      loop: "{{ firewall_allowed_networks }}"
       loop_control:
-        label: "{{ item.0 }} -> {{ item.1 }}/tcp"
-
-    - name: Allow NFS UDP ports
-      ufw:
-        rule: allow
-        src: "{{ item.0 }}"
-        port: "{{ item.1 }}"
-        proto: udp
-        comment: "NFS {{ item.1 }}/udp"
-      loop: "{{ firewall_allowed_networks | product(['111', '2049']) | list }}"
-      loop_control:
-        label: "{{ item.0 }} -> {{ item.1 }}/udp"
+        label: "{{ item }} -> 2049/tcp"
 
     - name: Enable UFW if not active
       ufw:
@@ -93,22 +82,21 @@
         msg: "{{ ufw_rules.stdout_lines }}"
       when: ufw_rules.stdout_lines is defined
 
-    - name: Verify NFS firewall rules
+    - name: Verify NFSv4 firewall rule
       shell: |
         set -o pipefail
-        ufw status | grep -E '(111|2049|20048)'
+        ufw status | grep '2049'
       register: nfs_ports_check
       changed_when: false
       failed_when: false
 
-    - name: Assert NFS firewall rules are present
+    - name: Assert NFSv4 firewall rule is present
       assert:
         that:
           - nfs_ports_check.rc == 0
-          - "'111' in nfs_ports_check.stdout"
           - "'2049' in nfs_ports_check.stdout"
-        success_msg: "NFS firewall rules are properly configured"
-        fail_msg: "NFS firewall rules are missing or incomplete"
+        success_msg: "NFSv4 firewall rule is properly configured"
+        fail_msg: "NFSv4 firewall rule (2049/tcp) is missing"
 
 - name: Warn if UFW is not available
   debug:
