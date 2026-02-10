@@ -93,7 +93,7 @@
         mode: "0755"
 
     - name: Test mount NFS export locally # noqa command-instead-of-module
-      command: "mount -t nfs localhost:/mnt/storage/Temp /tmp/nfs_test_mount"
+      command: "mount -t nfs {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_test_mount"
       register: test_mount
       changed_when: false
       failed_when: false
@@ -108,7 +108,7 @@
 
     - name: Test read from NFS mount
       command: cat /tmp/nfs_test_mount/.nfs_test_file
-      when: test_write is succeeded
+      when: test_mount.rc == 0
       register: test_read
       changed_when: false
 
@@ -116,7 +116,7 @@
       file:
         path: /tmp/nfs_test_mount/.nfs_test_file
         state: absent
-      when: test_write is succeeded
+      when: test_mount.rc == 0
 
     - name: Unmount test NFS share
       command: umount /tmp/nfs_test_mount
