@@ -1,30 +1,34 @@
 ---
-- name: Create mergerfs mount configuration
+- name: Build mergerfs mount options
   set_fact:
     mergerfs_branches: "{{ disk_directories | join(':') }}"
-    mergerfs_options: "defaults,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
-    # TODO: I think nonempty is removed in FUSE3?
-    # mergerfs_options: "defaults,nonempty,allow_other,use_ino,cache.files=partial,dropcacheonclose=true,category.create=mfs"
+    mergerfs_systemd_requires: "{{ disk_directories | map('regex_replace', '^/', '') | map('regex_replace', '/', '-') | map('regex_replace', '$', '.mount') | list }}" # noqa yaml[line-length]
 
-- name: Add mergerfs mount to fstab
-  lineinfile:
-    path: /etc/fstab
-    line: "{{ mergerfs_branches }} /mnt/storage fuse.mergerfs {{ mergerfs_options }} 0 0"
-    state: present
+- name: Build mergerfs fstab options
+  set_fact:
+    mergerfs_options: >-
+      defaults,allow_other,use_ino,cache.files=off,category.create=epmfs,{{
+        mergerfs_systemd_requires | map('regex_replace', '^', 'x-systemd.requires=') | join(',')
+      }}
+
+- name: Mount mergerfs pool
+  mount:
+    path: /mnt/storage
+    src: "{{ mergerfs_branches }}"
+    fstype: fuse.mergerfs
+    opts: "{{ mergerfs_options }}"
+    # The passno is the 6th field in /etc/fstab. It tells fsck (filesystem check at boot) the order to check filesystems:
+    # - 0 — don't check
+    # - 1 — check first (root filesystem)
+    # - 2 — check after root
+    #
+    # For FUSE filesystems like mergerfs, there is no fsck.fuse.mergerfs — the kernel doesn't know how to check them.
+    # If passno were non-zero, the boot process would attempt to fsck the FUSE mount and either fail or stall.
+    # In practice, ansible.posix.mount defaults passno to 0 when unspecified,
+    # so this is more about explicitness and consistency.
+    passno: "0"
+    state: mounted
     backup: true
-  notify: mount mergerfs
-
-- name: Check if mergerfs is already mounted
-  command: mountpoint -q /mnt/storage
-  register: mergerfs_already_mounted
-  failed_when: false
-  changed_when: false
-
-- name: Mount mergerfs pool # noqa command-instead-of-module no-changed-when
-  command: mount /mnt/storage
-  when: mergerfs_already_mounted.rc != 0
-  register: mergerfs_mount_result
 
 - name: Validate mergerfs mount
   include_tasks: mount_validation.yml
-  when: mergerfs_mount_result is changed or mergerfs_already_mounted.rc == 0
