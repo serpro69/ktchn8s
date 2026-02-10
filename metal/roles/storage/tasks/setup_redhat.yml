@@ -1,8 +1,16 @@
 ---
-- name: Download rpm
+- name: Download mergerfs rpm
   get_url:
     url: "{{ mergerfs_url_rpm }}"
-    dest: "/tmp/mergerfs-{{ mergerfs_ver }}.rpm"
+    dest: "/tmp/mergerfs-{{ mergerfs_version }}.rpm"
+    mode: "0755"
+
+- name: Copy snapraid .rpm
+  copy:
+    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.rpm
+    dest: /tmp/
+    owner: root
+    group: root
     mode: "0755"
 
 - name: Set fastestmirror=True for dnf
@@ -27,14 +35,14 @@
       - lm_sensors
       # nfs
       - nfs-utils
-      # snapraid build dependencies
-      - gcc
-      - make
-      - git
-      - wget
     state: present
 
 - name: Install mergerfs
   dnf:
-    name: "/tmp/mergerfs-{{ mergerfs_ver }}.rpm"
+    name: /tmp/mergerfs-{{ mergerfs_version }}.rpm
+    state: present
+
+- name: Install snapraid
+  dnf:
+    name: "/tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.rpm"
     state: present
