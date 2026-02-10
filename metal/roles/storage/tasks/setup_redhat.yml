@@ -29,8 +29,6 @@
 - name: Ensure required packages
   dnf:
     name:
-      # base utils
-      - xz
       # hardware monitoring
       - lm_sensors
       # nfs
