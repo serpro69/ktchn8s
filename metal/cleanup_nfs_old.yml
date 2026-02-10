@@ -1,0 +1,155 @@
+---
+# One-shot playbook: undo nfs_old state so the nfs branch can be applied cleanly.
+# Safe to run multiple times (idempotent).
+# Delete this file after use.
+- name: Clean up nfs_old state from yggdrasil
+  hosts: nas
+  gather_facts: true
+  become: true
+  tasks:
+    # --- Phase 1: Clean up failed NFS validation artifacts ---
+    # The local NFS test mount is likely still active on yggdrasil.
+    # Must unmount BEFORE touching mergerfs.
+
+    - name: Check if NFS test mount is still mounted
+      command: mountpoint -q /tmp/nfs_test_mount
+      register: test_mount_check
+      failed_when: false
+      changed_when: false
+
+    - name: Unmount stale NFS test mount
+      command: umount -f /tmp/nfs_test_mount
+      when: test_mount_check.rc == 0
+      register: nfs_umount
+      failed_when: false
+
+    - name: Lazy unmount NFS test mount if force failed
+      command: umount -l /tmp/nfs_test_mount
+      when:
+        - test_mount_check.rc == 0
+        - nfs_umount.rc != 0
+
+    - name: Remove NFS test mount directory
+      file:
+        path: /tmp/nfs_test_mount
+        state: absent
+
+    - name: Remove NFS test file from storage
+      file:
+        path: /mnt/storage/Temp/.nfs_test_file
+        state: absent
+
+    # --- Phase 2: Unmount mergerfs ---
+    # Must unmount before data drives (mergerfs is a FUSE overlay on top)
+
+    - name: Check if mergerfs is mounted
+      command: mountpoint -q /mnt/storage
+      register: mergerfs_mounted
+      failed_when: false
+      changed_when: false
+
+    - name: Unmount mergerfs pool
+      command: umount /mnt/storage
+      when: mergerfs_mounted.rc == 0
+
+    # --- Phase 3: Remove mergerfs fstab entry ---
+    # The nfs branch uses the mount module with different options
+    # (cache.files=off, category.create=epmfs, x-systemd.requires=...).
+    # Remove the old lineinfile entry to guarantee a clean state.
+
+    - name: Remove old mergerfs fstab entry
+      lineinfile:
+        path: /etc/fstab
+        regexp: '\s+/mnt/storage\s+fuse\.mergerfs\s+'
+        state: absent
+        backup: true
+
+    # --- Phase 4: Clean stale UFW firewall rules ---
+    # The nfs branch is NFSv4-only (2049/tcp). Remove NFSv3 ports
+    # that the nfs branch will never manage.
+
+    - name: Check if UFW is available
+      command: which ufw
+      register: ufw_check
+      failed_when: false
+      changed_when: false
+
+    - name: Remove stale NFSv3 firewall rules
+      when: ufw_check.rc == 0
+      block:
+        - name: Remove rpcbind TCP rule (111/tcp)
+          ufw:
+            rule: allow
+            src: "10.10.10.0/24"
+            port: "111"
+            proto: tcp
+            delete: true
+          failed_when: false
+
+        - name: Remove rpcbind UDP rule (111/udp)
+          ufw:
+            rule: allow
+            src: "10.10.10.0/24"
+            port: "111"
+            proto: udp
+            delete: true
+          failed_when: false
+
+        - name: Remove mountd TCP rule (20048/tcp)
+          ufw:
+            rule: allow
+            src: "10.10.10.0/24"
+            port: "20048"
+            proto: tcp
+            delete: true
+          failed_when: false
+
+        - name: Remove NFS UDP rule (2049/udp)
+          ufw:
+            rule: allow
+            src: "10.10.10.0/24"
+            port: "2049"
+            proto: udp
+            delete: true
+          failed_when: false
+
+    # --- Phase 5: Remove snapraid build dependencies ---
+    # nfs_old installed these for building snapraid from source.
+    # The nfs branch installs snapraid from a .deb file instead.
+
+    - name: Remove source-built snapraid binary
+      file:
+        path: /usr/local/bin/snapraid
+        state: absent
+
+    - name: Remove snapraid build dependencies
+      apt:
+        name:
+          - build-essential
+          - git
+          - wget
+        state: absent
+        autoremove: true
+      when: ansible_os_family == 'Debian'
+
+    # --- Phase 6: Verify clean state ---
+
+    - name: Show final fstab
+      command: cat /etc/fstab
+      register: final_fstab
+      changed_when: false
+
+    - name: Display fstab
+      debug:
+        msg: "{{ final_fstab.stdout_lines }}"
+
+    - name: Show UFW status
+      command: ufw status numbered
+      register: ufw_final
+      changed_when: false
+      failed_when: false
+
+    - name: Display UFW rules
+      debug:
+        msg: "{{ ufw_final.stdout_lines }}"
+      when: ufw_final.rc == 0
