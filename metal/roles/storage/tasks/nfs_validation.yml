@@ -1,5 +1,5 @@
 ---
-# NFS Export Validation
+# NFS Export Validation (NFSv4-only)
 # Verifies NFS exports are properly configured and accessible
 
 # =================================================================
@@ -19,29 +19,16 @@
     fail_msg: "NFS server service is not running"
     success_msg: "NFS server service is active"
 
-- name: Check rpcbind service status
-  systemd:
-    name: rpcbind
-  register: rpcbind_status
-  failed_when: false
-
-- name: Verify rpcbind service is running
-  assert:
-    that:
-      - rpcbind_status.status.ActiveState == "active"
-    fail_msg: "rpcbind service is not running"
-    success_msg: "rpcbind service is active"
-
-- name: Verify NFS exports are visible
-  command: showmount -e localhost
-  register: showmount_result
+- name: Verify NFS exports are configured
+  command: exportfs -v
+  register: exportfs_result
   changed_when: false
-  failed_when: showmount_result.rc != 0
+  failed_when: exportfs_result.rc != 0
 
 - name: Verify /mnt/storage export is present
   assert:
     that:
-      - "'/mnt/storage' in showmount_result.stdout"
+      - "'/mnt/storage' in exportfs_result.stdout"
     fail_msg: "NFS export missing: /mnt/storage"
     success_msg: "NFS export present: /mnt/storage"
 
@@ -54,22 +41,22 @@
 - name: Verify NFS firewall rules (if ufw is active)
   when: "'Status: active' in ufw_status.stdout"
   block:
-    - name: Check NFS port firewall rules
+    - name: Check NFSv4 port firewall rule
       shell: |
         set -o pipefail
-        ufw status numbered | grep -E '(111|2049|20048)'
+        ufw status numbered | grep '2049'
       register: firewall_rules
       changed_when: false
       failed_when: false
 
     - name: Display firewall status
       debug:
-        msg: "NFS firewall rules are configured"
+        msg: "NFSv4 firewall rule is configured"
       when: firewall_rules.rc == 0
 
     - name: Warn if firewall rules missing
       debug:
-        msg: "WARNING: NFS firewall rules may not be configured correctly"
+        msg: "WARNING: NFSv4 firewall rule (2049/tcp) may not be configured correctly"
       when: firewall_rules.rc != 0
 
 - name: Test local NFS mount capability
@@ -81,7 +68,7 @@
         mode: "0755"
 
     - name: Test mount NFS export locally # noqa command-instead-of-module
-      command: "mount -t nfs {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_test_mount"
+      command: "mount -t nfs4 {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_test_mount"
       register: test_mount
       changed_when: false
       failed_when: false
@@ -128,7 +115,7 @@
 # =================================================================
 # REMOTE NFS VALIDATION (from controller)
 # =================================================================
-# Only tests network reachability and export visibility via showmount.
+# Tests NFSv4 port reachability from the controller.
 # The actual mount/write/read test is covered by the local NFS test above
 # and the K8s pod test in k8s_validation.yml.
 
@@ -136,26 +123,20 @@
   delegate_to: localhost
   become: false
   block:
-    - name: Verify NFS exports visible from controller
-      command: "showmount -e {{ ansible_host }}"
-      register: remote_showmount
-      changed_when: false
+    - name: Verify NFSv4 port is reachable from controller
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 2049
+        timeout: 10
+      register: nfs_port_check
       failed_when: false
 
-    - name: Verify remote showmount succeeded
+    - name: Verify NFSv4 connectivity
       assert:
         that:
-          - remote_showmount.rc == 0
-        fail_msg: "Cannot reach NFS exports from controller - check firewall and network connectivity"
-        success_msg: "NFS exports visible from controller"
-
-    - name: Verify /mnt/storage export visible from controller
-      assert:
-        that:
-          - "'/mnt/storage' in remote_showmount.stdout"
-        fail_msg: "NFS export not visible from controller: /mnt/storage"
-        success_msg: "NFS export visible from controller: /mnt/storage"
-      when: remote_showmount.rc == 0
+          - nfs_port_check is succeeded
+        fail_msg: "Cannot reach NFSv4 port (2049) from controller - check firewall and network connectivity"
+        success_msg: "NFSv4 port reachable from controller"
 
 - name: NFS validation complete
   debug:
