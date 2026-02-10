@@ -44,14 +44,6 @@
   include_tasks: disks.yml
   when: data_drives is defined and data_drives | length > 0
 
-- name: Ensure storage mountpoint directory
-  file:
-    path: /mnt/storage
-    state: directory
-    mode: "0755"
-    owner: root
-    group: root
-
 - name: Include mergerfs configuration
   include_tasks: mergerfs.yml
   when:
