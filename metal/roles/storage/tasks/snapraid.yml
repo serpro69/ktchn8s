@@ -9,43 +9,6 @@
     fail_msg: "Cannot configure snapraid: parity_drives or data_drives is empty or undefined"
     success_msg: "Parity drives validation passed: {{ parity_drives | length }} parity drive(s), {{ data_drives | length }} data drive(s)"
 
-- name: Create snapraid build directory
-  tempfile:
-    state: directory
-  register: snapraid_build_dir
-
-- name: Download snapraid source
-  get_url:
-    url: "{{ snapraid_url }}"
-    dest: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}.tar.gz"
-    mode: "0644"
-
-- name: Extract snapraid source
-  unarchive:
-    src: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}.tar.gz"
-    dest: "{{ snapraid_build_dir.path }}"
-    remote_src: true
-    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
-
-- name: Configure snapraid build
-  command: ./configure
-  args:
-    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
-    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}/Makefile"
-
-- name: Build snapraid
-  command: make -j{{ ansible_processor_vcpus }}
-  args:
-    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
-    creates: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}/snapraid"
-
-- name: Install snapraid
-  command: make install
-  args:
-    chdir: "{{ snapraid_build_dir.path }}/snapraid-{{ snapraid_version }}"
-    creates: /usr/local/bin/snapraid
-  become: true
-
 - name: Create snapraid configuration
   template:
     src: snapraid.conf.j2
@@ -258,8 +221,3 @@
     enabled: "{{ snapraid_maintenance.content_backup_enabled }}"
     daemon_reload: true
   when: snapraid_maintenance.content_backup_enabled
-
-- name: Cleanup build directory
-  file:
-    path: "{{ snapraid_build_dir.path }}"
-    state: absent
