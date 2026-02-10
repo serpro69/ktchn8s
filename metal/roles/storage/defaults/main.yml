@@ -3,7 +3,13 @@
 homelab_net_cidr: "10.10.10.0/24"
 
 # Default NFS export options
-default_nfs_options: "rw,sync,no_subtree_check,no_root_squash,insecure"
+default_nfs_options: "rw,sync,no_subtree_check,root_squash,insecure"
+
+# Anonymous uid/gid for root_squash mapping (squashed root becomes this user).
+# Set to match the uid/gid used by application pods (e.g. fsGroup) so that
+# root-running containers and kubelet fsGroup chown operations work correctly.
+nfs_anon_uid: 1000
+nfs_anon_gid: 1000
 
 # Firewall configuration
 manage_firewall: true # Set to false to skip firewall configuration
