@@ -32,10 +32,10 @@ You can have some (or all) of your persistent volumes provisioned on your NAS se
   +                interface: Gi0/4
   +            ansible_host: 10.10.10.30
   +            mac: aa:bb:cc:dd:ee:ff
-  +            data_drives:
+  +            data_drives: # NB! pre-partitioned
   +                - id: ata-ST18000NM000J-FOOBAR_ABCDEF-part1
   +                  brand: seagate
-  +            parity_drives: []
+  +            parity_drives: [] # NB! pre-partitioned
   +                - id: ata-ST18000NM000J-FOOBAR_0123456-part1
   +                  brand: seagate
   +            network_interface: eno1
@@ -78,6 +78,27 @@ You can have some (or all) of your persistent volumes provisioned on your NAS se
 ./apps/jellyfin/values.yaml:113:113,160:168
 --8<--
 ```
+
+## NFS Permissions and `root_squash`
+
+The NFS server is configured with `root_squash` (the NFS default). This means any process connecting as root (uid 0) from a K8s node is mapped to the anonymous user on the NFS server. Non-root users pass through unchanged.
+
+The anonymous uid/gid is configured via `nfs_anon_uid`/`nfs_anon_gid` (default `1000`) and should match the `fsGroup` used by your application pods. This ensures that:
+
+- **kubelet `fsGroup` chown** works correctly — the kubelet runs as root, so its chown calls are squashed to uid 1000, which matches the target group
+- **Root-running containers** (e.g., linuxserver.io images that start as root before dropping to `PUID`/`PGID`) create files owned by uid 1000 on the NFS server
+- **Non-root containers** running as uid 1000 can read/write files created by either path above
+
+Your pod spec should set `fsGroup` to match:
+
+```yaml
+spec:
+  securityContext:
+    fsGroup: 1000
+```
+
+!!! tip
+    If your applications use a different uid (e.g., 568 for some Helm charts), override `nfs_anon_uid` and `nfs_anon_gid` in your inventory to match.
 
 ## Reference
 
