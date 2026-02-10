@@ -15,14 +15,23 @@
       # nfs
       - nfs-kernel-server
       - nfs-common
-      # snapraid build dependencies
-      - build-essential
-      - git
-      - wget
     state: present
     update_cache: true
 
 - name: Install mergerfs
   apt:
     deb: "{{ mergerfs_url_deb }}"
+    state: present
+
+- name: Copy snapraid .deb
+  copy:
+    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
+    dest: /tmp/
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install snapraid
+  apt:
+    deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
     state: present
