@@ -12,47 +12,20 @@
       - "Data drives: {{ data_devices }}"
       - "Parity drives: {{ parity_devices }}"
 
-# TODO: should partitioning tasks be removed altogether?
-# The inventory currently contains partition IDs (the drives are pre-partitioned), so this code technically does nothing.
-# The question is, do we want to pre-partition the drives manually, or via this role? What are the downsides of each approach?
-#
-# - name: Check if drives are already partitioned
-#   command: "lsblk -no TYPE {{ item }}"
-#   loop: "{{ data_devices + parity_devices }}"
-#   register: partition_check
-#   changed_when: false
-#   failed_when: false
-#
-# - name: Partition drives (create single GPT partition)
-#   parted:
-#     device: "{{ item }}"
-#     number: 1
-#     state: present
-#     # part_type: primary
-#     part_start: 2048s
-#     part_end: 100%
-#     label: gpt
-#   loop: "{{ data_devices + parity_devices }}"
-#   # Only partition if no 'part' type found in lsblk output (disk is unpartitioned)
-#   when:
-#     - "'part' not in partition_check.results[ansible_loop.index0].stdout"
-#   loop_control:
-#     extended: true
-#   register: partition_result
-#
-# - name: Wait for partition devices to be available
-#   wait_for:
-#     path: "{{ item }}"
-#     timeout: 30
-#   loop: "{{ data_devices + parity_devices }}"
-#   when: partition_result is changed
-
-- name: Check for existing filesystems on partitions
+- name: Check for existing filesystems on data partitions
   command: "blkid {{ item }}"
-  loop: "{{ data_devices + parity_devices }}"
-  register: filesystem_check
+  loop: "{{ data_devices }}"
+  register: data_filesystem_check
   changed_when: false
   failed_when: false
+
+- name: Check for existing filesystems on parity partitions
+  command: "blkid {{ item }}"
+  loop: "{{ parity_devices }}"
+  register: parity_filesystem_check
+  changed_when: false
+  failed_when: false
+  when: parity_devices | length > 0
 
 - name: Format data drives with ext4
   filesystem:
@@ -63,9 +36,9 @@
   loop: "{{ data_devices }}"
   loop_control:
     extended: true
-  # Format only if: partition exists AND no filesystem detected
+  # Format only if: no filesystem detected
   when:
-    - filesystem_check.results[ansible_loop.index0].rc != 0
+    - data_filesystem_check.results[ansible_loop.index0].rc != 0
   register: data_format_result
 
 - name: Format parity drives with ext4
@@ -77,61 +50,34 @@
   loop: "{{ parity_devices }}"
   loop_control:
     extended: true
-  # Format only if: partition exists AND no filesystem detected
+  # Format only if: no filesystem detected
   when:
-    - filesystem_check.results[data_devices | length + ansible_loop.index0].rc != 0
+    - parity_filesystem_check.results[ansible_loop.index0].rc != 0
   register: parity_format_result
 
-- name: Create mount point directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-    owner: root
-    group: root
-  loop: "{{ disk_directories + parity_directories }}"
-
-- name: Generate fstab entries for data drives
-  set_fact:
-    data_fstab_entries: "{{ data_devices | zip(disk_directories) | map('join', ' ') | map('regex_replace', '$', ' ext4 defaults,noatime 0 2') | list }}"
-
-- name: Generate fstab entries for parity drives
-  set_fact:
-    parity_fstab_entries: "{{ parity_devices | zip(parity_directories) | map('join', ' ') | map('regex_replace', '$', ' ext4 defaults,noatime 0 2') | list }}"
-
-- name: Add data drives to fstab
-  lineinfile:
-    path: /etc/fstab
-    line: "{{ item }}"
-    state: present
+- name: Mount data drives
+  ansible.posix.mount:
+    path: "{{ item.1 }}"
+    src: "{{ item.0 }}"
+    fstype: ext4
+    opts: defaults,noatime
+    passno: "2"
+    state: mounted
     backup: true
-  loop: "{{ data_fstab_entries }}"
-  notify: mount data drives
+  loop: "{{ data_devices | zip(disk_directories) | list }}"
+  loop_control:
+    label: "{{ item.0 }} -> {{ item.1 }}"
 
-- name: Add parity drives to fstab
-  lineinfile:
-    path: /etc/fstab
-    line: "{{ item }}"
-    state: present
+- name: Mount parity drives
+  mount:
+    path: "{{ item.1 }}"
+    src: "{{ item.0 }}"
+    fstype: ext4
+    opts: defaults,noatime
+    passno: "2"
+    state: mounted
     backup: true
-  loop: "{{ parity_fstab_entries }}"
-  notify: mount parity drives
-
-- name: Mount all drives # noqa command-instead-of-module
-  command: mount -a
-  changed_when: false
-
-- name: Verify data drive mounts
-  command: "mountpoint -q {{ item }}"
-  loop: "{{ disk_directories }}"
-  register: data_mount_verification
-  failed_when: data_mount_verification.rc != 0
-  changed_when: false
-
-- name: Verify parity drive mounts
-  command: "mountpoint -q {{ item }}"
-  loop: "{{ parity_directories }}"
-  register: parity_mount_verification
-  failed_when: parity_mount_verification.rc != 0
-  changed_when: false
-  when: parity_directories is defined and parity_directories | length > 0
+  loop: "{{ parity_devices | zip(parity_directories) | list }}"
+  loop_control:
+    label: "{{ item.0 }} -> {{ item.1 }}"
+  when: parity_devices | length > 0
