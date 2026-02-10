@@ -41,6 +41,9 @@
           spec:
             containers:
             - name: nfs-test
+              # for a short-lived validation pod that just runs echo and cat,
+              # busybox is stable enough that version differences are negligible,
+              # so using latest is safe
               image: busybox:latest
               command: ["/bin/sh", "-c"]
               args:
@@ -50,7 +53,6 @@
                   cat /mnt/nfs/.k8s_nfs_test &&
                   rm /mnt/nfs/.k8s_nfs_test &&
                   echo "NFS test passed!" &&
-                  sleep 10
               volumeMounts:
               - name: nfs-volume
                 mountPath: /mnt/nfs
@@ -106,7 +108,9 @@
           - "'NFS test passed!' in pod_logs.stdout"
         success_msg: "Kubernetes NFS connectivity test passed"
         fail_msg: "Kubernetes NFS connectivity test failed"
-      when: pod_logs.rc == 0
+      # The when condition makes the assert skip when the pod fails.
+      # So if the pod fails to get logs (rc != 0), the assert is skipped and the playbook reports success.
+      # when: pod_logs.rc == 0
 
 - name: Skip Kubernetes test if kubectl not available
   debug:
