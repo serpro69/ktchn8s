@@ -1,24 +1,4 @@
 ---
-- name: mount data drives # noqa: command-instead-of-module no-changed-when
-  command: mount -a
-  listen: mount data drives
-
-- name: verify data drives mounted # noqa: no-changed-when
-  command: "mountpoint -q {{ item }}"
-  loop: "{{ disk_directories }}"
-  listen: mount data drives
-  when: disk_directories is defined
-
-- name: mount parity drives # noqa: command-instead-of-module no-changed-when
-  command: mount -a
-  listen: mount parity drives
-
-- name: verify parity drives mounted # noqa: no-changed-when
-  command: "mountpoint -q {{ item }}"
-  loop: "{{ parity_directories }}"
-  listen: mount parity drives
-  when: parity_directories is defined and parity_directories | length > 0
-
 - name: reload systemd
   systemd:
     daemon_reload: true
