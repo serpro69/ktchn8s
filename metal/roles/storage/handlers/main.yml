@@ -14,14 +14,6 @@
     state: restarted
     enabled: true
 
-- name: mount mergerfs # noqa: command-instead-of-module no-changed-when
-  command: mount /mnt/storage
-  listen: mount mergerfs
-
-- name: verify mergerfs mounted # noqa: no-changed-when
-  command: mountpoint -q /mnt/storage
-  listen: mount mergerfs
-
 - name: initial snapraid sync
   include_tasks: snapraid_initial_sync.yml
   listen: initial snapraid sync
