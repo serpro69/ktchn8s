@@ -2,10 +2,6 @@
 # NFS Firewall Configuration
 # Configures UFW firewall rules for NFS services
 
-# =================================================================
-# FIREWALL DETECTION AND SETUP
-# =================================================================
-
 - name: Check if UFW is installed
   command: which ufw
   register: ufw_check
@@ -30,11 +26,7 @@
   debug:
     msg: "UFW is {{ 'available' if ufw_available.rc == 0 else 'not available' }}"
 
-# =================================================================
-# UFW CONFIGURATION
-# =================================================================
-
-- name: Configure UFW firewall rules
+- name: Configure and validate UFW firewall
   when: ufw_available.rc == 0
   block:
     - name: Check UFW status
@@ -53,18 +45,18 @@
         direction: outgoing
         policy: allow
 
-    - name: Configure TCP ports in firewall
+    - name: Allow SSH access
       ufw:
         rule: allow
-        src: "{{ item.0 }}"
-        port: "{{ item.1 }}"
+        src: "{{ item }}"
+        port: "22"
         proto: tcp
-        comment: "{{ item.1 }}/tcp"
-      loop: "{{ firewall_allowed_networks | product(['22']) | list }}"
+        comment: "SSH 22/tcp"
+      loop: "{{ firewall_allowed_networks }}"
       loop_control:
-        label: "{{ item.0 }} -> {{ item.1 }}/tcp"
+        label: "{{ item }} -> 22/tcp"
 
-    - name: Configure NFS TCP ports in firewall
+    - name: Allow NFS TCP ports
       ufw:
         rule: allow
         src: "{{ item.0 }}"
@@ -75,17 +67,21 @@
       loop_control:
         label: "{{ item.0 }} -> {{ item.1 }}/tcp"
 
-    - name: Configure NFS UDP ports in firewall
+    - name: Allow NFS UDP ports
       ufw:
         rule: allow
         src: "{{ item.0 }}"
         port: "{{ item.1 }}"
         proto: udp
         comment: "NFS {{ item.1 }}/udp"
-      # UDP 2049 to support potential NFSv3 clients
       loop: "{{ firewall_allowed_networks | product(['111', '2049']) | list }}"
       loop_control:
         label: "{{ item.0 }} -> {{ item.1 }}/udp"
+
+    - name: Enable UFW if not active
+      ufw:
+        state: enabled
+      when: "'Status: active' not in ufw_status.stdout"
 
     - name: Display firewall rules
       command: ufw status numbered
@@ -97,20 +93,7 @@
         msg: "{{ ufw_rules.stdout_lines }}"
       when: ufw_rules.stdout_lines is defined
 
-    - name: Enable UFW if not active
-      ufw:
-        state: enabled
-      when: "'Status: active' not in ufw_status.stdout"
-      register: ufw_enable
-
-# =================================================================
-# FIREWALL VALIDATION
-# =================================================================
-
-- name: Validate firewall allows NFS traffic
-  when: ufw_available.rc == 0
-  block:
-    - name: Check if NFS ports are allowed
+    - name: Verify NFS firewall rules
       shell: |
         set -o pipefail
         ufw status | grep -E '(111|2049|20048)'
@@ -118,7 +101,7 @@
       changed_when: false
       failed_when: false
 
-    - name: Verify NFS firewall rules
+    - name: Assert NFS firewall rules are present
       assert:
         that:
           - nfs_ports_check.rc == 0

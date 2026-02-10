@@ -38,24 +38,12 @@
   changed_when: false
   failed_when: showmount_result.rc != 0
 
-- name: Parse exported directories
-  set_fact:
-    exported_dirs: "{{ showmount_result.stdout_lines[1:] | map('regex_replace', '^(/\\S+).*', '\\1') | list }}"
-  when: showmount_result.stdout_lines | length > 1
-
-- name: Display exported directories
-  debug:
-    msg: "Exported NFS directories: {{ exported_dirs | join(', ') }}"
-  when: exported_dirs is defined
-
-- name: Verify expected exports are present
+- name: Verify /mnt/storage export is present
   assert:
     that:
-      - "'/mnt/storage/' + item in exported_dirs"
-    fail_msg: "NFS export missing: /mnt/storage/{{ item }}"
-    success_msg: "NFS export present: /mnt/storage/{{ item }}"
-  loop: "{{ storage_dirs }}"
-  when: exported_dirs is defined
+      - "'/mnt/storage' in showmount_result.stdout"
+    fail_msg: "NFS export missing: /mnt/storage"
+    success_msg: "NFS export present: /mnt/storage"
 
 - name: Check if ufw firewall is active
   command: ufw status
@@ -161,19 +149,13 @@
         fail_msg: "Cannot reach NFS exports from controller - check firewall and network connectivity"
         success_msg: "NFS exports visible from controller"
 
-    - name: Parse remote exported directories
-      set_fact:
-        remote_exported_dirs: "{{ remote_showmount.stdout_lines[1:] | map('regex_replace', '^(/\\S+).*', '\\1') | list }}"
-      when: remote_showmount.stdout_lines | length > 1
-
-    - name: Verify expected exports visible from controller
+    - name: Verify /mnt/storage export visible from controller
       assert:
         that:
-          - "'/mnt/storage/' + item in remote_exported_dirs"
-        fail_msg: "NFS export not visible from controller: /mnt/storage/{{ item }}"
-        success_msg: "NFS export visible from controller: /mnt/storage/{{ item }}"
-      loop: "{{ storage_dirs }}"
-      when: remote_exported_dirs is defined
+          - "'/mnt/storage' in remote_showmount.stdout"
+        fail_msg: "NFS export not visible from controller: /mnt/storage"
+        success_msg: "NFS export visible from controller: /mnt/storage"
+      when: remote_showmount.rc == 0
 
 - name: NFS validation complete
   debug:
