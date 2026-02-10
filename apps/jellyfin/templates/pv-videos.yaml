@@ -15,11 +15,21 @@ spec:
   storageClassName: nfs-csi-videos
   mountOptions:
     - nfsvers=4.1
+    # soft mount: return I/O errors instead of hanging indefinitely if the NAS goes down.
+    # Without this, pods freeze and can't be killed or rescheduled until the NAS returns.
+    - soft
+    - timeo=600 # timeout per retry in deciseconds (60s)
+    - retrans=2 # number of retries before returning error
+    # 1MB read/write buffers for media streaming throughput.
+    # Likely the negotiated default on modern kernels, but explicit to be deterministic.
+    - rsize=1048576
+    - wsize=1048576
   csi:
     driver: nfs.csi.k8s.io
-    # volumeHandle format: {nfs-server-address}#{sub-dir-name}#{share-name}
+    # volumeHandle format: {nfs-server-address}/{sub-dir-name}/{share-name}
     # make sure this value is unique for every share in the cluster
-    volumeHandle: {{ .Values.nfs.server }}/share/Videos
+    # (NB! volumeHandle format just needs to be unique, the format is arbitrary for consistency and readability)
+    volumeHandle: "{{ .Values.nfs.server }}/share/Videos"
     volumeAttributes:
-      server: {{ .Values.nfs.server }}
-      share: {{ .Values.nfs.basePath }}/Videos
+      server: "{{ .Values.nfs.server }}"
+      share: "{{ .Values.nfs.basePath }}/Videos"
