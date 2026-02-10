@@ -14,8 +14,8 @@
 - name: Set proper ownership for NFS shares
   file:
     path: "/mnt/storage/{{ item }}"
-    owner: root
-    group: root
+    owner: "{{ nfs_anon_uid }}"
+    group: "{{ nfs_anon_gid }}"
     mode: "0755"
     state: directory
   loop: "{{ storage_dirs }}"
