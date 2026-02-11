@@ -19,7 +19,7 @@ firewall_allowed_networks: # NB! The default will only allow connections (includ
   - "{{ homelab_net_cidr }}"
 
 # Network configuration (optional)
-configure_network: false
+configure_network: true
 storage_network:
   interface: "{{ network_interface | default('eth0') }}"
   address: "{{ ansible_host }}"
@@ -28,17 +28,6 @@ storage_network:
   dns_nameservers:
     - "10.10.10.1"
     - "1.1.1.1"
-
-# Disk health validation
-enable_disk_health_checks: false
-prefer_native_utils: false # Use smartctl by default, set true for brand-specific tools
-fail_on_unhealthy_drives: false # Warning only by default
-
-disk_health_thresholds:
-  max_temperature_celsius: 60
-  max_reallocated_sectors: 50
-  max_pending_sectors: 0
-  max_uncorrectable_errors: 0
 
 # Snapraid maintenance configuration
 snapraid_maintenance:
@@ -78,5 +67,21 @@ snapraid_maintenance:
   content_backup_enabled: true
   content_backup_count: 5 # Keep last N backups
 
+# Don't upgrade all packages on each run
 # Set to true (e.g. via cli: '-e upgrade_packages=true') to upgrade all packages on the host
 upgrade_packages: false
+
+# Healthchecks, validations, tests, etc.
+
+# Disk health validation
+enable_disk_health_checks: false
+prefer_native_utils: false # Use smartctl by default, set true for brand-specific tools
+fail_on_unhealthy_drives: false # Warning only by default
+disk_health_thresholds:
+  max_temperature_celsius: 60
+  max_reallocated_sectors: 50
+  max_pending_sectors: 0
+  max_uncorrectable_errors: 0
+
+# Run nfs validations
+validate_nfs: false
