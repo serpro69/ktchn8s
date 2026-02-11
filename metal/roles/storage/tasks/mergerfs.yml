@@ -7,7 +7,7 @@
 - name: Build mergerfs fstab options
   set_fact:
     mergerfs_options: >-
-      defaults,allow_other,use_ino,cache.files=off,category.create=epmfs,{{
+      defaults,allow_other,use_ino,cache.files=off,category.create=mfs,{{
         mergerfs_systemd_requires | map('regex_replace', '^', 'x-systemd.requires=') | join(',')
       }}
 
