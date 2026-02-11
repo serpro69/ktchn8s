@@ -5,7 +5,7 @@
     dest: /etc/network/interfaces
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
     backup: true
   when: ansible_os_family == 'Debian'
   notify: restart networking debian
@@ -16,7 +16,7 @@
     dest: "/etc/sysconfig/network-scripts/ifcfg-{{ storage_network.interface }}"
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
     backup: true
   when: ansible_os_family == 'RedHat'
   notify: restart networking redhat

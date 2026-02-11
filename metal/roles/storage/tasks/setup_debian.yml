@@ -8,8 +8,6 @@
 - name: Ensure base packages
   apt:
     name:
-      # temp 'apt' module dependency for installing .deb
-      - xz-utils
       # hardware monitoring
       - lm-sensors
       # nfs
@@ -30,6 +28,15 @@
     owner: root
     group: root
     mode: "0755"
+  register: snapraid_deb
+
+- name: Ensure apt module dependencies
+  apt:
+    name:
+      # temp 'apt' module dependency for installing .deb
+      - xz-utils
+    state: present
+  when: snapraid_deb is changed
 
 - name: Install snapraid
   apt:
