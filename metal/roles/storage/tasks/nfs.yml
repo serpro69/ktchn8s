@@ -62,6 +62,7 @@
 
 - name: Validate NFS exports
   include_tasks: nfs_validation.yml
+  when: validate_nfs
 
 - name: Validate NFS-K8S integration
   include_tasks:
@@ -69,3 +70,4 @@
     apply:
       become: false
       delegate_to: localhost
+  when: validate_nfs

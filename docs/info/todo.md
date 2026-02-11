@@ -208,3 +208,4 @@ title: ToDo
     - Parse the data in the systemd-sheduled script and put it to sqlite DB
     - Create a dashboard and alerts in grafana
     - Profit ...or not, depending on how lucky you are with the disks, but at least you'll be notified about issues
+  - With snapraid it's a good idea to **exclude _unimportant_ files that regularly change**. Jellyfin metadata for example.
