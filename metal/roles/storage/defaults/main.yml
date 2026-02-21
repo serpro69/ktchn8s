@@ -17,6 +17,7 @@ manage_firewall: true # Set to false to skip firewall configuration
 install_ufw: true # Install UFW if not present (only when manage_firewall=true)
 firewall_allowed_networks: # NB! The default will only allow connections (including SSH) from homelab network
   - "{{ homelab_net_cidr }}"
+  - "192.168.1.100/32" # 'serenity' workstation with reserved static IP on vlan2 (home network)
 
 # Network configuration (optional)
 configure_network: true
