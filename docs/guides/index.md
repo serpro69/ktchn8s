@@ -10,6 +10,7 @@ title: Guides
 
 ## How-To Guides
 
+- [Add DHCP Reservations](./how_to_add_dhcp_reservations.md)
 - [Add/Move/Remove a Node](./how_to_add_or_remove_nodes.md)
 - [Backup and Restore](./how_to_backup_and_restore.md)
 - [Configuring Minicom](./how_to_configure_minicom.md)
