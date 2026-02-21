@@ -4,7 +4,7 @@
 site_name: ktchn8s
 # ref: https://www.mkdocs.org/user-guide/configuration/#site_url
 # ref: https://www.mkdocs.org/user-guide/configuration/#environment-variables
-site_url: !ENV [MKDOCS_SITE_URL, 'http://localhost:8000']
+site_url: !ENV [MKDOCS_SITE_URL, "http://localhost:8000"]
 copyright: Copyright &copy; 2025 - present, serpro69
 
 repo_url: https://github.com/serpro69/ktchn8s
@@ -158,6 +158,7 @@ nav:
   - "☷ Guides":
       - guides/index.md
       - "☳ HowTo":
+          - guides/how_to_add_dhcp_reservations.md
           - guides/how_to_add_or_remove_nodes.md
           - guides/how_to_alternate_dns_setup.md
           - guides/how_to_backup_and_restore.md
