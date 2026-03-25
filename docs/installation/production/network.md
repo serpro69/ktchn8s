@@ -1056,6 +1056,10 @@ ip access-list extended ACL_WAN_INBOUND
  104 permit icmp any any time-exceeded
  105 remark -> Permit ICMP Unreachable (for Path MTU discovery etc.)
  105 permit icmp any any unreachable
+ ! Add return UDP rule for all protocols (not just DNS/NTP)
+ ! NAT provides the actual stateful protection for UDP
+ 106 remark -> Permit UDP responses to ephemeral ports (NAT drops unsolicited traffic)
+ 106 permit udp any any gt 1023
  199 remark --- END ---
 
  998 remark -> Deny and Log all other unsolicited Internet traffic
@@ -1280,4 +1284,34 @@ Run verifications after the network has been configured with:
 
 ```bash
 ./tests/network_stage4.sh
+```
+
+## Config Backups
+
+On the router/switch:
+
+```cisco
+! temporary enable scp server
+conf t
+ip scp server enable
+exit
+
+! backup startup configuration to a local file on bootflash
+cd bootflash:
+copy startup-config bootflash:/startup-config_stageX.bak
+```
+
+On the controller
+
+```bash
+scp muspell:bootflash:/startup-config_stageX.bak /tmp/muspell_startup-config_stageX.txt
+```
+
+On the router/switch:
+
+```cisco
+! disable scp server
+conf t
+no ip scp server enable
+exit
 ```
