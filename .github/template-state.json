@@ -6,6 +6,7 @@
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
-    "CC_MODEL": "opus"
+    "CC_MODEL": "opus",
+    "SERENA_INITIAL_PROMPT": ""
   }
 }
