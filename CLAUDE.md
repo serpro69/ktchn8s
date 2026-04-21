@@ -9,6 +9,7 @@ This is ktchn8s - a homelab Kubernetes cluster project that uses Infrastructure 
 ## Key Commands
 
 ### Development Environment
+
 ```bash
 # Enter Nix development shell (REQUIRED for all tooling - provides all necessary tools)
 nix develop
@@ -18,6 +19,7 @@ make ktchn8s
 ```
 
 ### Cluster Management
+
 ```bash
 # List all metal hosts from ansible inventory
 make inventory
@@ -42,6 +44,7 @@ make clean
 ```
 
 ### Layer-Specific Commands
+
 ```bash
 # Provision bare metal layer (PXE boot + OS install + K3s)
 make metal
@@ -60,6 +63,7 @@ make docs
 ```
 
 ### Testing & Validation
+
 ```bash
 # Run metal infrastructure tests (Cilium, LoadBalancer, etc.)
 ./tests/metal.sh
@@ -72,6 +76,7 @@ make -C tests filter=Smoke
 ```
 
 ### Node Management
+
 ```bash
 # Add nodes: Update metal/inventory/hosts.yml, then run
 make metal
@@ -90,6 +95,7 @@ make -C metal wipe SERVER=${NODE_NAME} DISK=/dev/nvme0n1
 The codebase follows a layered architecture with clear separation of concerns:
 
 ### Directory Structure
+
 - **`metal/`**: Ansible playbooks for bare metal provisioning
   - PXE boot server setup (ephemeral Docker containers for DHCP/TFTP/HTTP)
   - Fedora Server installation via kickstart
@@ -137,6 +143,7 @@ The codebase follows a layered architecture with clear separation of concerns:
   - `helm-diff.py`: Helm chart comparison
 
 ### Provisioning Flow
+
 1. **Metal Layer**:
    - Start ephemeral PXE server on controller
    - Wake nodes via WoL
@@ -157,6 +164,7 @@ The codebase follows a layered architecture with clear separation of concerns:
    - Configure ingress and external access
 
 ### Key Technologies
+
 - **Kubernetes**: K3s (lightweight distribution)
 - **CNI**: Cilium with eBPF (replaces kube-proxy, provides L2 LoadBalancer)
 - **GitOps**: ArgoCD (manages all K8s resources after bootstrap)
@@ -172,6 +180,7 @@ The codebase follows a layered architecture with clear separation of concerns:
 - **Monitoring**: Prometheus, Loki, Grafana stack
 
 ### Network Configuration
+
 - **VLANs**:
   - VLAN 2 (Home Network): `192.168.1.0/24`
   - VLAN 10 (Homelab/Lab Network): `10.10.10.0/24`
@@ -186,6 +195,7 @@ The codebase follows a layered architecture with clear separation of concerns:
 - **External Access**: Via Cloudflare tunnels (no port forwarding needed)
 
 ### Hardware Details
+
 - **Nodes**: Mix of Lenovo Tiny PCs (M720q, M70q Gen 2/3)
 - **Storage**: NAS with 6x18TB drives
 - **Network**: Cisco C1111 router, C3560 switch, Eero 6 AP
@@ -193,25 +203,30 @@ The codebase follows a layered architecture with clear separation of concerns:
 ## Important Concepts
 
 ### PXE Boot Process
+
 The project uses PXE boot for automated OS installation:
+
 1. Ephemeral PXE server provides DHCP, TFTP, and HTTP services
 2. Nodes boot from network, receive IP and boot instructions
 3. Kickstart file automates Fedora installation
 4. Post-install scripts configure networking and prepare for K3s
 
 ### Secrets Management
+
 - Global secrets stored in `global-secrets` namespace
 - External Secrets Operator syncs secrets to application namespaces
 - Secrets can be auto-generated or provided via Terraform
 - Uses Kubernetes provider (not external provider by default)
 
 ### Backup and Restore
+
 - Supports S3-compatible storage (AWS S3, Minio, etc.)
 - Restic for volume backups
 - Configured via `external/terraform.tfvars`
 - Run `make backup` to configure, `make restore` to restore
 
 ### Node Operations
+
 - Nodes can be added/removed dynamically
 - Inventory managed in `metal/inventory/hosts.yml`
 - Support for Wake-on-LAN for power management
@@ -228,8 +243,3 @@ The project uses PXE boot for automated OS installation:
 - The project assumes specific network configuration (VLANs, IP ranges) - adjust as needed
 - PXE server containers must be stopped with `make clean` after provisioning
 - Test deployments thoroughly before production use
-
-## Task Master AI Instructions
-
-**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
-@./.taskmaster/CLAUDE.md
