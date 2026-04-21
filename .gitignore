@@ -26,3 +26,4 @@ site/
 !.serena
 !.claude
 !.taskmaster
+.capy/**
