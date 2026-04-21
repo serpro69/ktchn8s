@@ -6,10 +6,6 @@
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
-    "CC_MODEL": "opus",
-    "SERENA_INITIAL_PROMPT": "",
-    "TM_CUSTOM_SYSTEM_PROMPT": "You are an experienced Kubernetes developer.",
-    "TM_APPEND_SYSTEM_PROMPT": "Always follow coding and kubernetes best practices. Use context7 MCP to lookup specific libraries and manifests documentation when needed.",
-    "TM_PERMISSION_MODE": "default"
+    "CC_MODEL": "opus"
   }
 }
