@@ -247,3 +247,6 @@ The project uses PXE boot for automated OS installation:
 # capy — MANDATORY routing rules
 
 @.claude/capy/CLAUDE.md
+
+# Extra Instructions
+@.claude/CLAUDE.extra.md

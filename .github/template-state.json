@@ -1,12 +1,16 @@
 {
   "schema_version": "1",
-  "upstream_repo": "serpro69/claude-starter-kit",
-  "template_version": "26af43ece64706c4f6c0ba5949732ac87400bfd6",
-  "synced_at": "2026-02-08T15:09:05Z",
+  "upstream_repo": "serpro69/claude-toolbox",
+  "template_version": "d88965f4ce61958b66f5e444a42fbb5283372cfe",
+  "synced_at": "2026-04-21T16:57:43Z",
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
     "CC_MODEL": "opus",
-    "SERENA_INITIAL_PROMPT": ""
-  }
+    "SERENA_INITIAL_PROMPT": "",
+    "CC_EFFORT_LEVEL": "high",
+    "CC_PERMISSION_MODE": "default",
+    "CC_STATUSLINE": "enhanced"
+  },
+  "plugin_migrated": true
 }

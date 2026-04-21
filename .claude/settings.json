@@ -50,29 +50,31 @@
       "Read(./**/venv/)",
       "Read(./**/__pycache__/)"
     ],
-    "ask": []
+    "ask": [],
+    "defaultMode": "default"
   },
   "enabledMcpjsonServers": [],
   "env": {
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": 64000,
-    "MAX_MCP_OUTPUT_TOKENS": 64000
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/.claude/scripts/validate-bash.sh"
-          }
-        ]
-      }
-    ]
+    "MAX_MCP_OUTPUT_TOKENS": 64000,
+    "CLAUDE_STATUSLINE_MODE": "dark",
+    "CLAUDE_STATUSLINE_THEME": "catppuccin"
   },
   "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "bash $CLAUDE_PROJECT_DIR/.claude/scripts/statusline.sh"
+  },
+  "extraKnownMarketplaces": {
+    "claude-toolbox": {
+      "source": {
+        "source": "github",
+        "repo": "serpro69/claude-toolbox"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "enabledPlugins": {
+    "kk@claude-toolbox": true
   }
 }
