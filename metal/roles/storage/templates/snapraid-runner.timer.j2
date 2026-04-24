@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SnapRAID daily sync
+
+[Timer]
+# Run daily at configured time
+OnCalendar=*-*-* {{ snapraid_maintenance.sync_time }}:00
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=multi-user.target

@@ -29,7 +29,7 @@
 
 .POSIX:
 .ONESHELL:
-.PHONY: bootstrap
+.PHONY: main
 
 .SHELL 			:= $(shell which bash)
 .SHELLFLAGS := -ec

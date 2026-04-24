@@ -1,0 +1,74 @@
+---
+- name: Set global facts
+  include_tasks: facts.yml
+
+- name: Include network configuration
+  include_tasks: network.yml
+  when: configure_network | default(false)
+
+- name: Ensure base packages
+  package:
+    name:
+      # hardware monitoring
+      - smartmontools
+
+- name: Persist drivetemp across reboots
+  copy:
+    content: "drivetemp\n"
+    dest: /etc/modules-load.d/drivetemp.conf
+    mode: "0644"
+  register: drivetemp
+
+- name: Load drivetemp module
+  command: modprobe drivetemp
+  changed_when: true
+  when: drivetemp is changed
+
+- include_tasks: setup_redhat.yml # noqa name[missing]
+  when: ansible_os_family == 'RedHat'
+
+- include_tasks: setup_debian.yml # noqa name[missing]
+  when: ansible_os_family == 'Debian'
+
+- name: Detect sensors
+  command: sensors-detect --auto
+  changed_when: true
+
+- name: Validate disk health
+  include_tasks: disk_health.yml
+  when:
+    - enable_disk_health_checks | default(false)
+    - (data_drives is defined and data_drives | length > 0) or (parity_drives is defined and parity_drives | length > 0)
+
+- name: Include disk management tasks
+  include_tasks: disks.yml
+  when: data_drives is defined and data_drives | length > 0
+
+- name: Include mergerfs configuration
+  include_tasks: mergerfs.yml
+  when:
+    - data_drives is defined
+    - data_drives | length > 0
+    - disk_directories is defined
+
+- name: Check snapraid prerequisites
+  debug:
+    msg: "Skipping snapraid configuration: requires both parity_drives and data_drives to be populated"
+  when: >
+    (parity_drives is not defined or parity_drives | length == 0) or
+    (data_drives is not defined or data_drives | length == 0)
+
+- name: Include snapraid configuration
+  include_tasks: snapraid.yml
+  when:
+    - parity_drives is defined
+    - parity_drives | length > 0
+    - data_drives is defined
+    - data_drives | length > 0
+
+- name: Include NFS server configuration
+  include_tasks: nfs.yml
+  when:
+    - data_drives is defined
+    - data_drives | length > 0
+    - disk_directories is defined

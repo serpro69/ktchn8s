@@ -189,3 +189,42 @@ title: ToDo
     - Seems like adding `fastestmirror=True` to `/etc/dnf/dnf.conf` helps at least to some degree
 
 - [ ] Setup pi-hole on the cluster
+
+- [ ] Storage Node / NFS Optimizations
+  - NFS mount monitoring/health check on K8s side
+    There's no monitoring or alerting for NFS mount failures on the K8s side. If the NAS goes down, pods will hang on NFS operations. This is a common NFS issue. Consider adding:
+    - NFS mount soft option (instead of default hard) for timeout behavior
+    - A health check pod or monitoring rule
+  - NFS server tuning
+    For a 4-drive array serving media to a K8s cluster, you might want to tune:
+    - NFS thread count (/proc/fs/nfsd/threads, default is 8)
+    - Read/write size in mount options
+    This is optional and premature optimization, but should be kept in mind.
+  - fstab entry cleanup
+    - If you remove a data drive from inventory, the fstab entry persists (uses lineinfile with state: present, never absent). Not a concern for initial deployment.
+  - Use `nftables` instead of `ufw` on Debian
+    - Add equivalent `firewalld` tasks to properly support RedHat
+  - Monitoring of SMART data
+    - Parse the data in the systemd-sheduled script and put it to sqlite DB
+    - Create a dashboard and alerts in grafana
+    - Profit ...or not, depending on how lucky you are with the disks, but at least you'll be notified about issues
+  - With snapraid it's a good idea to **exclude _unimportant_ files that regularly change**. Jellyfin metadata for example.
+
+- [ ] Investigate and fix CGNAT / Double NAT from ISP
+  - **Problem:** ISP assigns a CGNAT address (`100.64.0.0/10` range) instead of a public IP, resulting in double NAT (ISP NAT + C1111 NAT). This can affect P2P/torrents (reduced peer connectivity), some VOIP providers, and gaming (strict NAT type).
+  - **How to detect:**
+    - Check router WAN IP: `show ip interface GigabitEthernet0/0/0 | include Internet address` — if it's in the `100.64.0.0/10` range (CGNAT reserved per RFC 6598), you're behind CGNAT
+    - Compare WAN IP to public IP: `show ip interface GigabitEthernet0/0/0` vs what `curl ifconfig.me` returns from an internal host — if they differ, you're behind CGNAT
+    - Traceroute: `traceroute 8.8.8.8` from the router — extra hops in the `100.64.0.0/10` range confirm CGNAT
+  - **Possible solutions:**
+    - [ ] **Request a public IP from ISP** — simplest fix; some ISPs offer it for free, others charge a small monthly fee. Ask for a static public IPv4 address
+    - [ ] **Request a dynamic public IP** — cheaper alternative; you still get a real public IP, it just changes occasionally. Works well with DDNS (though less relevant since external access uses Cloudflare tunnels)
+    - [ ] **Use IPv6** — if ISP provides native IPv6, services can be reached directly over IPv6 without NAT. Requires configuring IPv6 on C1111 and firewall rules for it
+    - [ ] **DS-Lite / MAP-E** — some ISPs offer transition mechanisms that give you a public IPv4 via tunneling over IPv6. Check if your ISP supports this
+    - [ ] **VPN with port forwarding** — services like Mullvad or AirVPN provide a VPN with a dedicated port forward, bypassing CGNAT for specific services (useful for torrents)
+  - **Current impact assessment:**
+    - Cloudflare tunnels: **not affected** (outbound-initiated)
+    - Web browsing / streaming: **not affected**
+    - Torrents: **reduced peer connectivity** (can't accept inbound connections from full swarm)
+    - VOIP: **mostly fine** with modern providers using STUN/TURN
+    - Gaming: **possible strict NAT** issues with matchmaking

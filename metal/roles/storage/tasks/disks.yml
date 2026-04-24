@@ -1,0 +1,83 @@
+---
+- name: Verify disk devices exist
+  stat:
+    path: "{{ item }}"
+  loop: "{{ data_devices + parity_devices }}"
+  register: disk_check
+  failed_when: not disk_check.stat.exists
+
+- name: Display discovered drives
+  debug:
+    msg:
+      - "Data drives: {{ data_devices }}"
+      - "Parity drives: {{ parity_devices }}"
+
+- name: Check for existing filesystems on data partitions
+  command: "blkid {{ item }}"
+  loop: "{{ data_devices }}"
+  register: data_filesystem_check
+  changed_when: false
+  failed_when: false
+
+- name: Check for existing filesystems on parity partitions
+  command: "blkid {{ item }}"
+  loop: "{{ parity_devices }}"
+  register: parity_filesystem_check
+  changed_when: false
+  failed_when: false
+  when: parity_devices | length > 0
+
+- name: Format data drives with ext4
+  filesystem:
+    fstype: ext4
+    dev: "{{ item }}"
+    opts: -L "data{{ ansible_loop.index }}"
+    force: false
+  loop: "{{ data_devices }}"
+  loop_control:
+    extended: true
+  # Format only if: no filesystem detected
+  when:
+    - data_filesystem_check.results[ansible_loop.index0].rc != 0
+  register: data_format_result
+
+- name: Format parity drives with ext4
+  filesystem:
+    fstype: ext4
+    dev: "{{ item }}"
+    opts: -L "parity{{ ansible_loop.index }}"
+    force: false
+  loop: "{{ parity_devices }}"
+  loop_control:
+    extended: true
+  # Format only if: no filesystem detected
+  when:
+    - parity_filesystem_check.results[ansible_loop.index0].rc != 0
+  register: parity_format_result
+
+- name: Mount data drives
+  ansible.posix.mount:
+    path: "{{ item.1 }}"
+    src: "{{ item.0 }}"
+    fstype: ext4
+    opts: defaults,noatime
+    passno: "2"
+    state: mounted
+    backup: true
+  loop: "{{ data_devices | zip(disk_directories) | list }}"
+  loop_control:
+    label: "{{ item.0 }} -> {{ item.1 }}"
+
+- name: Mount parity drives
+  mount:
+    path: "{{ item.1 }}"
+    src: "{{ item.0 }}"
+    fstype: ext4
+    opts: defaults,noatime
+    passno: "2"
+    state: mounted
+    backup: true
+  loop: "{{ parity_devices | zip(parity_directories) | list }}"
+  loop_control:
+    label: "{{ item.0 }} -> {{ item.1 }}"
+  when: parity_devices | length > 0

@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# /etc/network/interfaces for {{ inventory_hostname }}
+
+# Loopback interface
+auto lo
+iface lo inet loopback
+
+# Primary network interface
+auto {{ storage_network.interface }}
+iface {{ storage_network.interface }} inet static
+    address {{ storage_network.address }}
+    netmask {{ storage_network.netmask }}
+    gateway {{ storage_network.gateway }}
+    dns-nameservers {{ storage_network.dns_nameservers | join(' ') }}

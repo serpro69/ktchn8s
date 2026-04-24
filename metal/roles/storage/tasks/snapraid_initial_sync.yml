@@ -1,0 +1,98 @@
+---
+# Snapraid Initial Sync
+# Starts the initial parity sync as a systemd service and returns immediately.
+# The sync runs independently on the NAS - no need for the controller to stay connected.
+
+# =================================================================
+# PRE-SYNC VALIDATION
+# =================================================================
+
+- name: Validate snapraid configuration exists
+  stat:
+    path: /etc/snapraid.conf
+  register: snapraid_conf
+  failed_when: not snapraid_conf.stat.exists
+
+- name: Test snapraid configuration
+  command: /usr/local/bin/snapraid status
+  register: snapraid_status_check
+  changed_when: false
+  failed_when: snapraid_status_check.rc not in [0, 2]
+  # rc=2 means no parity file yet, which is expected for initial sync
+
+# =================================================================
+# CHECK IF SYNC ALREADY COMPLETED
+# =================================================================
+
+- name: Check if parity file already exists
+  stat:
+    path: "{{ parity_directories[0] }}/snapraid.parity"
+  register: parity_file_check
+
+- name: Check if initial sync service is currently running
+  systemd:
+    name: snapraid-initial-sync.service
+  register: initial_sync_service_status
+  failed_when: false
+
+- name: Skip sync if parity already exists
+  debug:
+    msg: "Parity file already exists - initial sync was already completed. Skipping."
+  when: parity_file_check.stat.exists
+
+- name: Skip sync if already running
+  debug:
+    msg: "Initial sync service is already running. Monitor with: journalctl -u snapraid-initial-sync -f"
+  when:
+    - not parity_file_check.stat.exists
+    - initial_sync_service_status.status.ActiveState | default('inactive') == 'active'
+
+# =================================================================
+# START INITIAL SYNC
+# =================================================================
+
+- name: Run initial sync
+  when:
+    - not parity_file_check.stat.exists
+    - initial_sync_service_status.status.ActiveState | default('inactive') != 'active'
+  block:
+    - name: Create snapraid log directory
+      file:
+        path: /var/log/snapraid
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Deploy initial sync systemd service
+      template:
+        src: snapraid-initial-sync.service.j2
+        dest: /etc/systemd/system/snapraid-initial-sync.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: reload systemd
+
+    - name: Reload systemd immediately
+      systemd:
+        daemon_reload: true
+
+    - name: Start initial snapraid sync service
+      systemd:
+        name: snapraid-initial-sync.service
+        state: started
+
+    - name: Display sync monitoring instructions
+      debug:
+        msg:
+          - "Initial snapraid sync started as a systemd service on {{ inventory_hostname }}."
+          - "The controller can now disconnect safely."
+          - ""
+          - "Monitor progress:"
+          - "  ssh {{ ansible_host }} journalctl -u snapraid-initial-sync -f"
+          - "  ssh {{ ansible_host }} tail -f /var/log/snapraid/initial-sync.log"
+          - ""
+          - "Check status:"
+          - "  ssh {{ ansible_host }} systemctl status snapraid-initial-sync"
+          - ""
+          - "On next playbook run, this step will be skipped if parity file exists."

@@ -1,0 +1,50 @@
+---
+- name: Upgrade packages
+  apt:
+    update_cache: true
+    upgrade: dist
+  when: upgrade_packages
+
+- name: Ensure base packages
+  apt:
+    name:
+      # hardware monitoring
+      - lm-sensors
+      # nfs
+      - nfs-kernel-server
+      - nfs-common
+    state: present
+    update_cache: true
+
+- name: Install mergerfs
+  apt:
+    deb: "{{ mergerfs_url_deb }}"
+    state: present
+
+- name: Copy snapraid .deb
+  copy:
+    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
+    dest: /tmp/
+    owner: root
+    group: root
+    mode: "0755"
+  register: snapraid_deb
+
+- name: Ensure apt module dependencies
+  apt:
+    name:
+      # temp 'apt' module dependency for installing .deb
+      - xz-utils
+    state: present
+  when: snapraid_deb is changed
+
+- name: Install snapraid
+  apt:
+    deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
+    state: present
+
+- name: Clean up temporary packages
+  apt:
+    name:
+      - xz-utils
+    state: absent

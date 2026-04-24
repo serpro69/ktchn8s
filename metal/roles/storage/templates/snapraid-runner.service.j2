@@ -1,0 +1,10 @@
+[Unit]
+Description=SnapRAID Runner
+After=multi-user.target
+Conflicts=snapraid-scrub.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/snapraid-runner/snapraid-runner.py -c /opt/snapraid-runner/snapraid-runner.conf
+User=root
+Group=root

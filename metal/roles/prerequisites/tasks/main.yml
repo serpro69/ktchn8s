@@ -19,7 +19,7 @@
 
 - name: Update all packages # noqa package-latest
   dnf:
-    name: '*'
+    name: "*"
     state: latest
 
 - name: Ensure base packages are installed
@@ -30,6 +30,8 @@
       - lm_sensors
       - hddtemp
       - smartmontools
+      # nfs
+      - nfs-utils
     state: present
 
 - name: Detect sensors

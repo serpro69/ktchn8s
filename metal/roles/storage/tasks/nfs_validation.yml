@@ -1,0 +1,143 @@
+---
+# NFS Export Validation (NFSv4-only)
+# Verifies NFS exports are properly configured and accessible
+
+# =================================================================
+# LOCAL NFS VALIDATION
+# =================================================================
+
+- name: Check NFS server service status
+  systemd:
+    name: "{{ nfs_server_service }}"
+  register: nfs_service_status
+  failed_when: false
+
+- name: Verify NFS service is running
+  assert:
+    that:
+      - nfs_service_status.status.ActiveState == "active"
+    fail_msg: "NFS server service is not running"
+    success_msg: "NFS server service is active"
+
+- name: Verify NFS exports are configured
+  command: exportfs -v
+  register: exportfs_result
+  changed_when: false
+  failed_when: exportfs_result.rc != 0
+
+- name: Verify /mnt/storage export is present
+  assert:
+    that:
+      - "'/mnt/storage' in exportfs_result.stdout"
+    fail_msg: "NFS export missing: /mnt/storage"
+    success_msg: "NFS export present: /mnt/storage"
+
+- name: Check if ufw firewall is active
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Verify NFS firewall rules (if ufw is active)
+  when: "'Status: active' in ufw_status.stdout"
+  block:
+    - name: Check NFSv4 port firewall rule
+      shell: |
+        set -o pipefail
+        ufw status numbered | grep '2049'
+      register: firewall_rules
+      changed_when: false
+      failed_when: false
+
+    - name: Display firewall status
+      debug:
+        msg: "NFSv4 firewall rule is configured"
+      when: firewall_rules.rc == 0
+
+    - name: Warn if firewall rules missing
+      debug:
+        msg: "WARNING: NFSv4 firewall rule (2049/tcp) may not be configured correctly"
+      when: firewall_rules.rc != 0
+
+- name: Test local NFS mount capability
+  block:
+    - name: Create test mount point
+      file:
+        path: /tmp/nfs_test_mount
+        state: directory
+        mode: "0755"
+
+    - name: Test mount NFS export locally # noqa command-instead-of-module
+      command: "mount -t nfs4 {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_test_mount"
+      register: test_mount
+      changed_when: false
+      failed_when: false
+
+    - name: Test write to NFS mount
+      copy:
+        content: "NFS validation test - {{ ansible_date_time.iso8601 }}"
+        dest: /tmp/nfs_test_mount/.nfs_test_file
+        mode: "0644"
+      when: test_mount.rc == 0
+      register: test_write
+
+    - name: Test read from NFS mount
+      command: cat /tmp/nfs_test_mount/.nfs_test_file
+      when: test_mount.rc == 0
+      register: test_read
+      changed_when: false
+
+    - name: Cleanup test file
+      file:
+        path: /tmp/nfs_test_mount/.nfs_test_file
+        state: absent
+      when: test_mount.rc == 0
+
+    - name: Unmount test NFS share
+      command: umount /tmp/nfs_test_mount
+      when: test_mount.rc == 0
+      changed_when: false
+
+    - name: Remove test mount point
+      file:
+        path: /tmp/nfs_test_mount
+        state: absent
+
+    - name: Verify local NFS mount test succeeded
+      assert:
+        that:
+          - test_mount.rc == 0
+          - test_write is succeeded
+          - test_read is succeeded
+        success_msg: "Local NFS mount test passed"
+        fail_msg: "Local NFS mount test failed"
+
+# =================================================================
+# REMOTE NFS VALIDATION (from controller)
+# =================================================================
+# Tests NFSv4 port reachability from the controller.
+# The actual mount/write/read test is covered by the local NFS test above
+# and the K8s pod test in k8s_validation.yml.
+
+- name: Test NFS access from controller
+  delegate_to: localhost
+  become: false
+  block:
+    - name: Verify NFSv4 port is reachable from controller
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 2049
+        timeout: 10
+      register: nfs_port_check
+      failed_when: false
+
+    - name: Verify NFSv4 connectivity
+      assert:
+        that:
+          - nfs_port_check is succeeded
+        fail_msg: "Cannot reach NFSv4 port (2049) from controller - check firewall and network connectivity"
+        success_msg: "NFSv4 port reachable from controller"
+
+- name: NFS validation complete
+  debug:
+    msg: "NFS export validation completed successfully (local and remote)"

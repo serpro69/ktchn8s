@@ -1,5 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/app-template-4.1.2/charts/other/app-template/values.schema.json
 ---
+nfs:
+  server: 10.10.10.30
+  basePath: /mnt/storage
 app-template:
   defaultPodOptions:
     securityContext:
@@ -148,3 +151,21 @@ app-template:
           jellyseerr:
             - path: /app/config
               subPath: jellyseerr/config
+    dri-devices:
+      enabled: true
+      type: hostPath
+      hostPath: /dev/dri
+      advancedMounts:
+        main:
+          main:
+            - path: /dev/dri
+              readOnly: false
+    anothervideos:
+      enabled: true
+      type: persistentVolumeClaim
+      existingClaim: pvc-nfs-videos
+      advancedMounts:
+        main:
+          main:
+            - path: /media/Videos
+              readOnly: false

@@ -1,0 +1,35 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: restart nfs server
+  service:
+    name: "{{ nfs_server_service }}"
+    state: restarted
+
+- name: restart snapraid-runner
+  service:
+    name: snapraid-runner.timer
+    state: restarted
+    enabled: true
+
+- name: initial snapraid sync
+  include_tasks: snapraid_initial_sync.yml
+  listen: initial snapraid sync
+
+- name: reload nfs exports # noqa: no-changed-when
+  command: exportfs -ra
+  listen: reload nfs exports
+
+- name: restart networking debian
+  service:
+    name: networking
+    state: restarted
+  listen: restart networking debian
+
+- name: restart networking redhat
+  service:
+    name: NetworkManager
+    state: restarted
+  listen: restart networking redhat

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run SnapRAID monthly scrub
+
+[Timer]
+# Run on first Sunday of every month
+OnCalendar={{ snapraid_maintenance.scrub_schedule }}
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
