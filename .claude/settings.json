@@ -26,7 +26,11 @@
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(sort:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(echo \"${TOOLBOX_PLUGIN_ROOT}\")",
+      "Bash(echo \"${TOOLBOX_PLUGIN_ROOT:-NOT_SET}\")",
+      "Skill(kk:*)",
+      "Read(~/.claude/plugins/cache/claude-toolbox/*)"
     ],
     "ask": [],
     "defaultMode": "default",
@@ -57,7 +61,7 @@
     ]
   },
   "statusLine": {
-    "command": "bash $CLAUDE_PROJECT_DIR/.claude/scripts/statusline_enhanced.sh",
+    "command": "bash $CLAUDE_PROJECT_DIR/.claude/toolbox/scripts/statusline_enhanced.sh",
     "type": "command"
   }
 }

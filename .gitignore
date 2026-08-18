@@ -23,7 +23,11 @@ site/
 *.tgz
 
 # AI tools
-!.serena
 !.claude
-!.taskmaster
+!.codex
+.claude/worktrees
+
 .capy/**
+!.capy
+!.capy/AGENTS.md
+!.capy/knowledge.db
