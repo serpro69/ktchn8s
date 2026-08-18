@@ -1,0 +1,27 @@
+{{- range .Values.nfs.volumes }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs-{{ required "nfs.volumes[].name is required" .name }}
+spec:
+  capacity:
+    storage: {{ required "nfs.volumes[].capacity is required" .capacity | quote }}
+  accessModes:
+    - ReadWriteMany
+  # NAS data outlives any single consumer; never release the volume for reuse
+  # (and never delete NFS contents) when the claim is deleted.
+  persistentVolumeReclaimPolicy: Retain
+  # No storageClassName: these are static PVs. Consuming PVCs must set
+  # volumeName: pv-nfs-<name> and storageClassName: "" to bind.
+  mountOptions:
+    {{- toYaml $.Values.nfs.mountOptions | nindent 4 }}
+  csi:
+    driver: nfs.csi.k8s.io
+    # volumeHandle just needs to be unique per share across the cluster;
+    # server + real export path is used for readability.
+    volumeHandle: "{{ $.Values.nfs.server }}{{ $.Values.nfs.basePath }}/{{ required "nfs.volumes[].share is required" .share }}"
+    volumeAttributes:
+      server: "{{ $.Values.nfs.server }}"
+      share: "{{ $.Values.nfs.basePath }}/{{ .share }}"
+{{- end }}
