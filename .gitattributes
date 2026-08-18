@@ -19,6 +19,7 @@ terraform.tfstate.backup  diff=sopsdiffer_json
 # (binary is a macro for -text -diff)
 *.7z        binary
 *.bz2       binary
+*.db        binary
 *.catalog   binary
 *.eot       binary
 *.ez        binary
