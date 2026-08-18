@@ -7,7 +7,10 @@ mergerfs_url_deb: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_deb}}"
 mergerfs_url_rpm: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_rpm }}"
 
 snapraid_version: "13.0"
-snapraid_runner_url: "https://raw.githubusercontent.com/Chronial/snapraid-runner/master/snapraid-runner.py"
+# Pinned to upstream master tip (2023-03-09); executed as root, so bump SHA + checksum together
+snapraid_runner_commit: 8f78f9f1af8ca5a9b6469a6c142cab2577157331
+snapraid_runner_url: "https://raw.githubusercontent.com/Chronial/snapraid-runner/{{ snapraid_runner_commit }}/snapraid-runner.py"
+snapraid_runner_checksum: "sha256:0aa60a88b0b5da06daffe1cda348721ffd579af4334f6a5f2ba3dc41447fe667"
 
 # Storage directories
 storage_dirs:

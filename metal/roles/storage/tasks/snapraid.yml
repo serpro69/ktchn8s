@@ -28,6 +28,7 @@
 - name: Download snapraid-runner
   get_url:
     url: "{{ snapraid_runner_url }}"
+    checksum: "{{ snapraid_runner_checksum }}"
     dest: /opt/snapraid-runner/snapraid-runner.py
     mode: "0755"
 
