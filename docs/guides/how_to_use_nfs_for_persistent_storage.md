@@ -52,15 +52,21 @@ You can have some (or all) of your persistent volumes provisioned on your NAS se
 - [Install the driver on a Kubernetes cluster](https://github.com/kubernetes-csi/csi-driver-nfs?tab=readme-ov-file#install-driver-on-a-kubernetes-cluster). See [`system/csi-driver-nfs`](https://github.com/serpro69/ktchn8s/tree/master/system/csi-driver-nfs) for more details.
   - _I use the static mode based on my own needs._
 
-- Create a static PV:
+- Declare a static PV for each NAS share. `PersistentVolume` is a cluster-scoped resource, so PVs live in the system layer — not in app charts — and are rendered from the `nfs.volumes` list in the csi-driver-nfs chart values:
 
-```yaml title="./apps/jellyfin/templates/pv-videos.yaml"
+```yaml title="./system/csi-driver-nfs/values.yaml"
 --8<--
-./apps/jellyfin/templates/pv-videos.yaml
+./system/csi-driver-nfs/values.yaml
 --8<--
 ```
 
-- Create a static PVC:
+```yaml title="./system/csi-driver-nfs/templates/pv-nfs.yaml"
+--8<--
+./system/csi-driver-nfs/templates/pv-nfs.yaml
+--8<--
+```
+
+- Create a static PVC in the consuming app's chart. The PVC binds to the PV via `volumeName`; `storageClassName: ""` must be the empty string (not omitted) so the default-StorageClass admission plugin doesn't assign a class and break binding:
 
 ```yaml title="./apps/jellyfin/templates/pvc-videos.yaml"
 --8<--

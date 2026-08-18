@@ -4,12 +4,16 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: pvc-nfs-videos
-  namespace: "{{.Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 1Ti
+  # Static binding to the cluster-scoped NFS PV defined in system/csi-driver-nfs.
   volumeName: pv-nfs-videos
-  storageClassName: nfs-csi-videos
+  # Empty string (not omitted): prevents the default-StorageClass admission
+  # plugin from assigning a class, which would break binding to the class-less
+  # static PV.
+  storageClassName: ""

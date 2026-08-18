@@ -1,4 +1,27 @@
 ---
+nfs:
+  # TODO: use a DNS name once the NAS has a stable record (see docs/info/todo.md)
+  server: 10.10.10.30
+  basePath: /mnt/storage
+  # Mount options applied to every static NFS PV below.
+  mountOptions:
+    - nfsvers=4.1
+    # soft mount: return I/O errors instead of hanging indefinitely if the NAS goes down.
+    # Without this, pods freeze and can't be killed or rescheduled until the NAS returns.
+    - soft
+    - timeo=600 # timeout per retry in deciseconds (60s)
+    - retrans=2 # number of retries before returning error
+    # 1MB read/write buffers for media streaming throughput.
+    # Likely the negotiated default on modern kernels, but explicit to be deterministic.
+    - rsize=1048576
+    - wsize=1048576
+  # One static PV per NAS share, named pv-nfs-<name>.
+  # Consuming apps bind with a namespaced PVC that sets
+  # volumeName: pv-nfs-<name> and storageClassName: "".
+  volumes:
+    - name: videos
+      share: Videos # subdirectory of basePath exported by the NAS
+      capacity: 1Ti
 csi-driver-nfs:
   storageClass:
     create: false
