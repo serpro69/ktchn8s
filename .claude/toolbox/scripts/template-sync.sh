@@ -10,6 +10,8 @@
 #   ./template-sync.sh --version v1.2.0     # Sync to specific version
 #   ./template-sync.sh --dry-run            # Preview what would change
 #   ./template-sync.sh --ci                 # CI mode for GitHub Actions
+#   ./template-sync.sh --local                         # Fetch, compare, and apply locally
+#   ./template-sync.sh --apply --output-dir ./staging  # Apply staged changes (CI)
 #
 # OPTIONS:
 #   --version VERSION     Target version to sync (default: latest)
@@ -17,6 +19,8 @@
 #                         - "main": Latest from main branch
 #                         - "v1.2.3": Specific tag
 #   --dry-run             Preview changes without applying them
+#   --local               Fetch, compare, and apply in a single invocation
+#   --apply               Apply pre-staged changes to the working tree (used by CI)
 #   --ci                  CI mode for GitHub Actions (structured output)
 #   --output-dir DIR      Directory for staged changes (default: temp)
 #   -h, --help            Show this help message
@@ -50,6 +54,21 @@
 #     - Restore from version control if corrupted
 
 set -euo pipefail
+
+# Source semver comparison (provides compare() function).
+# Bootstrap: downstream repos may not have this file yet if they haven't synced
+# since it was introduced — fetch from upstream so the script stays self-contained.
+# shellcheck source=semver-compare.sh
+_semver_path="$(dirname "${BASH_SOURCE[0]}")/semver-compare.sh"
+if [[ ! -f "$_semver_path" ]]; then
+  curl -fsSL "https://raw.githubusercontent.com/serpro69/claude-toolbox/master/.claude/toolbox/scripts/semver-compare.sh" \
+    -o "$_semver_path" 2>/dev/null || {
+    echo "Failed to fetch semver-compare.sh" >&2
+    exit 1
+  }
+fi
+source "$_semver_path"
+unset _semver_path
 
 # =============================================================================
 # Global Configuration
@@ -85,6 +104,7 @@ BUILTIN_EXCLUSIONS=(
   ".claude/settings.local.json"
   ".claude/capy/*"
   ".claude/scripts/capy.sh"
+  ".codex/scripts/capy.sh"
 )
 
 # Resolved version (for reporting)
@@ -92,6 +112,13 @@ RESOLVED_VERSION=""
 
 # Plugin migration tracking
 PLUGIN_MIGRATED=false
+
+# Apply mode: when true, migration functions perform filesystem mutations.
+# When false (default), they only populate tracking arrays for reporting.
+APPLY_MODE=false
+
+# Local mode: fetch + compare + apply in a single invocation
+LOCAL_MODE=false
 
 # =============================================================================
 # Color Output
@@ -205,12 +232,15 @@ check_dependencies() {
     missing+=("git")
   fi
 
-  if ! command -v curl &>/dev/null; then
-    missing+=("curl")
-  fi
+  # curl and yq are only needed for fetch/substitute, not apply mode
+  if ! $APPLY_MODE; then
+    if ! command -v curl &>/dev/null; then
+      missing+=("curl")
+    fi
 
-  if ! command -v yq &>/dev/null; then
-    missing+=("yq")
+    if ! command -v yq &>/dev/null; then
+      missing+=("yq")
+    fi
   fi
 
   if [[ ${#missing[@]} -gt 0 ]]; then
@@ -219,6 +249,31 @@ check_dependencies() {
     echo "  macOS:  brew install ${missing[*]}"
     echo "  Linux:  apt-get install ${missing[*]}"
     exit 1
+  fi
+}
+
+# json_update()
+# Atomically updates a JSON file using a jq expression.
+# Writes to a temp file first, then moves into place on success.
+#
+# Args:
+#   $1 - Target file path
+#   $2 - jq filter expression
+#   $@ - Additional arguments forwarded to jq (e.g., --arg key val)
+#
+# Returns:
+#   0 on success, 1 on jq failure (target file unchanged)
+json_update() {
+  local file="$1" expr="$2"
+  shift 2
+  local tmp
+  tmp=$(mktemp "/tmp/json-update.XXXXXX")
+  if jq "$@" "$expr" "$file" >"$tmp"; then
+    mv "$tmp" "$file"
+    return 0
+  else
+    rm -f "$tmp"
+    return 1
   fi
 }
 
@@ -334,7 +389,7 @@ validate_manifest() {
   fi
 
   # Verify all required variables exist (can be empty but must be present)
-  local required_vars=("PROJECT_NAME" "LANGUAGES" "CC_MODEL" "SERENA_INITIAL_PROMPT")
+  local required_vars=("PROJECT_NAME" "LANGUAGES" "CC_MODEL")
   for var in "${required_vars[@]}"; do
     if [[ "$(get_manifest_value ".variables.$var // \"__MISSING__\"")" == "__MISSING__" ]]; then
       log_error "Missing required variable in manifest: $var"
@@ -386,14 +441,10 @@ migrate_manifest() {
 
   if [[ "$upstream_repo" == "serpro69/claude-starter-kit" ]]; then
     log_info "Migrating upstream_repo from serpro69/claude-starter-kit to serpro69/claude-toolbox"
-    local tmp
-    tmp=$(mktemp "/tmp/manifest-migrate.XXXXXX")
-    if ! jq '.upstream_repo = "serpro69/claude-toolbox"' "$MANIFEST_PATH" >"$tmp"; then
-      rm -f "$tmp"
+    if ! json_update "$MANIFEST_PATH" '.upstream_repo = "serpro69/claude-toolbox"'; then
       log_error "Failed to migrate manifest"
       exit 1
     fi
-    mv "$tmp" "$MANIFEST_PATH"
     read_manifest
   fi
 }
@@ -415,6 +466,9 @@ backfill_manifest_variables() {
     "CC_STATUSLINE:enhanced"
     "CC_EFFORT_LEVEL:high"
     "CC_PERMISSION_MODE:default"
+    "CODEX_MODEL:gpt-5.6-sol"
+    "CODEX_APPROVAL_POLICY:on-request"
+    "SKIP_CAPY:false"
   )
 
   local needs_update=false
@@ -430,8 +484,6 @@ backfill_manifest_variables() {
   done
 
   if $needs_update; then
-    local tmp
-    tmp=$(mktemp "/tmp/manifest-backfill.XXXXXX")
     local jq_expr='.'
     for entry in "${defaults[@]}"; do
       local var="${entry%%:*}"
@@ -440,12 +492,10 @@ backfill_manifest_variables() {
         jq_expr="$jq_expr | .variables.$var = \"$default_val\""
       fi
     done
-    if ! jq "$jq_expr" "$MANIFEST_PATH" >"$tmp"; then
-      rm -f "$tmp"
+    if ! json_update "$MANIFEST_PATH" "$jq_expr"; then
       log_warn "Failed to backfill manifest variables"
       return 0
     fi
-    mv "$tmp" "$MANIFEST_PATH"
     log_info "Backfilled missing manifest variables: ${backfilled[*]}"
     read_manifest
   fi
@@ -521,63 +571,217 @@ run_plugin_migration() {
     ".claude/scripts/validate-bash.sh"
   )
 
-  # Remove directories
+  # Track and optionally remove directories
   for dir in "${dirs_to_remove[@]}"; do
     if [[ -d "$dir" ]]; then
-      rm -rf "$dir"
       DELETED_FILES+=("$dir/")
-      log_info "Removed $dir/"
+      if $APPLY_MODE; then
+        rm -rf "$dir"
+        log_info "Removed $dir/"
+      else
+        log_info "Would remove $dir/"
+      fi
     fi
   done
 
-  # Remove individual files
+  # Track and optionally remove individual files
   for file in "${files_to_remove[@]}"; do
     if [[ -f "$file" ]]; then
-      rm -f "$file"
       DELETED_FILES+=("$file")
-      log_info "Removed $file"
+      if $APPLY_MODE; then
+        rm -f "$file"
+        log_info "Removed $file"
+      else
+        log_info "Would remove $file"
+      fi
     fi
   done
 
-  # Clean up empty parent directories
-  rmdir .claude/skills 2>/dev/null || true
-  rmdir .claude/commands 2>/dev/null || true
+  if $APPLY_MODE; then
+    # Clean up empty parent directories
+    rmdir .claude/skills 2>/dev/null || true
+    rmdir .claude/commands 2>/dev/null || true
 
-  # Update settings.json: remove hooks, add marketplace and plugin config
-  local settings_file=".claude/settings.json"
-  if [[ -f "$settings_file" ]]; then
-    local tmp
-    tmp=$(mktemp "/tmp/settings-migrate.XXXXXX")
-    if jq --arg repo "$upstream_repo" \
-      'del(.hooks) |
-       .extraKnownMarketplaces = {
-         "claude-toolbox": {
-           "source": {
-             "source": "github",
-             "repo": $repo
+    # Update settings.json: remove hooks, add marketplace and plugin config
+    local settings_file=".claude/settings.json"
+    if [[ -f "$settings_file" ]]; then
+      if json_update "$settings_file" \
+        'del(.hooks) |
+         .extraKnownMarketplaces = {
+           "claude-toolbox": {
+             "source": {
+               "source": "github",
+               "repo": $repo
+             }
            }
-         }
-       }' "$settings_file" >"$tmp"; then
-      mv "$tmp" "$settings_file"
-      log_info "Updated $settings_file for plugin system"
-    else
-      rm -f "$tmp"
-      log_warn "Failed to update $settings_file — manual update required"
+         }' --arg repo "$upstream_repo"; then
+        log_info "Updated $settings_file for plugin system"
+      else
+        log_warn "Failed to update $settings_file — manual update required"
+      fi
     fi
-  fi
 
-  # Set plugin_migrated flag in manifest
-  local tmp
-  tmp=$(mktemp "/tmp/manifest-plugin.XXXXXX")
-  if jq '.plugin_migrated = true' "$MANIFEST_PATH" >"$tmp"; then
-    mv "$tmp" "$MANIFEST_PATH"
-    log_info "Set plugin_migrated flag in manifest"
-  else
-    rm -f "$tmp"
-    log_warn "Failed to update manifest — manual update required"
+    # Set plugin_migrated flag in manifest
+    if json_update "$MANIFEST_PATH" '.plugin_migrated = true'; then
+      log_info "Set plugin_migrated flag in manifest"
+    else
+      log_warn "Failed to update manifest — manual update required"
+    fi
   fi
 
   log_success "Plugin migration complete"
+}
+
+# =============================================================================
+# Serena Removal Migration
+# =============================================================================
+
+# needs_serena_removal()
+# Checks whether the downstream repo still has Serena artifacts from the
+# template defaults that should be cleaned up.
+# Detection is based on the SERENA_INITIAL_PROMPT manifest variable — its
+# presence means the repo was set up when Serena was a template default.
+# If a user manually added .serena/ without the variable, we leave it alone.
+#
+# Returns:
+#   0 if removal is needed
+#   1 if not needed
+needs_serena_removal() {
+  if [[ -f "$MANIFEST_PATH" ]] && jq -e '.variables.SERENA_INITIAL_PROMPT' "$MANIFEST_PATH" &>/dev/null 2>&1; then
+    return 0
+  fi
+
+  return 1
+}
+
+# run_serena_removal()
+# Removes .serena/ directory and SERENA_INITIAL_PROMPT from the manifest.
+# Serena MCP was dropped from upstream defaults — downstream repos no longer
+# need the config directory or the manifest variable.
+#
+# Side effects:
+#   - Deletes .serena/ directory if present
+#   - Removes SERENA_INITIAL_PROMPT from manifest variables
+#   - Appends removed files to DELETED_FILES array
+run_serena_removal() {
+  log_step "Removing Serena artifacts (no longer in upstream defaults)"
+
+  # Respect sync_exclusions — if .serena/ is excluded, skip directory removal
+  if is_excluded ".serena/project.yml"; then
+    log_info "Skipping .serena/ removal (matched sync_exclusions)"
+  else
+    if [[ -d ".serena" ]]; then
+      DELETED_FILES+=(".serena/")
+      if $APPLY_MODE; then
+        rm -rf ".serena"
+        log_info "Removed .serena/"
+      else
+        log_info "Would remove .serena/"
+      fi
+    fi
+
+    # Remove !.serena from .gitignore if present
+    if [[ -f ".gitignore" ]] && grep -q '^!\.serena' .gitignore; then
+      MODIFIED_FILES+=(".gitignore")
+      if $APPLY_MODE; then
+        sed -i '/^!\.serena$/d' .gitignore
+        log_info "Removed !.serena from .gitignore"
+      else
+        log_info "Would remove !.serena from .gitignore"
+      fi
+    fi
+
+    # Remove mcp__serena__* from settings.local.json permissions if present
+    local local_settings=".claude/settings.local.json"
+    if [[ -f "$local_settings" ]] && jq -e '.permissions.allow | any(startswith("mcp__serena__"))' "$local_settings" &>/dev/null 2>&1; then
+      if $APPLY_MODE; then
+        if json_update "$local_settings" '.permissions.allow |= map(select(startswith("mcp__serena__") | not))'; then
+          MODIFIED_FILES+=("$local_settings")
+          log_info "Removed mcp__serena__* from $local_settings permissions"
+        fi
+      else
+        MODIFIED_FILES+=("$local_settings")
+        log_info "Would remove mcp__serena__* from $local_settings permissions"
+      fi
+    fi
+  fi
+
+  # Clean manifest: remove SERENA_INITIAL_PROMPT variable and set flag
+  if [[ -f "$MANIFEST_PATH" ]]; then
+    if $APPLY_MODE; then
+      if json_update "$MANIFEST_PATH" 'del(.variables.SERENA_INITIAL_PROMPT)'; then
+        read_manifest
+        log_info "Removed SERENA_INITIAL_PROMPT from manifest"
+      else
+        log_warn "Failed to update manifest — manual cleanup may be needed"
+      fi
+    else
+      log_info "Would remove SERENA_INITIAL_PROMPT from manifest"
+    fi
+  fi
+
+  log_success "Serena removal complete"
+}
+
+# =============================================================================
+# Script Consolidation Migration
+# =============================================================================
+
+# needs_script_consolidation()
+# Checks whether scripts still exist at pre-consolidation locations.
+# Returns 0 if any old-location scripts are found.
+needs_script_consolidation() {
+  local old_paths=(
+    ".github/scripts/template-sync.sh"
+    ".github/scripts/semver-compare.sh"
+    ".claude/scripts/statusline.sh"
+    ".claude/scripts/statusline_enhanced.sh"
+    ".claude/scripts/sync-workflow.sh"
+    "docs/update.sh"
+  )
+
+  for path in "${old_paths[@]}"; do
+    if [[ -f "$path" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# run_script_consolidation()
+# Removes scripts from pre-consolidation locations. The new copies at
+# .claude/toolbox/scripts/ arrive via the normal .claude/ directory sync.
+#
+# Side effects:
+#   - Deletes old-location script files
+#   - Removes empty parent directories
+#   - Appends removed files to DELETED_FILES array
+run_script_consolidation() {
+  log_step "Consolidating scripts to .claude/toolbox/scripts/"
+
+  local files_to_remove=(
+    ".github/scripts/template-sync.sh"
+    ".github/scripts/semver-compare.sh"
+    ".claude/scripts/statusline.sh"
+    ".claude/scripts/statusline_enhanced.sh"
+    ".claude/scripts/sync-workflow.sh"
+    "docs/update.sh"
+  )
+
+  for file in "${files_to_remove[@]}"; do
+    if [[ -f "$file" ]]; then
+      DELETED_FILES+=("$file")
+      if $APPLY_MODE; then
+        rm -f "$file"
+        log_info "Removed $file"
+      else
+        log_info "Would remove $file"
+      fi
+    fi
+  done
+
+  log_success "Script consolidation complete"
 }
 
 # =============================================================================
@@ -607,12 +811,29 @@ resolve_version() {
 
   case "$target" in
   latest)
-    # Get the most recent tag sorted by version
-    # Note: Use 'grep ... || true' to handle case when no tags exist (grep returns 1 for no matches)
-    resolved=$(git ls-remote --tags --sort=-v:refname "$repo_url" 2>/dev/null |
+    # Find highest version tag using semver comparison (source: semver-compare.sh).
+    # git's --sort=-v:refname is broken for pre-releases: it ranks v1.0.0-rc.1
+    # above v1.0.0. We iterate all tags and compare properly instead.
+    local tags
+    tags=$(git ls-remote --tags "$repo_url" 2>/dev/null |
       { grep -v '\^{}' || true; } |
-      head -1 |
       sed 's/.*refs\/tags\///')
+
+    local tag
+    while IFS= read -r tag; do
+      [[ -z "$tag" ]] && continue
+      local stripped="${tag#v}"
+      # Skip non-semver tags
+      [[ "$stripped" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || continue
+      if [[ -z "$resolved" ]]; then
+        resolved="$tag"
+      else
+        local resolved_stripped="${resolved#v}"
+        if [[ "$(compare "$stripped" "$resolved_stripped")" == "gt" ]]; then
+          resolved="$tag"
+        fi
+      fi
+    done <<< "$tags"
 
     # If no tags exist, resolve default branch to SHA
     if [[ -z "$resolved" ]]; then
@@ -745,13 +966,13 @@ fetch_upstream_templates() {
   if ! git sparse-checkout init --cone --quiet 2>/dev/null; then
     log_warn "Sparse-checkout init failed, continuing with full checkout"
   fi
-  if ! git sparse-checkout set .claude .serena .github/workflows/template-sync.yml .github/scripts/template-sync.sh docs/update.sh klaude-plugin/.claude-plugin/plugin.json --quiet 2>/dev/null; then
+  if ! git sparse-checkout set .claude .codex .github/workflows/template-sync.yml klaude-plugin/.claude-plugin/plugin.json --quiet 2>/dev/null; then
     log_warn "Sparse-checkout set failed, config dirs may not exist at this version"
   fi
 
   cd - >/dev/null
 
-  # Build a staging structure with claude/ and serena/ subdirs (without dot prefix)
+  # Build a staging structure with claude/ subdirs (without dot prefix)
   # so the downstream substitution and comparison pipeline works unchanged.
   FETCHED_TEMPLATES_PATH="$work_dir/fetched"
   mkdir -p "$FETCHED_TEMPLATES_PATH"
@@ -765,14 +986,14 @@ fetch_upstream_templates() {
     rm -rf "$FETCHED_TEMPLATES_PATH/claude/capy"
     rm -f "$FETCHED_TEMPLATES_PATH/claude/scripts/capy.sh"
   fi
-  if [[ -d "$upstream_root/.serena" ]]; then
-    cp -rp "$upstream_root/.serena" "$FETCHED_TEMPLATES_PATH/serena"
+  if [[ -d "$upstream_root/.codex" ]]; then
+    cp -rp "$upstream_root/.codex" "$FETCHED_TEMPLATES_PATH/codex"
+    rm -f "$FETCHED_TEMPLATES_PATH/codex/scripts/capy.sh"
   fi
-
-  if [[ ! -d "$FETCHED_TEMPLATES_PATH/claude" && ! -d "$FETCHED_TEMPLATES_PATH/serena" ]]; then
+  if [[ ! -d "$FETCHED_TEMPLATES_PATH/claude" ]]; then
     log_error "Config directories not found in upstream at version: $version"
-    log_error "Expected .claude/ and/or .serena/ in the upstream repository."
-    log_error "The upstream repository may not have these directories at this version,"
+    log_error "Expected .claude/ in the upstream repository."
+    log_error "The upstream repository may not have this directory at this version,"
     log_error "or the repository structure has changed."
     exit 1
   fi
@@ -797,7 +1018,6 @@ fetch_upstream_templates() {
 #
 # Substitutions applied:
 #   - Claude Code settings: CC_MODEL, CC_EFFORT_LEVEL, CC_PERMISSION_MODE
-#   - Serena settings: PROJECT_NAME, LANGUAGES, SERENA_INITIAL_PROMPT
 #
 # Side effects:
 #   Creates output directory and copies/modifies template files
@@ -813,7 +1033,7 @@ apply_substitutions() {
   cp -rp "$template_dir"/* "$output_dir/"
 
   # Read all variables from manifest
-  local project_name languages cc_model cc_effort_level cc_permission_mode cc_statusline serena_prompt
+  local project_name languages cc_model cc_effort_level cc_permission_mode cc_statusline
 
   project_name=$(get_manifest_value '.variables.PROJECT_NAME')
   languages=$(get_manifest_value '.variables.LANGUAGES')
@@ -821,7 +1041,6 @@ apply_substitutions() {
   cc_effort_level=$(get_manifest_value '.variables.CC_EFFORT_LEVEL // "high"')
   cc_permission_mode=$(get_manifest_value '.variables.CC_PERMISSION_MODE // "default"')
   cc_statusline=$(get_manifest_value '.variables.CC_STATUSLINE // "enhanced"')
-  serena_prompt=$(get_manifest_value '.variables.SERENA_INITIAL_PROMPT')
 
   # --- Claude Code Settings (claude/settings.json) ---
   local cc_settings_file="$output_dir/claude/settings.json"
@@ -873,7 +1092,10 @@ apply_substitutions() {
       # Permission mode
       .permissions.defaultMode = $cc_permission_mode |
       # Statusline script (guard against null/missing statusLine)
+      # Migrate old path (.claude/scripts/) to new (.claude/toolbox/scripts/)
+      # and swap script filename if needed
       (if (.statusLine.command | type) == "string" then
+        .statusLine.command |= gsub("\\.claude/scripts/"; ".claude/toolbox/scripts/") |
         .statusLine.command |= gsub("statusline_enhanced\\.sh"; $statusline_script)
       else . end) |
       # Plugin marketplace: directory -> github source for downstream
@@ -883,30 +1105,35 @@ apply_substitutions() {
     log_info "Applied Claude Code settings"
   fi
 
-  # --- Serena Settings (serena/project.yml) ---
-  local serena_settings_file="$output_dir/serena/project.yml"
-  if [[ -f "$serena_settings_file" ]]; then
-    # Project name - always substitute
-    yq -i ".project_name = \"$project_name\"" "$serena_settings_file"
+  # --- Codex Settings (codex/config.toml) ---
+  local codex_config_file="$output_dir/codex/config.toml"
+  if [[ -f "$codex_config_file" ]]; then
+    local codex_model codex_approval_policy
+    codex_model=$(get_manifest_value '.variables.CODEX_MODEL // "gpt-5.6-sol"')
+    codex_approval_policy=$(get_manifest_value '.variables.CODEX_APPROVAL_POLICY // "on-request"')
 
-    # Languages - convert comma-separated string to YAML array via jq
-    local lang_json
-    lang_json=$(echo "$languages" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$"; ""))')
-    yq -i ".languages = $lang_json" "$serena_settings_file"
+    yq -i -p toml -o toml \
+      ".model = \"$codex_model\" | .approval_policy = \"$codex_approval_policy\"" \
+      "$codex_config_file"
 
-    # Initial prompt - only substitute if provided
-    if [[ -n "$serena_prompt" ]]; then
-      yq -i ".initial_prompt = \"$serena_prompt\"" "$serena_settings_file"
+    local skip_capy
+    skip_capy=$(get_manifest_value '.variables.SKIP_CAPY // "false"')
+    if [[ "$skip_capy" == "true" ]]; then
+      yq -i -p toml -o toml 'del(.mcp_servers.capy) | with(select(.mcp_servers | length == 0); del(.mcp_servers))' "$codex_config_file"
+      log_info "Stripped capy MCP server config (SKIP_CAPY=true)"
     fi
-    log_info "Applied Serena settings"
+
+    log_info "Applied Codex config.toml settings"
   fi
 
   log_success "Substitutions applied to $output_dir"
 }
 
 # copy_sync_files()
-# Copies sync infrastructure files (workflow and script) from upstream to staging.
+# Copies sync infrastructure files (workflow) from upstream to staging.
 # These files are synced as-is without variable substitution.
+# Note: template-sync.sh and other scripts are now under .claude/toolbox/scripts/
+# and are synced as part of the .claude/ directory — no separate copy needed.
 #
 # Args:
 #   $1 - Upstream directory (parent of .github/)
@@ -916,16 +1143,15 @@ apply_substitutions() {
 #   0 on success
 #
 # Side effects:
-#   Creates workflows/ and scripts/ subdirectories in output_dir
-#   Copies template-sync.yml and template-sync.sh if they exist
+#   Creates workflows/ subdirectory in output_dir
+#   Copies template-sync.yml if it exists
 copy_sync_files() {
   local upstream_dir="$1"
   local output_dir="$2"
 
   log_step "Copying sync infrastructure files"
 
-  # Create staging subdirectories
-  mkdir -p "$output_dir/workflows" "$output_dir/scripts"
+  mkdir -p "$output_dir/workflows"
 
   local copied=0
 
@@ -933,21 +1159,6 @@ copy_sync_files() {
   if [[ -f "$upstream_dir/.github/workflows/template-sync.yml" ]]; then
     cp "$upstream_dir/.github/workflows/template-sync.yml" "$output_dir/workflows/"
     log_info "Copied template-sync.yml"
-    copied=$((copied + 1))
-  fi
-
-  # Copy script if it exists
-  if [[ -f "$upstream_dir/.github/scripts/template-sync.sh" ]]; then
-    cp "$upstream_dir/.github/scripts/template-sync.sh" "$output_dir/scripts/"
-    log_info "Copied template-sync.sh"
-    copied=$((copied + 1))
-  fi
-
-  # Copy docs/update.sh if it exists
-  if [[ -f "$upstream_dir/docs/update.sh" ]]; then
-    mkdir -p "$output_dir/docs"
-    cp "$upstream_dir/docs/update.sh" "$output_dir/docs/"
-    log_info "Copied docs/update.sh"
     copied=$((copied + 1))
   fi
 
@@ -978,7 +1189,6 @@ copy_sync_files() {
 #
 # Directories compared:
 #   staging/claude    -> .claude/
-#   staging/serena    -> .serena/
 compare_files() {
   local staging_dir="$1"
 
@@ -994,10 +1204,8 @@ compare_files() {
   # Directories to compare (staging subdir -> project dir)
   local -A dir_map=(
     ["claude"]=".claude"
-    ["serena"]=".serena"
+    ["codex"]=".codex"
     ["workflows"]=".github/workflows"
-    ["scripts"]=".github/scripts"
-    ["docs"]="docs"
   )
 
   for staging_subdir in "${!dir_map[@]}"; do
@@ -1034,9 +1242,8 @@ compare_files() {
     done < <(find "${staging_find_args[@]}" 2>/dev/null)
 
     # Find deleted files (exist in project but not in staging)
-    # Skip for sync infrastructure directories - we only sync specific files, not entire dirs
-    # (scripts/ only syncs template-sync.sh, workflows/ only syncs template-sync.yml)
-    if [[ -d "$project_dir" && "$staging_subdir" != "scripts" && "$staging_subdir" != "workflows" && "$staging_subdir" != "docs" ]]; then
+    # Skip for workflows/ — we only sync template-sync.yml, not the entire directory
+    if [[ -d "$project_dir" && "$staging_subdir" != "workflows" ]]; then
       local find_args=("$project_dir" -type f -print0)
 
       while IFS= read -r -d '' project_file; do
@@ -1169,8 +1376,6 @@ generate_diff_report() {
         # Map project path back to staging path
         if [[ "$file" == ".claude/"* ]]; then
           staging_file="$staging_dir/claude/${file#.claude/}"
-        elif [[ "$file" == ".serena/"* ]]; then
-          staging_file="$staging_dir/serena/${file#.serena/}"
         else
           staging_file="$staging_dir/$file"
         fi
@@ -1283,6 +1488,122 @@ generate_markdown_summary() {
     echo "2. Commands are now namespaced: \`/project:command\` → \`/kk:dir:command\` (skills remain unprefixed)"
     echo ""
   fi
+
+  local serena_deleted=false
+  for file in "${DELETED_FILES[@]}"; do
+    if [[ "$file" == ".serena/"* || "$file" == ".serena/" ]]; then
+      serena_deleted=true
+      break
+    fi
+  done
+  if $serena_deleted; then
+    echo "### Serena Removed"
+    echo ""
+    echo "Serena MCP has been removed from the template defaults."
+    echo "The \`.serena/\` directory and \`SERENA_INITIAL_PROMPT\` manifest variable have been cleaned up."
+    echo ""
+    echo "If you still want to use Serena, configure it at the user level in \`~/.claude.json\`."
+    echo ""
+  fi
+}
+
+# =============================================================================
+# Apply Changes (consolidates all mutations the YAML used to do inline)
+# =============================================================================
+
+# apply_changes()
+# Applies all staged changes to the working tree: copies files, runs
+# migrations, patches gitignore, auto-imports CLAUDE.extra.md, and
+# updates the manifest version.
+#
+# Args:
+#   $1 - Staging directory containing substituted templates
+#   $2 - Resolved version string to write into the manifest
+#
+# Side effects:
+#   Mutates working tree files, updates manifest
+apply_changes() {
+  local staging_dir="$1"
+  local new_version="$2"
+
+  log_step "Applying staged changes"
+
+  # --- Copy staged files into working tree ---
+  local -A dir_map=(
+    ["claude"]=".claude"
+    ["codex"]=".codex"
+    ["workflows"]=".github/workflows"
+    ["scripts"]=".github/scripts"
+    ["docs"]="docs"
+  )
+
+  for staging_subdir in "${!dir_map[@]}"; do
+    local source="$staging_dir/$staging_subdir"
+    local target="${dir_map[$staging_subdir]}"
+    [[ ! -d "$source" ]] && continue
+    mkdir -p "$target"
+    cp -r "$source/"* "$target/" 2>/dev/null || true
+    log_info "Applied changes to $target/"
+  done
+
+  # Restore executable permissions on scripts
+  chmod +x .codex/scripts/*.sh 2>/dev/null || true
+  chmod +x .github/scripts/*.sh 2>/dev/null || true
+
+  # --- Run migrations ---
+  local upstream_dir
+  upstream_dir="$(dirname "$staging_dir")/upstream"
+  if needs_plugin_migration "$upstream_dir"; then
+    run_plugin_migration
+  fi
+
+  if needs_serena_removal; then
+    run_serena_removal
+  fi
+
+  if needs_script_consolidation; then
+    run_script_consolidation
+  fi
+
+  # --- Patch .gitignore for .codex ---
+  if [[ -d "$staging_dir/codex" && -f ".gitignore" ]]; then
+    if git check-ignore -q .codex 2>/dev/null; then
+      if ! grep -q '^!\.codex' .gitignore; then
+        if grep -q '^!\.claude' .gitignore; then
+          sed -i '/^!\.claude$/a !.codex' .gitignore
+        else
+          printf '!.codex\n' >> .gitignore
+        fi
+        log_info "Added !.codex to .gitignore (was excluded by .* pattern)"
+      fi
+    fi
+  fi
+
+  # --- Auto-import CLAUDE.extra.md ---
+  if [[ -f "$staging_dir/claude/CLAUDE.extra.md" && -f "CLAUDE.md" ]]; then
+    if ! grep -q '@.claude/CLAUDE.extra.md' CLAUDE.md; then
+      printf '\n# Extra Instructions\n' >> CLAUDE.md
+      printf '@.claude/CLAUDE.extra.md\n' >> CLAUDE.md
+      log_info "Added @import reference for .claude/CLAUDE.extra.md to CLAUDE.md"
+    fi
+  fi
+
+  # --- Update manifest version ---
+  local synced_at
+  synced_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  migrate_manifest
+  backfill_manifest_variables
+
+  if json_update "$MANIFEST_PATH" \
+    '.template_version = $version | .synced_at = $synced_at' \
+    --arg version "$new_version" --arg synced_at "$synced_at"; then
+    log_info "Updated manifest to version $new_version"
+  else
+    log_warn "Failed to update manifest version"
+  fi
+
+  log_success "All changes applied"
 }
 
 # =============================================================================
@@ -1305,9 +1626,13 @@ Options:
                         - "v1.2.3": Specific tag
                         - SHA: Specific commit
   --dry-run             Preview changes without applying them
+  --local               Fetch, compare, and apply in a single invocation
+  --apply               Apply pre-staged changes to the working tree (CI only)
   --ci                  CI mode: outputs GitHub Actions compatible format
   --output-dir DIR      Directory to stage changes (default: temporary directory)
   -h, --help            Show this help message
+
+Requires: jq, git, curl, yq (mikefarah/yq for YAML processing)
 
 Exit Codes:
   0 - Success (changes found or no changes)
@@ -1315,14 +1640,14 @@ Exit Codes:
   2 - Invalid CLI arguments
 
 Examples:
-  # Sync to latest release
-  ./template-sync.sh
-
   # Preview changes without applying
   ./template-sync.sh --dry-run
 
-  # Sync to specific version
-  ./template-sync.sh --version v1.0.0
+  # Sync to latest release and apply locally
+  ./template-sync.sh --local
+
+  # Sync to specific version and apply locally
+  ./template-sync.sh --local --version v1.0.0
 
   # CI mode with custom output directory
   ./template-sync.sh --ci --output-dir ./staging
@@ -1346,6 +1671,14 @@ parse_arguments() {
       ;;
     --dry-run)
       DRY_RUN=true
+      shift
+      ;;
+    --apply)
+      APPLY_MODE=true
+      shift
+      ;;
+    --local)
+      LOCAL_MODE=true
       shift
       ;;
     --ci)
@@ -1388,13 +1721,19 @@ main() {
   # Register cleanup trap early for signal handling
   trap cleanup_on_exit EXIT INT TERM
 
-  # Check dependencies first
-  check_dependencies
-
-  # Parse CLI arguments
+  # Parse CLI arguments (before dependency check so APPLY_MODE is set)
   parse_arguments "$@"
 
-  # Set default staging directory if not provided
+  # Check dependencies (applies mode-aware checks)
+  check_dependencies
+
+  # Apply mode requires an explicit staging directory
+  if $APPLY_MODE && [[ -z "$STAGING_DIR" ]]; then
+    log_error "--apply requires --output-dir to locate staged changes"
+    exit 2
+  fi
+
+  # Set default staging directory if not provided (non-apply mode only)
   if [[ -z "$STAGING_DIR" ]]; then
     STAGING_DIR=$(mktemp -d "/tmp/template-sync.XXXXXX")
     # Track temp directory for cleanup
@@ -1418,6 +1757,13 @@ main() {
   # Read and validate manifest
   read_manifest
   validate_manifest
+
+  # Apply mode: skip fetch/compare/report, just apply staged changes
+  if $APPLY_MODE; then
+    apply_changes "$STAGING_DIR/substituted" "$TARGET_VERSION"
+    return 0
+  fi
+
   migrate_manifest
   backfill_manifest_variables
 
@@ -1458,6 +1804,15 @@ main() {
     run_plugin_migration
   fi
 
+  # Remove Serena artifacts if still present (upstream dropped Serena)
+  if needs_serena_removal; then
+    run_serena_removal
+  fi
+
+  if needs_script_consolidation; then
+    run_script_consolidation
+  fi
+
   # Apply substitutions to fetched templates
   SUBSTITUTED_TEMPLATES_PATH="$STAGING_DIR/substituted"
   apply_substitutions "$FETCHED_TEMPLATES_PATH" "$SUBSTITUTED_TEMPLATES_PATH"
@@ -1473,15 +1828,17 @@ main() {
   fi
 
   # Compare files and generate report
-  # Save migration deletions before compare_files resets arrays
-  local migration_deletions=()
-  if $PLUGIN_MIGRATED; then
-    migration_deletions=("${DELETED_FILES[@]}")
-  fi
+  # Save pre-compare deletions (from migrations, consolidation, etc.)
+  # before compare_files resets arrays
+  local pre_compare_deletions=("${DELETED_FILES[@]}")
   compare_files "$SUBSTITUTED_TEMPLATES_PATH"
-  # Merge migration deletions back
-  if [[ ${#migration_deletions[@]} -gt 0 ]]; then
-    DELETED_FILES+=("${migration_deletions[@]}")
+  # Merge pre-compare deletions back, skipping any already found by compare
+  if [[ ${#pre_compare_deletions[@]} -gt 0 ]]; then
+    local -A compare_seen=()
+    for f in "${DELETED_FILES[@]}"; do compare_seen["$f"]=1; done
+    for f in "${pre_compare_deletions[@]}"; do
+      [[ -z "${compare_seen[$f]+x}" ]] && DELETED_FILES+=("$f")
+    done
   fi
   generate_diff_report "$SUBSTITUTED_TEMPLATES_PATH"
 
@@ -1491,6 +1848,10 @@ main() {
     log_success "Templates are up to date - no changes needed"
   elif $DRY_RUN; then
     log_info "Dry run complete - $total_changes file(s) would be changed"
+  elif $LOCAL_MODE; then
+    log_info "Applying $total_changes change(s) locally..."
+    APPLY_MODE=true
+    apply_changes "$SUBSTITUTED_TEMPLATES_PATH" "$RESOLVED_VERSION"
   else
     log_info "Sync complete - $total_changes file(s) identified for update"
     log_info "Review the changes above and apply manually or via PR"

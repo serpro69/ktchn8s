@@ -1,16 +1,18 @@
 {
   "schema_version": "1",
   "upstream_repo": "serpro69/claude-toolbox",
-  "template_version": "d88965f4ce61958b66f5e444a42fbb5283372cfe",
-  "synced_at": "2026-04-21T16:57:43Z",
+  "template_version": "v0.19.0",
+  "synced_at": "2026-08-18T18:50:11Z",
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
     "CC_MODEL": "claude-opus-4-8[1m]",
-    "SERENA_INITIAL_PROMPT": "",
     "CC_EFFORT_LEVEL": "high",
     "CC_PERMISSION_MODE": "default",
-    "CC_STATUSLINE": "enhanced"
+    "CC_STATUSLINE": "enhanced",
+    "CODEX_MODEL": "gpt-5.6-sol",
+    "CODEX_APPROVAL_POLICY": "on-request",
+    "SKIP_CAPY": "false"
   },
   "plugin_migrated": true
 }
