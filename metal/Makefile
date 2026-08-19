@@ -206,14 +206,14 @@ _requirements:
 
 kubeconfig.yaml:
 	@for hst in $$(make --quiet inventory | xargs); do
-		if ping -q -c 3 -w 3 $${hst} >/dev/null; then
-			if ssh $${hst} "test -f /etc/rancher/k3s/k3s.yaml"; then
-				scp $${hst}:/etc/rancher/k3s/k3s.yaml kubeconfig.yaml >/dev/null
-				sed -i 's/127.0.0.1/10.10.10.100/' kubeconfig.yaml
-				exit 0
-			fi
+		if ssh -o ConnectTimeout=4 $${hst} "test -f /etc/rancher/k3s/k3s.yaml"; then
+			scp $${hst}:/etc/rancher/k3s/k3s.yaml kubeconfig.yaml >/dev/null
+			sed -i 's/127.0.0.1/10.10.10.100/' kubeconfig.yaml
+			exit 0
 		fi
 	done
+	echo "$(__RED)error: k3s.yaml not found or all hosts offline$(__RESET)"
+	exit 1
 
 ### Main
 
