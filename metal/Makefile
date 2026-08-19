@@ -198,14 +198,22 @@ default: help
 
 ### Helpers
 
-help: ## Print this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
 ~/.ssh/homelab_id_ed25519:
 	@ssh-keygen -t ed25519 -P '' -f "$@"
 
 _requirements:
 	@ansible-galaxy install -r requirements.yml
+
+kubeconfig.yaml:
+	@for hst in $$(make --quiet inventory | xargs); do
+		if ping -q -c 3 -w 3 $${hst} >/dev/null; then
+			if ssh $${hst} "test -f /etc/rancher/k3s/k3s.yaml"; then
+				scp $${hst}:/etc/rancher/k3s/k3s.yaml kubeconfig.yaml >/dev/null
+				sed -i 's/127.0.0.1/10.10.10.100/' kubeconfig.yaml
+				exit 0
+			fi
+		fi
+	done
 
 ### Main
 
@@ -242,3 +250,8 @@ wipe: SHELL:=$(shell which bash)
 wipe: ~/.ssh/homelab_id_ed25519 _requirements ## Wipe the DISK disk on the SERVER
 	@$(call check_defined, SERVER, missing or empty variable; run 'make inventory' for a list of hosts)
 	@$(call play,wipe.yml,$(ANSIBLE_TAGS),,-e "wipe_target=$(SERVER)")
+
+### Help
+
+help: ## Print this help message
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
