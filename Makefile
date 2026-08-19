@@ -166,8 +166,8 @@ finalize: clean ## Finalize the ktchn8s homelab cluster setup
 docs: ## Serve documentation on localhost
 	@mkdocs serve
 
-help: ## Print this help message
-	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+kubeconfig.yaml:
+	@make -C metal kubeconfig.yaml
 
 run: ## Run a CMD command on all servers via SSH
 	@cmd=$(CMD); \
@@ -180,3 +180,7 @@ run: ## Run a CMD command on all servers via SSH
 		ssh "$${host}" "$${cmd}" || continue; \
 		printf "done %s on %s\n" "$${cmd}" "$${host}"; \
 	done
+
+help: ## Print this help message
+	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
