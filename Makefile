@@ -177,7 +177,7 @@ run: ## Run a CMD command on all servers via SSH
 	fi; \
 	hosts=$$(ansible-inventory -i metal/inventory.sh --list | jq -r '._meta.hostvars | keys[]'); \
 	for host in $${hosts}; do \
-		ssh "$${host}" "$${cmd}" || continue; \
+		ssh -o ConnectTimeout=10 "$${host}" "$${cmd}" || continue; \
 		printf "done %s on %s\n" "$${cmd}" "$${host}"; \
 	done
 
