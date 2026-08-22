@@ -17,8 +17,10 @@ Replace the flat `storage_dirs` list with the designed tree.
 1. In `metal/roles/storage/vars/main.yml`, replace the `storage_dirs` value
    (`Backups, Documents, Music, Pictures, Temp, Videos`) with the full designed tree as
    relative paths (e.g. `00_meta`, `10_documents`, `10_documents/inbox`,
-   `10_documents/10.01_personal`, …, `30_media/rotation/movies`,
-   `30_media/downloads/complete`, `30_media/downloads/incomplete`, …, `99_tmp`). Keep it
+   `10_documents/10.01_personal`, …, `30_media/rotation/movies`, `30_media/rotation/shows`,
+   `30_media/rotation/downloads/complete`, `30_media/rotation/downloads/incomplete` —
+   NB: `downloads/` nests INSIDE `rotation/` so linking containers see one mount —
+   …, `99_tmp`). Keep it
    one flat list of paths — the consuming task (`tasks/nfs.yml:21`, a `file: state=directory`
    loop over `storage_dirs`) then needs no structural change. Set ownership/mode in that
    task to `1000:1000` / `0775` if not already (must match `nfs_anon_uid/gid` in
@@ -43,16 +45,20 @@ may reference it; grep the role first and repoint those to `99_tmp` if so.
 
 ## snapraid-excludes
 
-In `metal/roles/storage/templates/snapraid.conf.j2`, next to the existing
-`exclude downloads/` line, add:
+In `metal/roles/storage/templates/snapraid.conf.j2`, use **root-anchored** excludes
+(leading slash = disk root only) — name-anchored patterns match at ANY depth and would
+silently exclude same-named dirs inside `70_backups` dumps:
 
-- `exclude rotation/` — *arr churn, re-downloadable by design
-- `exclude inbox/` — machine-consumed transient drop dir
-- `exclude /99_tmp/` — root-anchored (leading slash = disk root only), staging/scratch
+- add `exclude /30_media/rotation/` — *arr + transmission churn (covers nested
+  `downloads/`), re-downloadable by design; keeps `update_threshold`/`delete_threshold`
+  meaningful
+- add `exclude /10_documents/inbox/` — machine-consumed transient drop dir
+- add `exclude /99_tmp/` — migration staging / scratch
+- **replace** the existing `exclude downloads/` with nothing (superseded by the rotation
+  entry) and review `exclude appdata/` the same way — both are name-anchored and would
+  hit backup-dump content; keep `/tmp/` and the dot-file excludes as-is
 
-Leave `appdata/`, `/tmp/` and the dot-file excludes as-is. Keep a one-line comment per
-new exclude stating *why* (rotation: quality-upgrade churn would trip
-`update_threshold`/`delete_threshold`; 99_tmp: migration staging).
+Keep a one-line comment per exclude stating *why*.
 → verify: rendered `/etc/snapraid.conf` on the NAS contains the three lines;
 `snapraid status` parses the config without error (parity may not exist yet — config
 parse is the check, not sync).
@@ -79,6 +85,10 @@ delete it (reclaim policy is `Retain`; nothing on the NAS is touched).
 `…/mnt/storage/30_media`; after ArgoCD sync, `kubectl get pv pv-nfs-media` exists and
 `pv-nfs-videos` is gone.
 
+Land this and the [jellyfin remount](#jellyfin-remount) in **one commit/sync window**: if
+this change syncs alone, the still-deployed jellyfin chart claims the now-deleted
+`pv-nfs-videos` and degrades until the remount lands (self-healing, but avoidable).
+
 ## jellyfin-remount
 
 In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
@@ -87,36 +97,49 @@ In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
    `metadata.name: pvc-nfs-media`, `volumeName: pv-nfs-media`, `storage` request ≤ PV
    capacity. Keep `storageClassName: ""`.
 2. In `persistence`: drop the `anothervideos` block. Rename/redefine it as `media` using
-   `existingClaim: pvc-nfs-media` with `advancedMounts`:
-   - `main.main` (Jellyfin): `/media/movies` → subPath `30.01_movies` (**readOnly**),
-     `/media/shows` → subPath `30.02_tv` (**readOnly**), `/media/music` → `30.03_music`
-     (**readOnly**), `/media/rotation` → subPath `rotation` (**readOnly**).
-   - `main.transmission`: `/downloads` → subPath `downloads` (rw).
-   - `main.radarr`: `/movies` → subPath `rotation/movies` (rw), `/downloads` → subPath
-     `downloads` (rw).
-   - `main.sonarr`: `/shows` → subPath `rotation/shows` (rw), `/downloads` → subPath
-     `downloads` (rw).
-3. In the `data` PVC `advancedMounts`, remove the media subPaths (`movies`, `shows`,
+   `existingClaim: pvc-nfs-media` with `advancedMounts`. **Critical rule: a container
+   that hardlinks (radarr, sonarr) gets exactly ONE mount from this PVC** — separate
+   subPath mounts of the same PVC are distinct bind mounts and `link(2)` fails with
+   `EXDEV` across them (kernel compares vfsmounts, not `st_dev`):
+   - `main.main` (Jellyfin, read-only-everything, never links — multiple mounts fine):
+     `/media/movies` → subPath `30.01_movies` (**readOnly**), `/media/shows` → subPath
+     `30.02_tv` (**readOnly**), `/media/music` → subPath `30.03_music` (**readOnly**),
+     `/media/rotation` → subPath `rotation` (**readOnly**).
+   - `main.transmission`: `/data/downloads` → subPath `rotation/downloads` (rw) — sole
+     mount; it never links, and the narrower subPath keeps least privilege while the
+     container-side path string matches the *arrs'.
+   - `main.radarr`: `/data` → subPath `rotation` (rw) — sole mount; root folder
+     `/data/movies`, downloads visible at `/data/downloads`.
+   - `main.sonarr`: `/data` → subPath `rotation` (rw) — sole mount; root folder
+     `/data/shows`.
+3. Add `PUID: "1000"` and `PGID: "1000"` env to every lscr.io container (transmission,
+   radarr, sonarr, prowlarr): `root_squash` remaps only uid 0, fsGroup is inert on NFS,
+   and linuxserver images otherwise drop to uid 911 → EACCES on `1000:1000/0775` dirs.
+   Do NOT set `runAsUser` on these containers — it disables linuxserver's PUID handling.
+4. In the `data` PVC `advancedMounts`, remove the media subPaths (`movies`, `shows`,
    `transmission/downloads`, `transmission/downloads/complete`) from all containers —
-   `data` keeps config mounts only. Update transmission's config (or its env/chart
-   settings) so the download dir is `/downloads/complete` with incomplete dir
-   `/downloads/incomplete`; radarr/sonarr download-client path stays `/downloads/…` —
-   identical strings across containers, no remote path mappings.
-4. Container-path consistency check: the *arr "Root Folder" settings (runtime config, set
+   `data` keeps config mounts only. Update transmission's config so the download dir is
+   `/data/downloads/complete` with incomplete dir `/data/downloads/incomplete`;
+   radarr/sonarr download-client paths see identical strings — no remote path mappings.
+5. Container-path consistency check: the *arr "Root Folder" settings (runtime config, set
    via each app's UI/API on first setup — see
-   `docs/guides/how_to_for_media_management.md`) must point at `/movies` and `/shows`
-   (which now resolve to `rotation/…`). The guide's Jellyfin library paths change to
-   `/media/movies`, `/media/shows` (preserved) + `/media/rotation/{movies,shows}`
-   (update the guide in the same commit).
+   `docs/guides/how_to_for_media_management.md`) must point at `/data/movies` and
+   `/data/shows`. The guide's Jellyfin library paths change to `/media/movies`,
+   `/media/shows` (preserved) + `/media/rotation/{movies,shows}` (update the guide in
+   the same commit).
 
 → verify (after ArgoCD sync, in order):
   a. `helm template apps/jellyfin` — every media mount resolves to the single
-     `pvc-nfs-media` claim; Jellyfin's mounts carry `readOnly: true`.
-  b. Hardlink proof: `kubectl exec` into the radarr container —
-     `touch /downloads/complete/.linktest && ln /downloads/complete/.linktest /movies/.linktest
-     && stat -c %h /movies/.linktest` prints `2`; clean both names up.
-  c. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
-  d. `./tests/metal.sh` still passes (NFS validation tasks).
+     `pvc-nfs-media` claim; Jellyfin's mounts carry `readOnly: true`; radarr/sonarr have
+     exactly one media volumeMount each; PUID/PGID env present on all lscr containers.
+  b. UID proof: `kubectl exec` into radarr — `id` shows the s6-dropped app user as
+     1000:1000 (after PUID applies), and `touch /data/downloads/.writetest` succeeds.
+  c. Hardlink proof: in radarr —
+     `touch /data/downloads/complete/.linktest && ln /data/downloads/complete/.linktest
+     /data/movies/.linktest && stat -c %h /data/movies/.linktest` prints `2`; clean up
+     both names.
+  d. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
+  e. `./tests/metal.sh` still passes (NFS validation tasks).
 
 ## migration-runbook
 
@@ -128,9 +151,13 @@ everything under `/mnt/storage/00_meta/migration/`.
    `-H` preserves any hardlinks in the source; no `--delete` ever during migration.
 2. **Manifests** (hash-set method — see design.md § Migration plan for why not `rsync -c`):
    for each dataset run `find <root> -type f -print0 | xargs -0 b3sum > <name>.b3` —
-   `nas-copy.b3` (on the NAS), `driveB.b3`, `driveC.b3` (hash B/C wherever they are
-   attached; can run in parallel with the NAS-side hashing). Store all `.b3` files in
-   `00_meta/migration/`.
+   `nas-copy.b3` (generated **on the NAS** so terabytes are read locally, not over NFS),
+   `driveB.b3`, `driveC.b3` (hash B/C wherever they are attached; can run in parallel
+   with the NAS-side hashing). The NAS needs b3sum installed: one-off
+   `apt install b3sum` (Debian; fall back to the static binary from the upstream BLAKE3
+   releases if the package is unavailable) — a migration-only tool, deliberately NOT
+   added to the storage role; record the install + version in
+   `00_meta/migration/README`. Store all `.b3` files in `00_meta/migration/`.
 3. **Hash-set diff:** hashes present in `driveB.b3`/`driveC.b3` but absent from
    `nas-copy.b3` (compare field 1 only, e.g. `comm -13` on sorted hash columns) → copy
    those files into `99_tmp/driveB_delta/` (preserving relative paths), regenerate
@@ -141,13 +168,20 @@ everything under `/mnt/storage/00_meta/migration/`.
    cruft (`.@__thumb`, `.streams`, `Thumbs.db`, superseded archive generations) and log
    deletions to `discarded.txt`.
 5. **Exit check:** `find /mnt/storage/99_tmp -type f | wc -l` → 0, and spot-audit:
-   sample N hashes from `nas-copy.b3`, confirm each file exists at its logged destination
-   (`b3sum -c` on a sample re-rooted via `moves.log`).
+   sample N hashes from `nas-copy.b3` and derive each file's destination by applying the
+   **longest-prefix-matching `moves.log` entry** to the manifest path (moves are logged
+   at directory level; the longest matching `src` prefix rewrites to its `dst`), then
+   `b3sum -c` the sampled hash against that destination path.
 
 ## parity-enablement
 
 One drive at a time; **drive A last**.
 
+0. **Parity-size gate (before ANY wipe):** snapraid requires each parity device to be at
+   least as large as the largest data branch. All drives are same-model 18TB Seagates
+   (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
+   the candidate parity drive vs every `/mnt/data*` device and record the numbers in
+   `00_meta/migration/`. Abort the wipe if the candidate is smaller.
 1. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
    `wipefs`/`blkdiscard` per the drive's disk-by-id), add its id under `parity_drives` in
    the sops inventory (`metal/inventory/metal.yml`), run the storage role
