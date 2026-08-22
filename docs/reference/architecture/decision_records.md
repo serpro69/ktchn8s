@@ -261,3 +261,27 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 - Any file's integrity can be re-verified by hash forever, even after sorting scattered it across the tree.
 - The migration window is longer than a copy-and-wipe approach — hashing 16TB per dataset is disk-bound (~a day per drive) — accepted as the price of the proof.
 - `b3sum` becomes a dev-shell dependency (`flake.nix`).
+
+## AD-0008 - Helm chart pinning strategy
+
+**Context**
+
+Decided 2026-08-18 during the `nfs` branch pre-merge review; originally recorded in [todo.md](../../info/todo.md) and lifted here.
+
+All Helm charts in this repo declare upstream dependencies in `Chart.yaml`. Three supply-chain postures were on the table: exact version pins with automated bumps, committing `Chart.lock` files, and vendoring the dependency archives (`charts/*.tgz`) into git. Two facts shaped the evaluation: `Chart.lock`'s digest hashes dependency *metadata*, not tarball content — so it verifies neither integrity nor reproducibility when versions are already exact-pinned; and with the cluster running continuously, chart repositories are only contacted at sync/render time — a failed render leaves the last-synced state running, so an upstream outage delays updates rather than breaking workloads.
+
+**Decision**
+
+- We will pin exact chart versions in `Chart.yaml` and let Renovate propose daily bumps.
+- We will not commit `Chart.lock` files and not vendor `charts/*.tgz` archives — both stay gitignored.
+
+**Status**
+
+- Accepted
+
+**Consequences**
+
+- Updates are deliberate, reviewable version bumps; no lockfile churn or binary blobs in git history.
+- With exact pins, `Chart.lock` would add no integrity or reproducibility guarantee — omitting it removes noise, not protection.
+- Accepted residual risk: a full cluster rebuild while an upstream repo is down or has pruned the pinned version requires bumping to an available version first.
+- Code reviews should not re-flag missing `Chart.lock` files — this is a decision, not an oversight.
