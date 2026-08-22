@@ -1,6 +1,6 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Status: designed (2026-08-22, revised same day after design review — see [design-review.md](./design-review.md) § Resolution) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
 > Key decisions recorded as ADRs [AD-0003 … AD-0007](../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail.
 
 ## Problem statement
@@ -53,8 +53,10 @@ NFS-mounted PVs all punish renames)?
 │   ├── 30.02_tv/         #                          │ automation can never delete these
 │   ├── 30.03_music/      #                          │
 │   ├── 30.04_audiobooks/ #                          ┘
-│   ├── rotation/         # *arr root folders: movies/ shows/ (music/ books/ later)
-│   └── downloads/        # transmission: complete/ incomplete/
+│   └── rotation/         # the ENTIRE machine tier under one parent (hardlinks need
+│       ├── downloads/    #   one bind mount — see mount topology): transmission
+│       ├── movies/       #   downloads/{complete,incomplete}; *arr root folders
+│       └── shows/        #   movies/ shows/ (music/ books/ later)
 ├── 40_library/
 │   ├── 40.01_books/      # by genre/language (Calibre/Kavita-compatible)
 │   ├── 40.02_courses/    # video courses, trainings, language materials
@@ -81,10 +83,15 @@ NFS-mounted PVs all punish renames)?
    correct up to 99 children everywhere (`ls`, NFS clients, web UIs) and match the vault's
    existing `.01` sub-level convention. The vault's three-digit top level encodes a third
    numbering level (`300/310/310.01`) which the NAS grammar deliberately does not have.
-2. **Numbered = human-curated and parity-protected; unnumbered lowercase = machine-owned
-   and parity-excluded.** One glance tells you who owns a dir and whether parity covers it.
-   (`90_inbox` is numbered — it is the *human's* inbox; `10_documents/inbox/` is unnumbered —
-   machines feed and delete there.)
+2. **At the two numbered levels: numbered = human-curated and parity-protected;
+   unnumbered lowercase = machine-owned and parity-excluded.** One glance tells you who
+   owns a dir and whether parity covers it. The rule applies only where numbering applies
+   (direct children of the pool root and of numbered dirs) — deeper plain-named dirs
+   (`10.01_personal/ids/`) simply inherit their ancestor's tier. (`90_inbox` is numbered —
+   it is the *human's* inbox; `10_documents/inbox/` is unnumbered — machines feed and
+   delete there.) One deliberate exception: `20.02_camera` is numbered and
+   parity-protected yet machine-*fed* — camera dumps are the sole copy of those photos
+   until promotion, so they must be under parity even though a service writes there.
 3. **Numbers are never recycled; directories are never renamed.** Categories retire via an
    entry in `00_meta/RETIRED.md`; the number stays burned.
 4. ASCII lowercase + underscores at numbered levels; leaf content keeps original names
@@ -92,9 +99,10 @@ NFS-mounted PVs all punish renames)?
 5. **Service shares alias the numbers away** (`media` → `30_media`, `photos` → `20_photos`)
    so external names stay stable; a future SMB layer exports the same aliases with zero
    restructuring.
-6. **Two-tier flow — machines feed, humans promote.** Machine tiers: `rotation/`,
-   `downloads/`, `20.02_camera`, Immich uploads (Ceph). Human promotion: `mv` into a
-   numbered dir. Applies symmetrically to media and photos.
+6. **Two-tier flow — machines feed, humans promote.** Machine tiers: `rotation/`
+   (including its nested `downloads/`), `20.02_camera` (numbered/parity exception — see
+   rule 2), Immich uploads (Ceph). Human promotion: `mv` into a numbered dir. Applies
+   symmetrically to media and photos.
 
 ### The `50_topics` decision rule (working-set test)
 
@@ -106,12 +114,13 @@ and deliberate — never "I have three files about X".
 
 ## Two-tier media & photos
 
-**Media.** transmission writes `downloads/` → *arr imports via **hardlink** into
-`rotation/` (same PV → same device → real link; seeding continues from the original name
-while the library copy carries the clean name) → the owner promotes keepers with `mv` into
-`30.0x` (instant, same filesystem). Radarr/Sonarr delete-and-replace files on quality
-upgrades, so the rotation/preserved split is a **data-safety boundary**: automation
-physically cannot touch `30.0x`.
+**Media.** transmission writes `rotation/downloads/` → *arr imports via **hardlink** into
+`rotation/movies|shows/` (both paths live under the *single* `rotation` mount in the *arr
+containers → real link; seeding continues from the original name while the library copy
+carries the clean name) → the owner promotes keepers with `mv` into `30.0x` (NAS-side,
+same filesystem, instant). Radarr/Sonarr delete-and-replace files on quality upgrades, so
+the rotation/preserved split is a **data-safety boundary**: automation physically cannot
+touch `30.0x`.
 
 Hardlinks consume storage **once** — two directory entries, one inode. The 2× case only
 occurs when a hardlink silently degrades to a copy (cross-device), which the single-PV
@@ -133,11 +142,15 @@ portability, only deletion risk.
 
 ## Service integration
 
-**Mount topology principle:** one PV per exposed subtree; any pod that must hardlink or
-rename across paths receives those paths as `subPath` mounts of a **single** PVC.
-(Verified: separate PVs — even of sibling subpaths of one export — are separate NFS
-mounts with distinct `st_dev`, and the VFS rejects cross-mount `link(2)`/`rename(2)` with
-`EXDEV` before the server ever sees the call.)
+**Mount topology principle:** one PV per exposed subtree; any container that must
+hardlink or rename across paths must see both paths under **one single volumeMount** —
+not merely one PVC. The kernel's `EXDEV` check in `link(2)`/`rename(2)` compares
+*vfsmounts*, not devices: every k8s volumeMount (including each `subPath`) is a distinct
+bind mount, so two subPath mounts of the *same* PVC still fail with `EXDEV` even though
+`st_dev` is identical (empirically verified 2026-08-22: cross-bind-mount `ln` fails,
+same-parent-mount `ln` succeeds). This is why the entire machine tier nests under
+`rotation/` — one subPath mount of `rotation` gives a linking container downloads and
+library roots inside a single vfsmount.
 
 - **`system/csi-driver-nfs`:** the `videos` volume entry is replaced by `media` → share
   `30_media`, PV `pv-nfs-media`. The old `pv-nfs-videos`/PVC pair is deleted, not migrated
@@ -145,15 +158,22 @@ mounts with distinct `st_dev`, and the VFS rejects cross-mount `link(2)`/`rename
   each: `photos` → `20_photos`, `documents` → `10_documents`, added with their consumers.
 - **Jellyfin chart (`apps/jellyfin`):** the 50Gi Ceph `data` PVC keeps *configs only* —
   media on triple-replicated NVMe is capacity-wrong (one 4K remux ≈ its size). All media
-  paths become subPaths of the NFS PVC. Write matrix:
-  - transmission → `downloads/` only (`/downloads`)
-  - Radarr → `rotation/movies` (`/movies`) + `downloads/` (`/downloads`)
-  - Sonarr → `rotation/shows` (`/shows`) + `downloads/` (`/downloads`)
-  - Jellyfin → **everything `:ro`** (`/media/movies` → `30.01_movies`, `/media/shows` →
-    `30.02_tv`, `/media/rotation/…` → `rotation/…`); Jellyfin writes nothing — its
-    metadata lives in its config volume; deletions flow Jellyseerr → *arr APIs.
-  - Container-side download paths are identical across transmission and the *arrs — no
-    remote-path mappings.
+  paths become subPaths of the NFS PVC. Write matrix (one volumeMount per writer):
+  - transmission → subPath `rotation/downloads` mounted at `/data/downloads` (rw; sees
+    only downloads — least privilege; it never links).
+  - Radarr → subPath `rotation` mounted at `/data` (rw; root folder `/data/movies`;
+    downloads at `/data/downloads` — links happen inside this one mount).
+  - Sonarr → subPath `rotation` mounted at `/data` (rw; root folder `/data/shows`).
+  - Jellyfin → **everything `:ro`**: `/media/movies` → `30.01_movies`, `/media/shows` →
+    `30.02_tv`, `/media/music` → `30.03_music`, `/media/rotation` → `rotation`
+    (`30.04_audiobooks` is intentionally unmounted until the Audiobookshelf/Kavita
+    decision). Jellyfin writes nothing — its metadata lives in its config volume;
+    deletions flow Jellyseerr → *arr APIs. Multiple RO mounts are fine: Jellyfin never
+    links or renames.
+  - Path-string consistency holds: transmission reports `/data/downloads/complete/x` and
+    the *arrs see the file at exactly that path — no remote-path mappings.
+  - All lscr.io writers get `PUID=1000`/`PGID=1000` (see Security posture) — and no
+    `runAsUser`, which would disable PUID handling in linuxserver images.
 - **NAS side:** zero export changes — the single root export (`fsid=1`,
   `no_subtree_check`) already serves subpath mounts.
 - **Future service requirements** (binding when they arrive; the services themselves are
@@ -203,9 +223,14 @@ schedulable changes). What does apply:
 ## Security posture
 
 - **No RBAC changes** — no new ServiceAccounts, Roles, or controllers.
-- **NFS trust model:** `root_squash` with `anonuid/anongid=1000` — every write from the
-  cluster lands as `1000:1000`; export restricted to the homelab CIDR + workstation
-  (UFW on the NAS, router ACLs upstream).
+- **NFS trust model:** `root_squash` with `anonuid/anongid=1000` remaps **only uid 0** —
+  non-root container UIDs pass through unchanged, and `fsGroup` is inert on NFS volumes
+  (kubelet does not chown NFS; supplementary-group tricks don't survive the linuxserver
+  s6 privilege drop). Therefore every writer must actually *run* as `1000:1000`: the
+  lscr.io containers (transmission, radarr, sonarr, prowlarr) get explicit
+  `PUID=1000`/`PGID=1000` env (their default is uid 911), and no `runAsUser` override.
+  Export restricted to the homelab CIDR + workstation (UFW on the NAS, router ACLs
+  upstream).
 - **Read-only enforcement at mount level:** Jellyfin's media mounts and Immich's
   `20.01_library` mount declare `readOnly: true` — kernel-enforced preservation boundary,
   not service-configuration hope.
@@ -225,10 +250,12 @@ schedulable changes). What does apply:
    copy only — survivable *by design*: source drives are wiped one at a time, the last
    only after the first successful snapraid sync + scrub. Worst case: re-copy from source.
    Detection: SMART/dmesg. Owner: the operator, during the runbook.
-3. **Silent hardlink breakage** (e.g. a future chart refactor splits the media PVC).
-   Impact: imports degrade to copies — 2× storage, seeding still works but space bleeds.
-   Detection: `30_media` usage ≈2× expected; `stat -c %h <imported file>` returns 1 while
-   the torrent still seeds. Recovery: restore single-PVC topology; re-import or dedupe.
+3. **Silent hardlink breakage** (e.g. a future chart refactor splits an *arr's single
+   `rotation` mount into separate per-dir subPath mounts — which `EXDEV`s even on one
+   PVC). Impact: imports degrade to copies — 2× storage, seeding still works but space
+   bleeds. Detection: `30_media` usage ≈2× expected; `stat -c %h <imported file>` returns
+   1 while the torrent still seeds. Recovery: restore the single-mount topology;
+   re-import or dedupe.
 4. **Accepted risks:** (a) a torrent client that mutates completed files would corrupt
    parity of a promoted file via the shared inode — Transmission does not mutate completed
    data; accepted. (b) Immich's DB is the sole holder of albums/faces — mitigated by
@@ -256,16 +283,26 @@ migration the pool has no parity; source drives are the only redundancy.
    archive generations; deletions recorded in the log.
 6. **Exit criterion:** `99_tmp` empty ∧ every manifest entry accounted for (moved or
    consciously deleted).
-7. **Release drives one at a time:** wipe B/C → add to `parity_drives` in the sops
-   inventory → storage role → snapraid initial sync + scrub. **Drive A last, only after
-   the first successful sync/scrub.**
+7. **Release drives one at a time:** verify the parity-size precondition (each parity
+   device ≥ largest data branch — snapraid requirement; all drives are 18TB Seagates,
+   confirmed 2026-08-22, so this holds, but the runbook checks `lsblk -b` anyway before
+   any wipe) → wipe B/C → add to `parity_drives` in the sops inventory → storage role →
+   snapraid initial sync + scrub. **Drive A last, only after the first successful
+   sync/scrub.**
 
 ## Parity & backup policy
 
-- **snapraid excludes** (in `snapraid.conf.j2`): existing `downloads/` + new `rotation/`,
-  `inbox/` (name-anchored, match anywhere) and root-anchored `/99_tmp/`. Everything
-  numbered is parity-protected. Churn thresholds (`delete_threshold: 40`,
-  `update_threshold: 500`) stay meaningful because machine churn is excluded.
+- **snapraid excludes** (in `snapraid.conf.j2`): **root-anchored** — `/30_media/rotation/`
+  (covers the nested `downloads/`), `/10_documents/inbox/`, `/99_tmp/`. Root-anchoring
+  matters: name-anchored patterns (`downloads/`) match at *any* depth and would silently
+  exclude same-named directories inside `70_backups` dumps — the tier meant to be most
+  protected. The pre-existing generic `downloads/` and `appdata/` lines carry the same
+  hazard and are replaced/reviewed in the same change. Everything numbered is
+  parity-protected. Churn thresholds (`delete_threshold: 40`, `update_threshold: 500`)
+  stay meaningful because *unattended* machine churn is excluded — with one caveat: a
+  large culling session in `20.02_camera` (parity-protected by design) that deletes >40
+  files trips `delete_threshold` and aborts the nightly sync; after a big cull, run a
+  manual `snapraid sync` (or a one-off threshold override) deliberately.
 - **restic tiers** (enabled by the tree; policy values are follow-up work): `10/20` =
   frequent + long retention; `40/50/60/70/80/90` = periodic; `30_media` preserved =
   rare/optional (large, semi-replaceable); `rotation/`, `downloads/`, `99_tmp` = never.
@@ -279,14 +316,19 @@ migration the pool has no parity; source drives are the only redundancy.
 2. ~~mergerfs ≥ 2.40 semantics~~ **confirmed**: pinned 2.41.1 in the storage role.
 3. The app-template chart supports one PVC mounted at multiple `subPath`s across
    containers — strongly indicated by the existing `data` PVC usage; verified when
-   templating Task 4.
+   templating Task 4. (Linking containers use exactly ONE such mount each — see mount
+   topology principle.)
 4. The NFS PV stack works end-to-end — it has **never run** (todo.md, NFS branch review);
    first boot is the real validation.
-5. `anonuid/anongid=1000` squashing is compatible with every consuming container's
-   runtime user — verify per chart at mount time.
+5. With `PUID=1000`/`PGID=1000` set, the lscr.io containers write as `1000:1000` and the
+   s6 init chown is a no-op on already-`1000:1000` dirs — verified by the write/hardlink
+   proofs in Task 5. (fsGroup is known-inert on NFS; do not rely on it.)
 6. Immich (at deploy time) supports ≥2 external libraries with per-library mount modes —
    re-verify against Immich docs when it is actually deployed.
 7. Drives B/C are readable enough to produce manifests — tested in migration step 3.
+   All drives (A/B/C and data branches) are same-size 18TB Seagates (owner-confirmed
+   2026-08-22), satisfying snapraid's parity ≥ largest-data-disk requirement; the runbook
+   re-checks sizes before any wipe regardless.
 
 ## Not Doing
 
@@ -324,7 +366,7 @@ migration the pool has no parity; source drives are the only redundancy.
 | Claim | Verdict | Source |
 |---|---|---|
 | mergerfs non-path-preserving (`mfs`) supports pool-wide hardlinks; `EXDEV` is a path-preserving-policy issue | Confirmed | [mergerfs FAQ](https://trapexit.github.io/mergerfs/latest/faq/why_isnt_it_working/), [mergerfs(1)](https://manpages.debian.org/unstable/mergerfs/mergerfs.1.en.html) |
-| Cross-PV hardlinks fail with `EXDEV`; single PVC + `subPath` shares one device | Confirmed | VFS semantics; corroborated by Gemini review (2026-08-22) |
+| Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; design-review.md finding R2-P0 |
 | *arrs hardlink-or-silently-copy; upgrades delete old files | Confirmed | *arr/trash-guides community documentation |
 | Immich external libs delete originals when RW; `:ro` is the enforcement; no XMP on `:ro` | Confirmed (corrected during review) | [Immich libraries docs](https://docs.immich.app/features/libraries/), [discussion #24064](https://github.com/immich-app/immich/discussions/24064), [#13771](https://github.com/immich-app/immich/discussions/13771) |
 | NFS subpath mounts of a FUSE export work via `fsid` + `no_subtree_check`; mergerfs restart ⇒ `ESTALE` | Confirmed | mergerfs docs + Gemini review |

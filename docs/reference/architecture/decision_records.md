@@ -153,7 +153,7 @@ Full design: [NAS storage layout](../../wip/nas-storage-layout/design.md).
 - We will use a two-level numeric grammar: two-digit decade prefixes at the top level (`10_documents`, `30_media`), `NN.MM_` at the second level (`30.01_movies`), and **no numbering below two levels** — deeper directories use plain names.
 - We will always use two digits at both levels so lexicographic sort is correct everywhere (`ls`, NFS clients, web UIs) up to 99 children — chosen while the tree was empty, because the never-rename rule makes padding unfixable later.
 - We will never rename a numbered directory and never recycle a number; retired categories get an entry in `00_meta/RETIRED.md` and the number stays burned.
-- We will encode ownership in the name: **numbered = human-curated and snapraid-parity-protected; unnumbered lowercase (`rotation/`, `downloads/`, `inbox/`) = machine-owned and parity-excluded**. snapraid excludes are name-based, so naming and parity policy are deliberately coupled.
+- We will encode ownership in the name at the two numbered levels: **numbered = human-curated and snapraid-parity-protected; unnumbered lowercase (`rotation/`, `inbox/`) = machine-owned and parity-excluded** — deeper plain-named dirs inherit their ancestor's tier. The parity excludes are **root-anchored paths** (`/30_media/rotation/`, `/10_documents/inbox/`, `/99_tmp/`), never bare names, which would silently deep-match same-named dirs inside `70_backups` dumps. One deliberate exception: `20.02_camera` is numbered and parity-protected yet machine-fed (camera dumps are the sole copy until promotion).
 - We will document the tree twice from one source: `00_meta/README.md` on the NAS (templated by the storage role from the same variable that creates the dirs) and a legend note in the Obsidian vault.
 
 **Status**
@@ -172,23 +172,23 @@ Full design: [NAS storage layout](../../wip/nas-storage-layout/design.md).
 
 **Context**
 
-The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: the torrent client must keep the original file name to continue seeding while the library carries the renamed copy — one inode, two names, storage consumed once. `link(2)` and `rename(2)` require the same mount: two static NFS PVs — even of sibling subdirectories of the same export — are separate NFS mounts with distinct `st_dev`, so the kernel VFS rejects cross-PV links with `EXDEV` before the NFS server sees the call. The *arr applications catch that error and silently fall back to copying (double storage, orphaned seeds). Verified against mergerfs semantics: with the pool's non-path-preserving `mfs` create policy, hardlinks work pool-wide on the NAS side ([mergerfs FAQ](https://trapexit.github.io/mergerfs/latest/faq/why_isnt_it_working/)).
+The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: the torrent client must keep the original file name to continue seeding while the library carries the renamed copy — one inode, two names, storage consumed once. The kernel's `EXDEV` check in `link(2)`/`rename(2)` compares **vfsmounts, not devices**: every Kubernetes volumeMount — including each `subPath` projection — is a distinct bind mount, so hardlinks fail across two mounts *even of the same PVC with identical `st_dev`* (empirically reproduced 2026-08-22 during design review: cross-bind-mount `ln` → "Invalid cross-device link"; single-parent-mount `ln` → success). The *arr applications catch `EXDEV` and silently fall back to copying (double storage, orphaned seeds). On the NAS side, mergerfs's non-path-preserving `mfs` create policy supports hardlinks pool-wide ([mergerfs FAQ](https://trapexit.github.io/mergerfs/latest/faq/why_isnt_it_working/)).
 
 **Decision**
 
-- We will place the machine-owned media dirs **inside** the media subtree (`30_media/rotation/`, `30_media/downloads/`) rather than under a separate top-level inbox.
-- We will mount **one** PVC (`pvc-nfs-media` → `pv-nfs-media`, share `30_media`) into every container of the media stack, projecting per-container paths via `subPath` — bind-mounts of a single NFS mount share one `st_dev`, so hardlinks and renames work end-to-end.
+- We will nest the **entire machine tier under one parent**: `30_media/rotation/{downloads,movies,shows}` — so that a single mount contains every path an importing container links across.
+- We will give each linking container (Radarr, Sonarr) **exactly one volumeMount** from the media PVC (`subPath: rotation` at `/data`); transmission mounts only `rotation/downloads` at `/data/downloads` (least privilege, identical path strings); Jellyfin's multiple read-only mounts are fine because it never links.
 - We will never mount the NAS root into any pod to "solve" cross-subtree linking.
 
 **Status**
 
-- Accepted
+- Accepted (amended 2026-08-22, same day: the original wording claimed multiple `subPath` mounts of one PVC suffice for hardlinks — refuted empirically during design review; see `docs/wip/nas-storage-layout/design-review.md`)
 
 **Consequences**
 
 - Hardlink imports and instant promotion moves (`mv rotation/… → 30.0x/…`) work; storage is consumed once per file regardless of how many names it has.
 - The torrent-exposed blast radius is exactly `30_media` — documents and photos are unreachable from the media stack.
-- The topology is fragile to well-meaning refactors: splitting the media PVC back into per-dir PVs silently degrades imports to copies. Detection signal: `30_media` usage ≈2× expected, or `stat -c %h` on an imported file returning 1 while seeding. Documented in the design's failure-mode narrative.
+- The topology is fragile to well-meaning refactors: splitting a linking container's single `rotation` mount into per-dir `subPath` mounts (or per-dir PVs) silently degrades imports to copies. Detection signal: `30_media` usage ≈2× expected, or `stat -c %h` on an imported file returning 1 while seeding. Documented in the design's failure-mode narrative.
 - Future *arr root folders (music, books) extend inside `rotation/` with no topology change.
 
 ## AD-0005 - Two-tier content flow: machines feed, humans promote
