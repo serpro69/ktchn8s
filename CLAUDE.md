@@ -248,5 +248,6 @@ The project uses PXE boot for automated OS installation:
 
 @.capy/AGENTS.md
 
-# Extra Instructions
+
 @.claude/CLAUDE.extra.md
+@.claude/toolbox/CLAUDE.md
