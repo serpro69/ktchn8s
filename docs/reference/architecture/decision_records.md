@@ -182,7 +182,7 @@ The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: t
 
 **Status**
 
-- Accepted (amended 2026-08-22, same day: the original wording claimed multiple `subPath` mounts of one PVC suffice for hardlinks — refuted empirically during design review; see `docs/wip/nas-storage-layout/design-review.md`)
+- Accepted (amended 2026-08-22, same day: the original wording claimed multiple `subPath` mounts of one PVC suffice for hardlinks — refuted empirically during design review; see `docs/feat/wip/nas-storage-layout/design-review.md`)
 
 **Consequences**
 

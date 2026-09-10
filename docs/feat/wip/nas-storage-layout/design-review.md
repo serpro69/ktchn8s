@@ -6,9 +6,9 @@
 **Overall assessment:** CONCERNS_FOUND
 **Documents:**
 
-- Design: `docs/wip/nas-storage-layout/design.md`
-- Implementation: `docs/wip/nas-storage-layout/implementation.md`
-- Tasks: `docs/wip/nas-storage-layout/tasks.md`
+- Design: `docs/feat/wip/nas-storage-layout/design.md`
+- Implementation: `docs/feat/wip/nas-storage-layout/implementation.md`
+- Tasks: `docs/feat/wip/nas-storage-layout/tasks.md`
 
 **Summary:** 8 findings: 0 critical, 2 high, 2 medium, 4 low
 
@@ -98,9 +98,9 @@ Scope: design + implementation + tasks
 Overall assessment: MAJOR_GAPS (one P0; otherwise a high-quality design)
 Documents:
 
-- Design: docs/wip/nas-storage-layout/design.md
-- Implementation: docs/wip/nas-storage-layout/implementation.md
-- Tasks: docs/wip/nas-storage-layout/tasks.md
+- Design: docs/feat/wip/nas-storage-layout/design.md
+- Implementation: docs/feat/wip/nas-storage-layout/implementation.md
+- Tasks: docs/feat/wip/nas-storage-layout/tasks.md
 
 Summary: 5 findings: 1 critical, 0 high, 1 medium, 3 low
 (capy tools unavailable this session — prior-context search and finding indexing skipped per protocol)

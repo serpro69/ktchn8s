@@ -116,7 +116,7 @@
 
 ### Subtasks
 - [ ] 9.1 Write the vault legend note (manual, in Obsidian vault) mirroring `00_meta/README.md`
-- [ ] 9.2 Point `docs/info/todo.md` storage section at `docs/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
+- [ ] 9.2 Point `docs/info/todo.md` storage section at `docs/feat/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
 - [ ] 9.3 Verify `make docs` builds clean
 
 ## Task 10: Final verification

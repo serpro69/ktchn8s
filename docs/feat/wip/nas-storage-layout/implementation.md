@@ -204,7 +204,7 @@ One drive at a time; **drive A last**.
    rules, working-set test, "machines feed, humans promote". Manual step; the repo-side
    task is only to keep `00_meta/README.md` authoritative.
 2. `docs/info/todo.md`: under "Storage Node / NFS Optimizations", add a line pointing to
-   `docs/wip/nas-storage-layout/` as the layout source of truth (the "Future shares
+   `docs/feat/wip/nas-storage-layout/` as the layout source of truth (the "Future shares
    (Pictures, Documents, Music, Backups)" naming in the NFS-review follow-up is
    superseded by this design's names).
 3. `docs/guides/how_to_for_media_management.md`: updated as part of
