@@ -156,8 +156,9 @@ Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
 the Task 3 `b3sum` executable. Before Task 13's NAS fixture, verify Python 3 and install
 `b3sum` once there (`apt install b3sum` on Debian, or a verified upstream binary);
-record both versions with the fixture results. The helper reads datasets and writes evidence only. Copying, moving, permission
-changes, discards and disk operations remain explicit operator actions.
+record both versions with the fixture results. The helper reads datasets and writes
+evidence only. Copying, moving, permission changes, discards and disk operations remain
+explicit operator actions.
 
 | Subcommand | Inputs and result |
 |---|---|
@@ -264,27 +265,28 @@ In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
    the replacement pod starts. Record the rendered rollout strategy inherited from
    app-template and its behavior with the retained config PVC.
 
-→ verify (render before sync; runtime checks after sync, in order):
-  a. `helm template apps/jellyfin` — every media mount resolves to the single
-     `pvc-nfs-media` claim; Jellyfin's mounts carry `readOnly: true`; radarr/sonarr have
-     exactly one media volumeMount each; PUID/PGID env present on all lscr containers.
-  b. UID proof: inspect the actual Radarr/Sonarr/Transmission process credentials
-     (for example, the process's `/proc/<pid>/status`), requiring UID/GID 1000.
-     In each writer container, use `s6-setuidgid abc id` and perform a disposable write
-     through that same helper. Bare `kubectl exec ... id` tests the exec process,
-     usually root, which can write through root-squash even with a wrong app UID.
-  c. Hardlink proof: in radarr, run the entire quoted probe as `abc`:
-     `s6-setuidgid abc sh -c 'touch /data/downloads/complete/.linktest && ln /data/downloads/complete/.linktest /data/movies/.linktest && stat -c %h /data/movies/.linktest'`
-     prints `2`; clean up
-     both names. Repeat for sonarr's `/data/shows`. Then import a small legal test
-     download using the application itself and prove it linked while seeding continues.
-  d. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
-  e. Run the storage-play command in [nfs-export-readiness](#nfs-export-readiness)
-     and confirm its NFS tests execute. `./tests/metal.sh` is a separate cluster/network
-     smoke test; it provides no NFS coverage. On final mounts, test promotion/rescan
-     and continued seeding using disposable media, then actual playback of migrated
-     content from every configured preserved library. Confirm RO enforcement survives
-     pod recreation. These application checks are Task 5 acceptance, not Task 11 gates.
+Verify in this order, rendering before sync and running runtime checks afterward:
+
+1. `helm template apps/jellyfin` — every media mount resolves to the single
+   `pvc-nfs-media` claim; Jellyfin's mounts carry `readOnly: true`; radarr/sonarr have
+   exactly one media volumeMount each; PUID/PGID env present on all lscr containers.
+2. UID proof: inspect the actual Radarr/Sonarr/Transmission process credentials
+   (for example, the process's `/proc/<pid>/status`), requiring UID/GID 1000.
+   In each writer container, use `s6-setuidgid abc id` and perform a disposable write
+   through that same helper. Bare `kubectl exec ... id` tests the exec process,
+   usually root, which can write through root-squash even with a wrong app UID.
+3. Hardlink proof: in radarr, run the entire quoted probe as `abc`:
+   `s6-setuidgid abc sh -c 'touch /data/downloads/complete/.linktest && ln /data/downloads/complete/.linktest /data/movies/.linktest && stat -c %h /data/movies/.linktest'`
+   prints `2`; clean up both names. Repeat for sonarr's `/data/shows`. Then import a
+   small legal test download using the application itself and prove it linked while
+   seeding continues.
+4. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
+5. Run the storage-play command in [nfs-export-readiness](#nfs-export-readiness)
+   and confirm its NFS tests execute. `./tests/metal.sh` is a separate cluster/network
+   smoke test; it provides no NFS coverage. On final mounts, test promotion/rescan
+   and continued seeding using disposable media, then actual playback of migrated
+   content from every configured preserved library. Confirm RO enforcement survives
+   pod recreation. These application checks are Task 5 acceptance, not Task 11 gates.
 
 ## migrated-content-access
 

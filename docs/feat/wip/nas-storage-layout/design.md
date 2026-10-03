@@ -8,8 +8,8 @@
 **How might we design a NAS directory tree that the owner (and household members via
 services) can navigate from memory years from now — where every service (Jellyfin/*arr,
 Immich, a future documents service) mounts a scoped subtree — under the constraint that
-a directory, once created, is never renamed** (path-based backups, NFS-mounted PVs,
-and navigation from memory depend on stable names)?
+a numbered directory, once created, is never renamed** (path-based backups,
+NFS-mounted PVs, and navigation from memory depend on stable names)?
 
 ### Personas
 
@@ -87,15 +87,15 @@ and navigation from memory depend on stable names)?
 2. **At the two numbered levels: numbered = human-curated and parity-protected;
    unnumbered lowercase = machine-owned and parity-excluded.** One glance tells you who
    owns a dir and whether parity covers it. The rule applies only where numbering applies
-   (direct children of the pool root and of numbered dirs) — deeper plain-named dirs
+   (direct children of the pool root and of top-level numbered dirs). Deeper plain-named dirs
    (`10.01_personal/ids/`) simply inherit their ancestor's tier. (`90_inbox` is numbered —
    it is the *human's* inbox; `10_documents/inbox/` is unnumbered — machines feed and
    delete there.) Exceptions: `99_tmp` is numbered for navigation but deliberately
    parity-excluded scratch; `20.02_camera` is numbered and
    parity-protected yet machine-*fed* — camera dumps are the sole copy of those photos
    until promotion, so they must be under parity even though a service writes there.
-3. **Numbers are never recycled; directories are never renamed.** Categories retire via an
-   entry in `00_meta/RETIRED.md`; the number stays burned.
+3. **Numbers are never recycled; numbered directories are never renamed.**
+   Categories retire via an entry in `00_meta/RETIRED.md`; the number stays burned.
 4. ASCII lowercase + underscores at numbered levels; leaf content keeps original names
    (release names, Cyrillic titles — fine).
 5. **Service shares alias the numbers away** (`media` → `30_media`, `photos` → `20_photos`)
@@ -103,8 +103,8 @@ and navigation from memory depend on stable names)?
    restructuring.
 6. **Two-tier flow — machines feed, humans promote.** Machine tiers: `rotation/`
    (including its nested `downloads/`), `20.02_camera` (numbered/parity exception — see
-   rule 2), Immich uploads (Ceph). Human promotion: `mv` into a numbered dir. Applies
-   symmetrically to media and photos.
+   rule 2), Immich uploads (Ceph). Human promotion is manual: `mv` within a NAS share,
+   or a verified copy before deleting a Ceph source (see [the flows below](#two-tier-media-photos)).
 
 ### The `50_topics` decision rule (working-set test)
 
@@ -160,8 +160,9 @@ library roots inside a single vfsmount.
 
 - **`system/csi-driver-nfs`:** the `videos` volume entry is replaced by `media` → share
   `30_media`, PV `pv-nfs-media`. The old `pv-nfs-videos`/PVC pair is deleted, not migrated
-  (the K8s NFS stack has never run; the NAS is empty). Future shares are one values entry
-  each: `photos` → `20_photos`, `documents` → `10_documents`, added with their consumers.
+  (the old share is assumed unused; Task 5 verifies that before cleanup). Each future
+  share adds one values entry: `photos` → `20_photos`, `documents` → `10_documents`,
+  added with its consumer.
 - **Jellyfin chart (`apps/jellyfin`):** the 50Gi Ceph `data` PVC keeps *configs only* —
   media on triple-replicated NVMe is capacity-wrong (one 4K remux ≈ its size). All media
   paths become subPaths of the NFS PVC. Write matrix (one volumeMount per writer):
@@ -326,9 +327,8 @@ areas may receive new files.
    and legend cannot drift. → verify: layout tasks alone are idempotent, dirs present.
 2. **Source inventory and copy** — freeze the original A/B/C entries; use Task 13's
    helper to inventory all entries and hash regular files on each source, including A.
-   Copy A into `99_tmp/driveA/`, hash the NAS copy
-   locally, and compare. Every command must complete successfully; partial manifests
-   do not authorize release.
+   Copy A into `99_tmp/driveA/`, hash the NAS copy locally, and compare. Every command
+   must complete successfully; partial manifests do not authorize release.
 3. **Cross-drive comparison** — use hash-sets to discover content missing from the NAS
    regardless of backup-generation paths. Preserve source/path identity separately:
    equal hashes do not authorize dropping a distinct required pathname. Copy unique

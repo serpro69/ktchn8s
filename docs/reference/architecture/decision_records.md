@@ -170,7 +170,7 @@ Full design: [NAS storage layout](../../feat/wip/nas-storage-layout/design.md).
 - The tree is rename-proof by construction; extension is additive (new numbers, never reshuffling).
 - The layout is decoupled from the Obsidian vault taxonomy — reorganizing the vault cannot break the NAS.
 - Sort-correctness caps each level at 99 children; if a category ever needs more, the taxonomy has failed, not the padding.
-- Enforced in `metal/roles/storage` (`storage_dirs` + README template) and `snapraid.conf.j2` excludes.
+- Planned enforcement is in `metal/roles/storage` (`storage_dirs` + README template) and `snapraid.conf.j2` excludes.
 
 ## AD-0004 - Single-PVC subPath topology for hardlink-dependent workloads
 
@@ -191,7 +191,7 @@ The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: t
 
 **Consequences**
 
-- The topology permits hardlink imports and same-filesystem promotion moves (`mv rotation/… → 30.0x/…`); actual export/import behavior must pass Tasks 11 and 5 before rollout. Storage is consumed once per underlying file regardless of how many names it has.
+- The topology permits hardlink imports and same-filesystem promotion moves (`mv rotation/… → 30.0x/…`). Task 11's export checks gate deployment; Task 5's live import checks gate acceptance after deployment. Storage is consumed once per underlying file regardless of how many names it has.
 - The torrent-exposed blast radius is exactly `30_media` — documents and photos are unreachable from the media stack.
 - The topology is fragile to well-meaning refactors: splitting a linking container's single `rotation` mount into per-dir `subPath` mounts (or per-dir PVs) silently degrades imports to copies. Detection signal: `30_media` usage ≈2× expected, or `stat -c %h` on an imported file returning 1 while seeding. Documented in the design's failure-mode narrative.
 - Future *arr root folders (music, books) extend inside `rotation/` with no topology change.
