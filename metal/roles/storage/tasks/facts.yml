@@ -1,3 +1,4 @@
+---
 # Global facts needed by several tasks
 
 - name: Set NFS service name

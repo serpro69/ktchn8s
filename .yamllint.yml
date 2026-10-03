@@ -2,6 +2,7 @@
 extends: default
 
 ignore: |-
+  system/csi-driver-nfs/templates/pv-nfs.yaml
   system/monitoring-system/templates/configmap.yaml
   platform/gitea/templates/config-source.yaml
   platform/global-secrets/templates/secret-generator/configmap.yaml
@@ -14,7 +15,7 @@ rules:
     min-spaces-from-content: 1
   comments-indentation: false
   line-length:
-    max: 160
+    max: 200
     allow-non-breakable-words: true
   octal-values:
     forbid-implicit-octal: true

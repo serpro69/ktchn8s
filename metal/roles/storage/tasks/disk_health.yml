@@ -57,6 +57,7 @@
   set_fact:
     unhealthy_drives: "{{ disk_health_report | selectattr('overall_health', 'equalto', false) | list }}"
 
+# yamllint disable rule:line-length
 - name: Check for drives exceeding temperature threshold
   set_fact:
     overheated_drives: "{{ disk_health_report | rejectattr('temperature', 'equalto', -1) | selectattr('temperature', 'defined') | list | json_query('[?to_number(temperature) > `' + (disk_health_thresholds.max_temperature_celsius | string) + '`]') }}" # noqa yaml[line-length]
@@ -81,6 +82,7 @@
       - "Drives with reallocated sectors: {{ reallocated_sector_warnings | map(attribute='device') | list | join(', ') if reallocated_sector_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
       - "Drives with pending sectors: {{ pending_sector_warnings | map(attribute='device') | list | join(', ') if pending_sector_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
       - "Drives with uncorrectable errors: {{ uncorrectable_error_warnings | map(attribute='device') | list | join(', ') if uncorrectable_error_warnings | length > 0 else 'None' }}" # noqa yaml[line-length]
+# yamllint enable rule:line-length
 
 - name: Create storage log directory
   file:

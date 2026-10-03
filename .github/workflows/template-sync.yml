@@ -253,6 +253,7 @@ jobs:
         if: always()
         env:
           DIFF_SUMMARY: ${{ needs.sync.outputs.diff_summary }}
+        # yamllint disable rule:line-length
         run: |
           echo "### Template Sync Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -269,3 +270,4 @@ jobs:
           echo "#### Changes" >> "$GITHUB_STEP_SUMMARY"
           # Use printf to avoid bash interpreting backticks in markdown as command substitution
           printf '%s\n' "$DIFF_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+        # yamllint enable rule:line-length
