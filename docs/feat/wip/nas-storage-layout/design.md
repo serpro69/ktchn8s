@@ -1,7 +1,7 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22, revised same day after design review — see [design-review.md](./design-review.md) § Resolution) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
-> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail.
+> Status: designed (2026-08-22; revised 2026-10-03 after [corroboration and correction](./design-review-2026-10-03.md#corroboration-and-resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Implementation and live acceptance remain pending.
 
 ## Problem statement
 
@@ -23,8 +23,9 @@ NFS-mounted PVs all punish renames)?
 
 ### Success criteria
 
-1. **Migration completes and drives are freed** — all backup-drive content has exactly one
-   home, `99_tmp` is empty, source drives verified and released to parity duty.
+1. **Migration completes and drives are freed** — every source entry has a verified
+   destination or explicit discard decision, `99_tmp` is empty, and source drives pass
+   the per-file redundancy and full parity-verification gates before release.
 2. **Zero renames, ever** — no numbered directory is ever renamed after creation;
    extension happens by adding numbers, never reshuffling.
 3. **Service-scoped mounts only** — every PV points at a subtree, never the root; no
@@ -89,7 +90,8 @@ NFS-mounted PVs all punish renames)?
    (direct children of the pool root and of numbered dirs) — deeper plain-named dirs
    (`10.01_personal/ids/`) simply inherit their ancestor's tier. (`90_inbox` is numbered —
    it is the *human's* inbox; `10_documents/inbox/` is unnumbered — machines feed and
-   delete there.) One deliberate exception: `20.02_camera` is numbered and
+   delete there.) Exceptions: `99_tmp` is numbered for navigation but deliberately
+   parity-excluded scratch; `20.02_camera` is numbered and
    parity-protected yet machine-*fed* — camera dumps are the sole copy of those photos
    until promotion, so they must be under parity even though a service writes there.
 3. **Numbers are never recycled; directories are never renamed.** Categories retire via an
@@ -117,14 +119,16 @@ and deliberate — never "I have three files about X".
 **Media.** transmission writes `rotation/downloads/` → *arr imports via **hardlink** into
 `rotation/movies|shows/` (both paths live under the *single* `rotation` mount in the *arr
 containers → real link; seeding continues from the original name while the library copy
-carries the clean name) → the owner promotes keepers with `mv` into `30.0x` (NAS-side,
-same filesystem, instant). Radarr/Sonarr delete-and-replace files on quality upgrades, so
+carries the clean name) → the owner promotes keepers with `mv` into `30.0x` through
+one operator NFS mount of `30_media`, containing both source and destination. This
+retains same-filesystem rename semantics without bypassing live NFS clients. Radarr/Sonarr delete-and-replace files on quality upgrades, so
 the rotation/preserved split is a **data-safety boundary**: automation physically cannot
 touch `30.0x`.
 
 Hardlinks consume storage **once** — two directory entries, one inode. The 2× case only
 occurs when a hardlink silently degrades to a copy (cross-device), which the single-PV
-design prevents. Monitoring signal: if `30_media` usage runs ~2× expected, hardlinking has
+topology avoids that particular failure. Task 11 verifies the NAS/export lifecycle too.
+Monitoring signal: if `30_media` usage runs ~2× expected, hardlinking has
 broken (`stat -c %h` on an imported file must be ≥2 while seeding).
 
 Jellyfin serves both tiers (either as separate libraries or one merged library per type).
@@ -136,7 +140,9 @@ is the metadata source of truth — date/GPS repairs happen via exiftool/digiKam
 tree, Immich picks them up on rescan) and `20.02_camera` **read-write** (triage: culling
 in the Immich UI deletes rejects from disk *by intent*; metadata edits write real XMP
 sidecars). Mobile uploads land in Immich-owned storage on Ceph. Keepers are promoted by
-`mv` into `20.01_library`. Albums/people/favorites live only in Immich's DB in *both*
+`mv` from the camera tier into `20.01_library` through one operator NFS mount of
+`20_photos`; Ceph uploads require a separately verified copy before deletion, not a
+same-filesystem rename. Albums/people/favorites live only in Immich's DB in *both*
 modes — the DB needs backing up regardless, so RW-everywhere would not have bought
 portability, only deletion risk.
 
@@ -174,8 +180,13 @@ library roots inside a single vfsmount.
     the *arrs see the file at exactly that path — no remote-path mappings.
   - All lscr.io writers get `PUID=1000`/`PGID=1000` (see Security posture) — and no
     `runAsUser`, which would disable PUID handling in linuxserver images.
-- **NAS side:** zero export changes — the single root export (`fsid=1`,
-  `no_subtree_check`) already serves subpath mounts.
+- **NAS side:** retain the root export and scoped client mounts; establish the mergerfs
+  NFS prerequisites in Task 11 before the media rollout. Use node retention
+  (`noforget`), `inodecalc=path-hash`, and a normal, non-lazy remount. The pinned
+  [2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
+  explains why export paths alone do not establish handle stability. Keep
+  `root_squash` pending the explicit UID-1000 acceptance tests below; do not silently
+  switch to `no_root_squash` if a test fails.
 - **Future service requirements** (binding when they arrive; the services themselves are
   out of scope): Immich per the photos section; paperless consumes `10_documents/inbox/`;
   a documents service (Nextcloud external-storage / Copyparty / OpenCloud posixfs) mounts
@@ -190,7 +201,8 @@ library roots inside a single vfsmount.
 - **Addons:** `csi-driver-nfs` Helm chart pinned at `4.13.0` (`system/csi-driver-nfs/Chart.yaml`);
   no version change required.
 - **NAS software:** mergerfs `2.41.1`, snapraid `13.0` (pinned in
-  `metal/roles/storage/vars/main.yml`) — both satisfy the verified-behavior requirements.
+  `metal/roles/storage/vars/main.yml`) — versions remain unchanged; export readiness
+  and parity initialization/expansion require Tasks 2, 11, and 12.
 - **Deprecation horizon:** none — core storage APIs are stable v1.
 
 ## Resource budget
@@ -205,6 +217,10 @@ No new workloads — this feature moves mounts, it does not add containers.
   dropped.
 - Blast radius: a runaway download fills the NAS pool, not Ceph — mergerfs `mfs` spreads
   writes to the emptiest branch; cluster workloads (Ceph-backed) are unaffected.
+- Retaining FUSE nodes consumes NAS memory as the working set grows; Task 11 records
+  NAS process memory during the lifecycle test. This is a host cost, not a new pod.
+- Migration requires independent space for any unique files on a source about to be
+  repurposed. Measure that space before release; insufficient space blocks the wipe.
 
 ## Reliability posture
 
@@ -215,10 +231,18 @@ schedulable changes). What does apply:
   the NAS is down (rationale documented in `system/csi-driver-nfs/values.yaml`).
 - Static PVs use `Retain`; PVC binding via `volumeName` + `storageClassName: ""` — a
   deleted claim never destroys NAS data.
-- Rollout of the mount change: ArgoCD sync replaces the pod; rollback = git revert +
-  resync (PV/PVC are declarative; the old `Videos` layout is trivially restorable while
-  the NAS is empty). Observable success signal: Jellyfin pod `Running` with all mounts,
-  and the hardlink verification below passes.
+- Roll out the media mounts only after migration/parity release (Task 8) and the isolated
+  export acceptance test (Task 11). This keeps Task 5's promotion tests outside the
+  included-data freeze. Operator promotion subsequently uses one NFS mount
+  of the relevant share; pause competing writers for the item being promoted.
+- Rollback of the media rollout: stop its consumers, git revert/resync the chart change,
+  and verify the prior pod mounts. After migration, recreate empty legacy directories
+  only if the reverted chart requires them; do not move the new tree back or claim the
+  old chart serves its content. Restore service with a corrected forward rollout.
+  Operator-owned acceptance is a running pod plus UID, import, RO, and reopen checks.
+- Parity bootstrap and expansion are explicit operator jobs. A present parity file or
+  successful service start is insufficient: require successful completion, unchanged
+  included data, and full scrub coverage before advancing the release sequence.
 
 ## Security posture
 
@@ -229,8 +253,15 @@ schedulable changes). What does apply:
   s6 privilege drop). Therefore every writer must actually *run* as `1000:1000`: the
   lscr.io containers (transmission, radarr, sonarr, prowlarr) get explicit
   `PUID=1000`/`PGID=1000` env (their default is uid 911), and no `runAsUser` override.
-  Export restricted to the homelab CIDR + workstation (UFW on the NAS, router ACLs
-  upstream).
+  Verify the actual service process credentials and run write/link probes using
+  `s6-setuidgid abc`, not a bare root exec session. The current NFS export permits the
+  homelab CIDR; the workstation firewall allowance alone does not grant an NFS export.
+  Operator NFS mounts run on the NAS or another permitted homelab client.
+- **Export-permission assumption:** upstream recommends `no_root_squash` for general
+  mergerfs use. This design retains the narrower existing policy for its fixed-owner
+  workloads and requires Task 11 to prove their operations work. Root-only metadata
+  repair remains local during a quiesced maintenance window. Any required export-policy
+  relaxation needs a design/security decision before rollout, not a test workaround.
 - **Read-only enforcement at mount level:** Jellyfin's media mounts and Immich's
   `20.01_library` mount declare `readOnly: true` — kernel-enforced preservation boundary,
   not service-configuration hope.
@@ -241,14 +272,18 @@ schedulable changes). What does apply:
 
 ## Failure-mode narrative
 
-1. **NAS down / mergerfs restart under live NFS server.** Impact: media stack I/O errors
+1. **NAS down / stale NFS handle / mergerfs restart.** Impact: media stack I/O errors
    (soft mounts prevent permanent hangs); possible `ESTALE` on clients until
    remount/pod restart. Detection: Jellyfin unavailable; no NFS health alerting exists yet
    (tracked in `docs/info/todo.md` → "Storage Node / NFS Optimizations"). Recovery:
-   restart NFS server after mergerfs is up, restart affected pods. Owner: the operator.
+   quiesce clients, restore mergerfs and NFS exports, then remount/restart affected
+   clients and repeat reopen checks. Task 11 tests handle lifetime during normal
+   operation as well as recovery after a controlled restart. Owner: the operator.
 2. **Disk loss during the migration window (no parity yet).** Impact: loss of the NAS
-   copy only — survivable *by design*: source drives are wiped one at a time, the last
-   only after the first successful snapraid sync + scrub. Worst case: re-copy from source.
+   copy only once every retained file has a verified independent surviving copy.
+   Unique B/C deltas must be copied to a surviving device before their source is wiped;
+   simply retaining A does not establish this. Stop the release sequence on failure,
+   re-copy from that recorded device, and re-verify before continuing.
    Detection: SMART/dmesg. Owner: the operator, during the runbook.
 3. **Silent hardlink breakage** (e.g. a future chart refactor splits an *arr's single
    `rotation` mount into separate per-dir subPath mounts — which `EXDEV`s even on one
@@ -259,36 +294,51 @@ schedulable changes). What does apply:
 4. **Accepted risks:** (a) a torrent client that mutates completed files would corrupt
    parity of a promoted file via the shared inode — Transmission does not mutate completed
    data; accepted. (b) Immich's DB is the sole holder of albums/faces — mitigated by
-   cluster PVC backups, accepted. (c) mergerfs `use_ino` option is legacy at 2.41.x
-   (ignored) — cleanup noted, harmless.
+   cluster PVC backups, accepted. Before a source-only file is successfully copied,
+   migration cannot recover its pre-existing source-disk failure; read errors stop
+   migration and are never treated as a discard decision.
 
 ## Migration plan
 
-Ordering rule: **no source drive is wiped until every later safety net exists.** During
-migration the pool has no parity; source drives are the only redundancy.
+Ordering rule: **before each wipe, prove recoverability for every retained file on that
+device.** Before verified parity exists this requires a checksummed copy on another
+independent device in addition to the NAS copy. A second path on the same disk is not
+redundancy. Keep included data unchanged from final reconciliation through parity
+verification; migrations run locally before production NFS consumers are enabled.
 
 1. **Skeleton via IaC** — the tree is created by the storage role (replacing the current
    `storage_dirs` list); `00_meta/README.md` is templated from the same variable, so code
-   and legend cannot drift. → verify: role idempotent, dirs present.
-2. **Copy** drive A → `99_tmp/driveA/` with rsync. → verify: manifest comparison (step 3).
-3. **Manifest verification** — `b3sum` manifest per dataset (the NAS copy, drives B, C),
-   compared as **hash-sets** ("content on B present nowhere in the copy?"), which is
-   immune to path differences between backup generations. Chosen over `rsync -c` passes:
-   manifests read each dataset once (vs re-reading the NAS copy per comparison) and
-   persist in `00_meta/migration/` as a permanent audit artifact. Unique content found on
-   B/C is copied into `99_tmp/driveB_delta/` etc.
+   and legend cannot drift. → verify: layout tasks alone are idempotent, dirs present.
+2. **Source inventory and copy** — freeze A/B/C; inventory all entries and hash regular
+   files on each source, including A. Copy A into `99_tmp/driveA/`, hash the NAS copy
+   locally, and compare. Every command must complete successfully; partial manifests
+   do not authorize release.
+3. **Cross-drive comparison** — use hash-sets to discover content missing from the NAS
+   regardless of backup-generation paths. Preserve source/path identity separately:
+   equal hashes do not authorize dropping a distinct required pathname. Copy unique
+   B/C content into source-specific delta directories and checksum those copies.
+   Retain manifests and the decision ledger in `00_meta/migration/` and on a surviving
+   source/temporary independent device. A full final read is an intentional additional
+   pass, not a claim that every dataset is read only once.
 4. **Sort** `99_tmp` → numbered homes per the [mapping table](#migration-mapping); each
-   move appended to a log in `00_meta/migration/`. Same-filesystem `mv` — instant.
+   move recorded by source identity and final path. Stop on a destination collision;
+   retain both versions at distinct leaf paths or record an explicit dedup/discard
+   decision. Never overwrite differing content. Local moves occur with clients absent.
 5. **Cruft dies during sorting** — `.@__thumb`, `.streams`, `Thumbs.db`, superseded
    archive generations; deletions recorded in the log.
-6. **Exit criterion:** `99_tmp` empty ∧ every manifest entry accounted for (moved or
-   consciously deleted).
-7. **Release drives one at a time:** verify the parity-size precondition (each parity
-   device ≥ largest data branch — snapraid requirement; all drives are 18TB Seagates,
-   confirmed 2026-08-22, so this holds, but the runbook checks `lsblk -b` anyway before
-   any wipe) → wipe B/C → add to `parity_drives` in the sops inventory → storage role →
-   snapraid initial sync + scrub. **Drive A last, only after the first successful
-   sync/scrub.**
+6. **Exit criterion:** no unresolved entries in `99_tmp`; every source entry has a
+   verified destination or a recorded discard; every retained regular file's final hash
+   matches its source. Verify symlink targets and retained directory metadata too.
+   The ledger must account for all entries, not a sample or only regular-file counts.
+7. **Release B:** verify device identity/size, independent-copy coverage (copy B-only
+   retained content to A/C or temporary storage if needed), and available capacity.
+   Only then wipe B, configure first parity, run the explicit full-sync unit and a
+   full scrub with zero errors and complete coverage. Failure stops all later wipes.
+8. **Release C, then A:** re-check C's retained data against the verified snapshot or
+   independent-copy ledger before wiping it. Add `2-parity`, explicitly rebuild all
+   parity levels, and full-scrub again. **A is last, after successful two-level sync
+   and full scrub.** Follow [the runbook](./implementation.md#parity-enablement) for
+   completion evidence, interruption recovery, and final drive disposition.
 
 ## Parity & backup policy
 
@@ -297,8 +347,9 @@ migration the pool has no parity; source drives are the only redundancy.
   matters: name-anchored patterns (`downloads/`) match at *any* depth and would silently
   exclude same-named directories inside `70_backups` dumps — the tier meant to be most
   protected. The pre-existing generic `downloads/` and `appdata/` lines carry the same
-  hazard and are replaced/reviewed in the same change. Everything numbered is
-  parity-protected. Churn thresholds (`delete_threshold: 40`, `update_threshold: 500`)
+  hazard and are replaced/reviewed in the same change. Numbered content except `99_tmp`
+  is intended for parity inclusion; protection begins only after successful sync.
+  Churn thresholds (`delete_threshold: 40`, `update_threshold: 500`)
   stay meaningful because *unattended* machine churn is excluded — with one caveat: a
   large culling session in `20.02_camera` (parity-protected by design) that deletes >40
   files trips `delete_threshold` and aborts the nightly sync; after a big cull, run a
@@ -316,19 +367,22 @@ migration the pool has no parity; source drives are the only redundancy.
 2. ~~mergerfs ≥ 2.40 semantics~~ **confirmed**: pinned 2.41.1 in the storage role.
 3. The app-template chart supports one PVC mounted at multiple `subPath`s across
    containers — strongly indicated by the existing `data` PVC usage; verified when
-   templating Task 4. (Linking containers use exactly ONE such mount each — see mount
+   templating Task 5. (Linking containers use exactly ONE such mount each — see mount
    topology principle.)
-4. The NFS PV stack works end-to-end — it has **never run** (todo.md, NFS branch review);
-   first boot is the real validation.
+4. The NFS PV stack has **never run** (todo.md, NFS branch review). Task 11 must prove
+   export lifecycle and fixed-owner operations with `root_squash`; Task 5 validates
+   the actual application import path. A failing prerequisite blocks media rollout.
 5. With `PUID=1000`/`PGID=1000` set, the lscr.io containers write as `1000:1000` and the
    s6 init chown is a no-op on already-`1000:1000` dirs — verified by the write/hardlink
-   proofs in Task 5. (fsGroup is known-inert on NFS; do not rely on it.)
+   proofs as the application user in Task 5. (fsGroup is known-inert on NFS; do not
+   rely on it.)
 6. Immich (at deploy time) supports ≥2 external libraries with per-library mount modes —
    re-verify against Immich docs when it is actually deployed.
-7. Drives B/C are readable enough to produce manifests — tested in migration step 3.
+7. Drives A/B/C are readable enough to produce complete manifests — tested in Task 6.
    All drives (A/B/C and data branches) are same-size 18TB Seagates (owner-confirmed
    2026-08-22), satisfying snapraid's parity ≥ largest-data-disk requirement; the runbook
-   re-checks sizes before any wipe regardless.
+   re-checks sizes before any wipe regardless. Space for unique-delta safety copies is
+   not assumed: measure and reserve it on a surviving independent device in Task 8.
 
 ## Not Doing
 
@@ -369,7 +423,9 @@ migration the pool has no parity; source drives are the only redundancy.
 | Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; design-review.md finding R2-P0 |
 | *arrs hardlink-or-silently-copy; upgrades delete old files | Confirmed | *arr/trash-guides community documentation |
 | Immich external libs delete originals when RW; `:ro` is the enforcement; no XMP on `:ro` | Confirmed (corrected during review) | [Immich libraries docs](https://docs.immich.app/features/libraries/), [discussion #24064](https://github.com/immich-app/immich/discussions/24064), [#13771](https://github.com/immich-app/immich/discussions/13771) |
-| NFS subpath mounts of a FUSE export work via `fsid` + `no_subtree_check`; mergerfs restart ⇒ `ESTALE` | Confirmed | mergerfs docs + Gemini review |
+| NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; live acceptance pending Task 11 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
+| `parity` and `1-parity` select the same level; additional protection starts with `2-parity`; a repeated level is rejected | Confirmed against the pinned version | [SnapRAID 13.0 parser](https://github.com/amadvance/snapraid/blob/v13.0/cmdline/state.c) |
+| Explicit full sync supports parity expansion; a full scrub is distinct from the maintenance percentage/age policy | Confirmed; job changes pending Task 12 | [SnapRAID 13.0 manual](https://github.com/amadvance/snapraid/blob/v13.0/snapraid.1) |
 | snapraid records hardlinks; excluded/included shared inodes protected via the included path; `name/` excludes match anywhere, `/name/` at disk root | Confirmed | [SnapRAID manual](https://www.snapraid.it/manual), [exclude-syntax thread](https://sourceforge.net/p/snapraid/discussion/1677233/thread/387da6b3/) |
 
 ## Migration mapping

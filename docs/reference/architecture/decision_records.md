@@ -142,18 +142,22 @@ So the alternative was to disable the GRUB timeout altogether.
 
 ## AD-0003 - NAS directory layout grammar
 
+AD-0003 through AD-0007 were amended on 2026-10-03 following
+[corroboration of the storage-layout review](../../feat/wip/nas-storage-layout/design-review-2026-10-03.md#corroboration-and-resolution).
+These are design decisions; the referenced implementation tasks remain pending.
+
 **Context**
 
 The NAS (`yggdrasil`) needed a directory structure before migrating ~16TB of semi-structured backups onto it. Renaming directories after creation is punished by the whole stack: snapraid re-syncs parity, rsync-style backups re-copy, and NFS-mounted PVs reference paths in Helm values. The structure must be navigable from memory at the shell (primary consumer) while services expose subtrees to the household. An earlier vault-style deep numbering scheme (`300/310/310.01`) proved heavy in practice — the third digit exists only to encode a third numbering level.
 
-Full design: [NAS storage layout](../../wip/nas-storage-layout/design.md).
+Full design: [NAS storage layout](../../feat/wip/nas-storage-layout/design.md).
 
 **Decision**
 
 - We will use a two-level numeric grammar: two-digit decade prefixes at the top level (`10_documents`, `30_media`), `NN.MM_` at the second level (`30.01_movies`), and **no numbering below two levels** — deeper directories use plain names.
 - We will always use two digits at both levels so lexicographic sort is correct everywhere (`ls`, NFS clients, web UIs) up to 99 children — chosen while the tree was empty, because the never-rename rule makes padding unfixable later.
 - We will never rename a numbered directory and never recycle a number; retired categories get an entry in `00_meta/RETIRED.md` and the number stays burned.
-- We will encode ownership in the name at the two numbered levels: **numbered = human-curated and snapraid-parity-protected; unnumbered lowercase (`rotation/`, `inbox/`) = machine-owned and parity-excluded** — deeper plain-named dirs inherit their ancestor's tier. The parity excludes are **root-anchored paths** (`/30_media/rotation/`, `/10_documents/inbox/`, `/99_tmp/`), never bare names, which would silently deep-match same-named dirs inside `70_backups` dumps. One deliberate exception: `20.02_camera` is numbered and parity-protected yet machine-fed (camera dumps are the sole copy until promotion).
+- We will encode ownership in the name at the two numbered levels: **numbered = human-curated and intended for snapraid parity; unnumbered lowercase (`rotation/`, `inbox/`) = machine-owned and parity-excluded** — deeper plain-named dirs inherit their ancestor's tier. The parity excludes are **root-anchored paths** (`/30_media/rotation/`, `/10_documents/inbox/`, `/99_tmp/`), never bare names, which would silently deep-match same-named dirs inside `70_backups` dumps. Exceptions: `99_tmp` is numbered scratch but excluded; `20.02_camera` is numbered and parity-included yet machine-fed (camera dumps are the sole copy until promotion). Included content is protected only after successful sync.
 - We will document the tree twice from one source: `00_meta/README.md` on the NAS (templated by the storage role from the same variable that creates the dirs) and a legend note in the Obsidian vault.
 
 **Status**
@@ -179,6 +183,7 @@ The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: t
 - We will nest the **entire machine tier under one parent**: `30_media/rotation/{downloads,movies,shows}` — so that a single mount contains every path an importing container links across.
 - We will give each linking container (Radarr, Sonarr) **exactly one volumeMount** from the media PVC (`subPath: rotation` at `/data`); transmission mounts only `rotation/downloads` at `/data/downloads` (least privilege, identical path strings); Jellyfin's multiple read-only mounts are fine because it never links.
 - We will never mount the NAS root into any pod to "solve" cross-subtree linking.
+- We will validate the mergerfs NFS export lifecycle separately from the container mount topology; operator promotion uses one NFS mount of the scoped share rather than local pool edits with clients still mounted.
 
 **Status**
 
@@ -186,7 +191,7 @@ The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: t
 
 **Consequences**
 
-- Hardlink imports and instant promotion moves (`mv rotation/… → 30.0x/…`) work; storage is consumed once per file regardless of how many names it has.
+- The topology permits hardlink imports and same-filesystem promotion moves (`mv rotation/… → 30.0x/…`); actual export/import behavior must pass Tasks 11 and 5 before rollout. Storage is consumed once per underlying file regardless of how many names it has.
 - The torrent-exposed blast radius is exactly `30_media` — documents and photos are unreachable from the media stack.
 - The topology is fragile to well-meaning refactors: splitting a linking container's single `rotation` mount into per-dir `subPath` mounts (or per-dir PVs) silently degrades imports to copies. Detection signal: `30_media` usage ≈2× expected, or `stat -c %h` on an imported file returning 1 while seeding. Documented in the design's failure-mode narrative.
 - Future *arr root folders (music, books) extend inside `rotation/` with no topology change.
@@ -200,7 +205,7 @@ Radarr/Sonarr delete and replace library files on quality upgrades — an *arr-m
 **Decision**
 
 - We will split every service-fed content area into a machine tier and a human tier: media `rotation/` → `30.0x` preserved dirs; photos `20.02_camera` (triage) and Immich-owned uploads (Ceph) → `20.01_library` (archive).
-- We will promote content exclusively by hand (`mv`) — human curation is the feature, not a gap to automate.
+- We will promote content exclusively by hand — human curation is the feature, not a gap to automate. Use `mv` within one NFS share mount for NAS tiers; Ceph-to-NAS promotion requires a verified copy before deleting its source. Local pool repair requires quiescing/unmounting clients first.
 - We will mount preserved tiers read-only in every service that touches them: Jellyfin gets **all** media mounts `:ro` (it writes nothing; deletions flow Jellyseerr → *arr APIs), Immich gets `20.01_library` `:ro` and `20.02_camera` read-write (in-app culling of camera dumps deletes rejects from disk *by intent*).
 - We will treat the filesystem as the metadata source of truth for the photo archive: date/GPS repairs happen via exiftool/digiKam on the tree; Immich re-reads them on rescan.
 
@@ -235,7 +240,7 @@ The NAS layout must outlive any particular service choice (Nextcloud vs Copypart
 **Consequences**
 
 - Every file on the NAS remains readable with nothing but a filesystem — no service lock-in; a future ZFS (or any other) migration is a plain copy.
-- New shares cost one values entry in `system/csi-driver-nfs` (single root export with `fsid=1` serves subpath mounts; zero NAS-side export changes).
+- Once Task 11 establishes export readiness, new shares cost one values entry in `system/csi-driver-nfs`; the single root export with `fsid=1` serves subpath mounts. Node retention, inode calculation and the fixed-owner `root_squash` acceptance test are prerequisite work, not established live guarantees.
 - Service selection for documents (Nextcloud/Copyparty/OpenCloud) stays an open, deferred decision — the tree doesn't depend on it.
 - Machine-generated churn never lands on the snapraid pool, keeping parity syncs quiet and meaningful.
 
@@ -247,9 +252,11 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 
 **Decision**
 
-- We will verify with BLAKE3 content-hash manifests (`b3sum`), one per dataset (NAS copy, each source drive), compared as **hash-sets** ("is any content on drive B present nowhere in the copy?") — immune to renames between backup generations, reading each dataset exactly once, parallelizable across machines.
-- We will keep the manifests, the move log, and the conscious-discard log permanently in `00_meta/migration/` as the audit record of what came from where and where it went.
-- We will release source drives one at a time, and wipe the **last** source drive only after the first snapraid sync **and** scrub complete successfully — the pool is never simultaneously parity-less and source-less.
+- We will inventory A/B/C, including all entry types, and hash regular files on each source and the NAS. Hash-set comparison discovers content deltas across renamed backup generations; a per-source/path ledger separately records destinations and explicit dedup/discard decisions.
+- We will stop on destination collisions and verify every retained final file after sorting, including a full checksum pass. Sampling and an empty staging directory alone cannot authorize source release. The additional read is an accepted integrity cost.
+- We will retain manifests, the per-entry ledger and logs in `00_meta/migration/` and on an independent surviving device. Evidence must survive loss of the NAS data disk containing `00_meta`.
+- Before **each** source wipe, every retained entry from that device must have a verified independent surviving copy in addition to the NAS, or coverage in an unchanged, fully verified parity snapshot. Before first parity exists, copy unique B content to A/C or temporary independent storage and verify capacity and checksums. A surviving source drive alone is not a per-file recovery guarantee.
+- We will release B, complete its sync and full scrub, then re-check C's coverage before its release. Adding C requires explicit full parity expansion and another complete scrub. Release A last only after both parity levels pass; retain separate copies of excluded content and audit evidence. Partial files, service startup, and the routine percentage scrub never substitute for these gates.
 
 **Status**
 
@@ -257,7 +264,7 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 
 **Consequences**
 
-- "Safe to wipe" is a provable statement (empty hash-set diff + logged discards), not a feeling.
+- "Safe to wipe" requires complete source-to-final reconciliation and recoverability for every retained entry after that specific wipe.
 - Any file's integrity can be re-verified by hash forever, even after sorting scattered it across the tree.
 - The migration window is longer than a copy-and-wipe approach — hashing 16TB per dataset is disk-bound (~a day per drive) — accepted as the price of the proof.
 - `b3sum` becomes a dev-shell dependency (`flake.nix`).

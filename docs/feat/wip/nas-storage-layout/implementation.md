@@ -25,8 +25,9 @@ Replace the flat `storage_dirs` list with the designed tree.
    loop over `storage_dirs`) then needs no structural change. Set ownership/mode in that
    task to `1000:1000` / `0775` if not already (must match `nfs_anon_uid/gid` in
    `defaults/main.yml`).
-   → verify: `ansible-playbook … --check --diff` shows only the new dirs; a second real
-   run reports zero changes (idempotent).
+   → verify: inspect a storage-play check/diff, then run twice and require zero changes
+   from the directory/legend tasks on the second run. Do not require the whole role's
+   recap to be zero: its existing `sensors-detect` task always reports a change.
 2. Add `templates/storage-readme.j2` rendering `00_meta/README.md` from the same
    `storage_dirs` variable plus a hand-written legend header (grammar rules, the
    `50_topics` working-set test, machine-vs-human convention, pointer to this repo's
@@ -54,14 +55,94 @@ silently exclude same-named dirs inside `70_backups` dumps:
   meaningful
 - add `exclude /10_documents/inbox/` — machine-consumed transient drop dir
 - add `exclude /99_tmp/` — migration staging / scratch
-- **replace** the existing `exclude downloads/` with nothing (superseded by the rotation
-  entry) and review `exclude appdata/` the same way — both are name-anchored and would
-  hit backup-dump content; keep `/tmp/` and the dot-file excludes as-is
+- **remove** the existing name-anchored `exclude downloads/` and `exclude appdata/` —
+  the former is superseded by rotation, and application state belongs on Ceph rather
+  than an arbitrary deep `appdata` directory. Keep `/tmp/` and the listed OS-cruft
+  excludes; the migration audit must identify any retained content matching them
 
-Keep a one-line comment per exclude stating *why*.
-→ verify: rendered `/etc/snapraid.conf` on the NAS contains the three lines;
-`snapraid status` parses the config without error (parity may not exist yet — config
-parse is the check, not sync).
+Keep a one-line comment per exclude stating *why*. In the same template, use
+`loop.index` for additional parity directives and filenames: `parity`, `2-parity`,
+`3-parity`. The present `loop.index - 1` repeats the first level via its `1-parity`
+alias when adding the second device.
+→ verify offline: render one-, two-, and three-device configurations; check the exact
+directives/paths and root-anchored excludes, including included backup paths containing
+`downloads` or `appdata`. Parse representative configs using SnapRAID 13.0 in a
+disposable fixture with accessible data/content directories; assert failure for the
+old duplicate-first-level configuration. No sync against real disks is part of Task 2.
+
+The role skips `snapraid.yml` entirely while `parity_drives` is empty. Inspect the live
+`/etc/snapraid.conf` and run `snapraid status` only in Task 8 after adding the first
+parity device; Task 2 completes with offline validation, not that later live check.
+
+## nfs-export-readiness
+
+Task 11 is a prerequisite to the media rollout. It uses disposable files under
+`99_tmp`; clean up its clients before NAS-local migration/sorting begins.
+
+1. In `metal/roles/storage/tasks/mergerfs.yml`, add `noforget` and
+   `inodecalc=path-hash` while retaining `category.create=mfs`, remove legacy `use_ino`,
+   and keep lazy unmount disabled. Apply in a maintenance window: stop/unmount clients,
+   stop NFS, unmount/remount mergerfs normally, restore exports/NFS, and reconnect
+   clients. Changing fstab alone does not prove the running options changed.
+   → verify: inspect active mergerfs options and NAS process memory, then exercise
+   repeated create/link/rename/open/close/reopen from two NFS clients, including after
+   an idle interval and a controlled server remount/recovery.
+2. Retain `root_squash` and `anonuid/anongid=1000`. The upstream general recommendation
+   is broader than this fixed-owner workload; explicitly test it as UID/GID 1000.
+   Directories needed by services are created NAS-side with that owner. Test nested
+   creation, link, rename, read and deletion; errors block rollout and require a
+   design decision, not an automatic switch to `no_root_squash` or privileged clients.
+   → verify: successful operations as the real writer identity, plus RO rejection.
+3. Extend `tasks/nfs_validation.yml` and `tasks/k8s_validation.yml` to perform the
+   lifecycle checks on `99_tmp`, report failures, and clean up fixtures. Correct the
+   test pod's existing trailing `&&` before relying on its shell script. Require an
+   available kubeconfig and an actually successful pod, not the optional-test skip.
+   From the repository root, run `make -C metal storage ANSIBLE_TARGETS=yggdrasil
+   ANSIBLE_ARGS='-e validate_nfs=true'` when the cluster and NAS are available.
+   → verify: NFS and Kubernetes validation both execute and pass; a deliberately
+   unwritable fixture is reported as failed, not skipped.
+4. Document operator promotion in `docs/guides/how_to_for_media_management.md`: use
+   one mount of `server:/mnt/storage/30_media` on the NAS or an allowed homelab client,
+   operate as UID/GID 1000, pause competing activity for the item, and move between
+   paths inside that mount. Do not edit through the NAS-local pool while consumers
+   remain mounted. For exceptional local repair, quiesce/unmount those clients first.
+   → verify: a client with previously read items can reopen them after promotion and
+   rescan; the remaining download hardlink still seeds. With `path-hash`, presented
+   inode numbers may differ; use link count and the backing branch's inode identity
+   to distinguish a hardlink from a copy.
+
+References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
+and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
+
+## parity-job-readiness
+
+Task 12 prepares bootstrap/expansion before source disks are released. Update
+`metal/roles/storage/tasks/snapraid.yml`, `tasks/snapraid_initial_sync.yml`,
+`handlers/main.yml`, and `templates/snapraid-initial-sync.service.j2`:
+
+1. Deploy the bootstrap unit on every configuration run, including when first parity
+   exists. Remove the first-file-exists completion assumption and automatic start
+   on config changes; the operator starts this job after the runbook's safety gates.
+   → verify: first setup, an interrupted job, and adding second parity all leave a
+   runnable unit; applying configuration alone does not run parity computation.
+2. Make the unit invoke `/usr/local/bin/snapraid --force-full sync` directly, retaining
+   output in the journal. This explicit full computation supports initial creation
+   and adding another parity level while retaining existing parity/content files.
+   Remove the `tee` pipeline and the fixed 12-hour cutoff (`TimeoutStartSec=infinity`);
+   the operator monitors progress and may stop a stuck job. Keep routine incremental
+   syncs in the maintenance runner.
+   → verify in a disposable multi-filesystem fixture: one parity then two parity
+   initialize, a nonzero SnapRAID exit produces a failed unit, an interrupted run
+   cannot satisfy completion, and retry completes without deleting old parity.
+3. During bootstrap/expansion, stop and disable the runner and scrub timers and wait
+   for existing jobs to finish. Ensure the role/handlers respect disabled maintenance
+   settings instead of restarting a timer unconditionally. Do not rely on `Conflicts=`
+   alone: a timer could start another unit and terminate the active bootstrap job.
+   → verify: a role rerun leaves maintenance stopped until the operator re-enables it.
+
+Task 8 records the unit invocation, completion result/exit status and logs, then runs
+an explicit full scrub. These changes do not make existence of a parity file or a
+previous successful invocation sufficient evidence for a newly added parity level.
 
 ## devshell-b3sum
 
@@ -85,6 +166,8 @@ delete it (reclaim policy is `Retain`; nothing on the NAS is touched).
 `…/mnt/storage/30_media`; after ArgoCD sync, `kubectl get pv pv-nfs-media` exists and
 `pv-nfs-videos` is gone.
 
+Complete Task 8's parity acceptance and Task 11's export checks before production sync;
+Task 5's promotion tests must run after the included-data freeze ends.
 Land this and the [jellyfin remount](#jellyfin-remount) in **one commit/sync window**: if
 this change syncs alone, the still-deployed jellyfin chart claims the now-deleted
 `pv-nfs-videos` and degrades until the remount lands (self-healing, but avoidable).
@@ -128,74 +211,138 @@ In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
    `/media/shows` (preserved) + `/media/rotation/{movies,shows}` (update the guide in
    the same commit).
 
-→ verify (after ArgoCD sync, in order):
+→ verify (render before sync; runtime checks after sync, in order):
   a. `helm template apps/jellyfin` — every media mount resolves to the single
      `pvc-nfs-media` claim; Jellyfin's mounts carry `readOnly: true`; radarr/sonarr have
      exactly one media volumeMount each; PUID/PGID env present on all lscr containers.
-  b. UID proof: `kubectl exec` into radarr — `id` shows the s6-dropped app user as
-     1000:1000 (after PUID applies), and `touch /data/downloads/.writetest` succeeds.
-  c. Hardlink proof: in radarr —
-     `touch /data/downloads/complete/.linktest && ln /data/downloads/complete/.linktest
-     /data/movies/.linktest && stat -c %h /data/movies/.linktest` prints `2`; clean up
-     both names.
+  b. UID proof: inspect the actual Radarr/Sonarr/Transmission process credentials
+     (for example, the process's `/proc/<pid>/status`), requiring UID/GID 1000.
+     In each writer container, use `s6-setuidgid abc id` and perform a disposable write
+     through that same helper. Bare `kubectl exec ... id` tests the exec process,
+     usually root, which can write through root-squash even with a wrong app UID.
+  c. Hardlink proof: in radarr, run the entire quoted probe as `abc`:
+     `s6-setuidgid abc sh -c 'touch /data/downloads/complete/.linktest && ln /data/downloads/complete/.linktest /data/movies/.linktest && stat -c %h /data/movies/.linktest'`
+     prints `2`; clean up
+     both names. Repeat for sonarr's `/data/shows`. Then import a small legal test
+     download using the application itself and prove it linked while seeding continues.
   d. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
-  e. `./tests/metal.sh` still passes (NFS validation tasks).
+  e. Run the storage-play command in [nfs-export-readiness](#nfs-export-readiness)
+     and confirm its NFS tests execute. `./tests/metal.sh` is a separate cluster/network
+     smoke test; it provides no NFS coverage. Repeat the reopen/promotion checks with
+     the final mounts and confirm RO enforcement survives pod recreation.
 
 ## migration-runbook
 
-Manual/operational — executed from the controller or NAS shell, not by ArgoCD. Record
-everything under `/mnt/storage/00_meta/migration/`.
+Manual/operational, before production NFS consumers start. Create
+`/mnt/storage/00_meta/migration/`; keep a second copy of its evidence on a surviving
+independent device, outside the source dataset being inventoried. Freeze source writes
+and stop on any enumeration, read, hash, copy, or reconciliation failure.
 
-1. **Copy drive A** (attach to NAS or workstation):
-   `rsync -aHAX --info=progress2 /mnt/driveA/ /mnt/storage/99_tmp/driveA/`.
-   `-H` preserves any hardlinks in the source; no `--delete` ever during migration.
-2. **Manifests** (hash-set method — see design.md § Migration plan for why not `rsync -c`):
-   for each dataset run `find <root> -type f -print0 | xargs -0 b3sum > <name>.b3` —
-   `nas-copy.b3` (generated **on the NAS** so terabytes are read locally, not over NFS),
-   `driveB.b3`, `driveC.b3` (hash B/C wherever they are attached; can run in parallel
-   with the NAS-side hashing). The NAS needs b3sum installed: one-off
-   `apt install b3sum` (Debian; fall back to the static binary from the upstream BLAKE3
-   releases if the package is unavailable) — a migration-only tool, deliberately NOT
-   added to the storage role; record the install + version in
-   `00_meta/migration/README`. Store all `.b3` files in `00_meta/migration/`.
-3. **Hash-set diff:** hashes present in `driveB.b3`/`driveC.b3` but absent from
-   `nas-copy.b3` (compare field 1 only, e.g. `comm -13` on sorted hash columns) → copy
-   those files into `99_tmp/driveB_delta/` (preserving relative paths), regenerate
-   `nas-copy.b3`, repeat until the diff is empty or every remaining line is a conscious
-   discard recorded in `00_meta/migration/discarded.txt`.
-4. **Sort:** `mv` content from `99_tmp` into numbered homes per design.md § Migration
-   mapping. Append each move as `src → dst` to `00_meta/migration/moves.log`. Delete
-   cruft (`.@__thumb`, `.streams`, `Thumbs.db`, superseded archive generations) and log
-   deletions to `discarded.txt`.
-5. **Exit check:** `find /mnt/storage/99_tmp -type f | wc -l` → 0, and spot-audit:
-   sample N hashes from `nas-copy.b3` and derive each file's destination by applying the
-   **longest-prefix-matching `moves.log` entry** to the manifest path (moves are logged
-   at directory level; the longest matching `src` prefix rewrites to its `dst`), then
-   `b3sum -c` the sampled hash against that destination path.
+1. **Inventory A/B/C before copying.** Record source disk-by-id and mount, tool versions,
+   regular-file hashes, symlink text, directory entries/metadata, and other file types.
+   Generate `driveA.b3`, `driveB.b3`, and `driveC.b3` at their attached machines; a failed
+   or partial scan is not a valid manifest. Use NUL-safe enumeration and the checksum
+   tool's escaped filename format/checker; do not parse filenames by whitespace or
+   silently omit non-regular entries. Never follow source symlinks during inventory.
+   Install `b3sum` once on the NAS (`apt install b3sum` on Debian, or a verified upstream
+   binary) and record the version. This remains a migration tool outside the role.
+   → verify: all scans complete with zero errors and entry counts reconcile; special
+   files need an explicit archive/restore or discard decision before release.
+2. **Copy A and reconcile.** Use `rsync -aHAX --info=progress2 /mnt/driveA/
+   /mnt/storage/99_tmp/driveA/`, checking success; never use `--delete`. Generate
+   `nas-copy.b3` locally on the NAS, outside the hashed staging tree. Compare all A
+   regular-file hashes and inventory entries against the copy.
+   → verify: no missing/mismatched entries, including symlinks and empty directories.
+3. **Discover B/C deltas.** Compare validated hash-sets to find content missing from
+   the NAS; copy it into `99_tmp/driveB_delta/` and `driveC_delta/`, preserving relative
+   paths, and hash every new copy. Keep source identities even for equal content:
+   a file needed at a second final path must be copied/linked there or explicitly
+   deduplicated by the operator. Equality of hashes alone is not a discard decision.
+   → verify: every B/C entry has staged content or a recorded proposed disposition.
+4. **Sort with collision checks.** Maintain an escaped, machine-readable ledger (JSONL)
+   with source disk ID, relative source path, entry type, source hash/link text,
+   final path, disposition (`keep`, `deduplicate`, `discard`), and decision reason.
+   Record moves as they occur; directory-level logs may aid reconstruction but cannot
+   replace each entry's final mapping. Before each move, check the destination. If
+   differing content collides, stop and choose distinct unnumbered leaf paths or an
+   explicit discard; never overwrite. Equal-content deduplication records the retained
+   destination for every source entry. Log cruft deletion deliberately.
+   → verify on a small fixture first: different contents with the same destination,
+   equal contents at required distinct paths, nested moves, spaces/newlines in names,
+   dangling symlinks, and a failed hash must not silently lose an entry.
+5. **Reconcile everything after sorting.** Re-read every retained regular file at its
+   final path and compare its source hash; verify symlink targets and directory
+   metadata, including any explicit transformations. Reject missing entries, unlogged
+   discards, destination collisions, unresolved paths and checksum failures. Remove
+   empty staging directories only after their entries are reconciled.
+   → verify: `99_tmp` has no unresolved entries of any type, all source entries have
+   checked dispositions, and the complete final audit has zero unexplained differences.
+   Sampling is optional additional inspection, never the release gate. Store the exact
+   audit commands/helper used and its output with the manifests for reproducibility.
+6. **Freeze the accepted dataset.** Stop promotions and all writers to included paths
+   until Task 8's final full scrub. Cross-check retained destinations against the
+   rendered SnapRAID excludes; an excluded retained item requires its own independent
+   backup or relocation into an included path before its source can be released.
+   During parity work, write new job logs/evidence outside the pool (NAS journal and
+   the independent evidence device), so updating `00_meta` cannot change the snapshot
+   under verification. Archive those logs into `00_meta/migration/` after release;
+   their independent copy protects them until the next normal parity sync.
+   → verify: the ledger and final checksums describe the dataset used for parity.
 
 ## parity-enablement
 
-One drive at a time; **drive A last**.
+One drive at a time; **drive A last**. Tasks 2, 7, and 12 must be complete. Stop/disable
+maintenance timers and wait for running jobs before each configuration transition.
+Preserve the frozen included dataset and the independently stored audit evidence.
 
 0. **Parity-size gate (before ANY wipe):** snapraid requires each parity device to be at
    least as large as the largest data branch. All drives are same-model 18TB Seagates
    (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
    the candidate parity drive vs every `/mnt/data*` device and record the numbers in
    `00_meta/migration/`. Abort the wipe if the candidate is smaller.
-1. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
+1. **Per-file redundancy gate before B:** use the ledger to identify retained content
+   on B without a verified copy on A/C or another independent surviving device, apart
+   from the NAS. Reserve sufficient free space there, copy those deltas into a separate
+   safety-copy directory, and read/hash them back. Record disk IDs, paths, hashes and
+   free space. No spare capacity or any failed verification means **do not wipe B**.
+   → verify: every retained B entry can be recovered if its NAS data disk fails during
+   first parity construction; another path/branch on the same physical disk does not count.
+2. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
    `wipefs`/`blkdiscard` per the drive's disk-by-id), add its id under `parity_drives` in
    the sops inventory (`metal/inventory/metal.yml`), run the storage role
-   (`make metal` limited to the storage host, or the role's play). The role formats,
-   mounts `/mnt/parity1`, templates `snapraid.conf`, and (see
-   `tasks/snapraid_initial_sync.yml`) runs the initial sync as a systemd unit.
-   → verify: `snapraid status` shows the parity file; initial sync completes in the unit
-   log (`journalctl -u snapraid-initial-sync`).
-2. Repeat for drive C (`2-parity`). → verify: `snapraid status` healthy with 2 parity.
-3. `snapraid scrub -p 100` (or the role's scrub unit) once. → verify: zero errors.
-4. Only now wipe drive A; decide (and record in `00_meta/migration/`) whether it becomes
-   a third parity, a data branch, or a cold spare.
-5. Update `snapraid_maintenance` thresholds in role defaults only if the first weeks show
+   (`make -C metal storage ANSIBLE_TARGETS=yggdrasil`). The role formats/mounts
+   `/mnt/parity1`, renders the corrected config and deploys the Task 12 unit; it does
+   not start it. Inspect `/etc/snapraid.conf`, excludes, and `snapraid status` here.
+   Start `snapraid-initial-sync` explicitly. Record this invocation's journal and
+   `systemctl show` result/exit status; wait for successful completion, not file creation.
+   → verify: success for the current dataset/configuration, no active competing job,
+   and `snapraid diff` reports no included changes before proceeding.
+3. **First full scrub:** run `snapraid scrub -p full` and require successful exit, zero
+   errors, and complete block coverage in the output/status. The default scrub unit's
+   10%/ten-day policy and an age-filtered percentage pass are not substitutes.
+   → verify: first parity can protect the retained snapshot before releasing C.
+4. **Release C and expand:** repeat identity/size and per-file recovery checks. Coverage
+   may now come from the unchanged verified first-parity snapshot; any excluded or
+   newly changed retained content still needs an independent copy. Wipe C only after
+   that gate, add it as `2-parity`, apply the role, then explicitly run the full-sync
+   unit again. Keep first parity/content files intact; do not delete them to trigger a
+   first-file guard. Full-scrub again with `snapraid scrub -p full`.
+   → verify: both configured levels are initialized, this invocation succeeded, no
+   included changes occurred, and all blocks passed the second full scrub.
+5. **Release A last:** repeat the per-file recovery check, including safety copies
+   placed on A and any retained excluded entries. Only the successful two-level sync
+   and full scrub authorize release. Record whether A becomes parity, data, or a cold
+   spare. Keep a spare unformatted until needed; adding parity repeats expansion/full
+   scrub, and adding a data branch requires another sync/full scrub before protection
+   of that changed layout is claimed. Preserve an independent copy of migration evidence.
+6. Re-enable maintenance only after recording successful completion. Update
+   `snapraid_maintenance` thresholds in role defaults only if the first weeks show
    false-positive aborts — do not pre-tune.
+
+On interruption or any failure: stop later wipes, retain all source/safety copies and
+existing parity/content files, diagnose, then restart the explicit job and repeat the
+full scrub. Never infer completion from a partial parity file or an earlier unit run.
+On unexpected data changes, redo affected checks and sync before accepting the scrub.
 
 ## legend-docs
 
@@ -208,8 +355,11 @@ One drive at a time; **drive A last**.
    (Pictures, Documents, Music, Backups)" naming in the NFS-review follow-up is
    superseded by this design's names).
 3. `docs/guides/how_to_for_media_management.md`: updated as part of
-   [jellyfin-remount](#jellyfin-remount) step 4.
-→ verify: `make docs` (mkdocs) builds without broken-link warnings.
+   [jellyfin-remount](#jellyfin-remount) step 5 and the operator-promotion procedure.
+→ verify: `python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check` completes
+without warnings. `make docs` serves a preview and is not a terminating build check.
+If unrelated baseline warnings exist, record them and prove no new warnings; do not
+silently weaken strict mode. Also check local links in the revised Markdown directly.
 
 ## Deferred / follow-ups (explicit)
 
@@ -217,7 +367,9 @@ One drive at a time; **drive A last**.
   frequencies/retention are future work (`scripts/backup.py` / backup docs).
 - **NFS health monitoring** — pre-existing todo.md item; becomes more urgent once media
   serving depends on the NAS. Not part of this feature.
-- **`use_ino` cleanup** in `tasks/mergerfs.yml` mount options — legacy no-op on 2.41.x;
-  remove opportunistically next time the role changes (needs remount to apply).
+- **Environment repair:** the existing `.venv/bin/pip` launcher references a differently
+  cased `ktchn8S` path. Recreate the virtualenv before dependency-installing checks;
+  existing `python3 -m mkdocs` works for this documentation pass. This pre-existing
+  environment issue is outside the storage changes.
 - **Immich & documents-service deployment** — their mount requirements are binding
   (design.md § Service integration); the deployments are separate features.
