@@ -76,8 +76,10 @@ parity device; Task 2 completes with offline validation, not that later live che
 
 ## nfs-export-readiness
 
-Task 11 is a prerequisite to the media rollout. It uses disposable files under
-`99_tmp`; clean up its clients before NAS-local migration/sorting begins.
+Task 11 is synthetic NFS validation, independent of the media applications. Create
+`99_tmp/nfs-readiness/{downloads,library}` and expose that one fixture subtree to its
+test clients. All creates, links, renames and RO probes stay there; clean up clients
+and fixtures before NAS-local migration/sorting begins.
 
 1. In `metal/roles/storage/tasks/mergerfs.yml`, add `noforget` and
    `inodecalc=path-hash` while retaining `category.create=mfs`, remove legacy `use_ino`,
@@ -101,15 +103,13 @@ Task 11 is a prerequisite to the media rollout. It uses disposable files under
    ANSIBLE_ARGS='-e validate_nfs=true'` when the cluster and NAS are available.
    → verify: NFS and Kubernetes validation both execute and pass; a deliberately
    unwritable fixture is reported as failed, not skipped.
-4. Document operator promotion in `docs/guides/how_to_for_media_management.md`: use
-   one mount of `server:/mnt/storage/30_media` on the NAS or an allowed homelab client,
-   operate as UID/GID 1000, pause competing activity for the item, and move between
-   paths inside that mount. Do not edit through the NAS-local pool while consumers
-   remain mounted. For exceptional local repair, quiesce/unmount those clients first.
-   → verify: a client with previously read items can reopen them after promotion and
-   rescan; the remaining download hardlink still seeds. With `path-hash`, presented
-   inode numbers may differ; use link count and the backing branch's inode identity
-   to distinguish a hardlink from a copy.
+4. Simulate promotion inside the fixture: link a downloads file into its library,
+   rename the library entry and reopen through both clients. Verify unchanged bytes
+   through the surviving download name and backing hardlink identity; no torrent
+   client or production library is needed. With `path-hash`, presented inode numbers
+   may differ, so also use link count and the backing branch's inode identity.
+   → verify: reads survive the rename and controlled remount/recovery. Actual seeding,
+   library rescans and the operator's production promotion procedure belong to Task 5.
 
 References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
 and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
@@ -150,6 +150,54 @@ Add `b3sum` to the `packages` list in the `devShells.default` `mkShell` block of
 `flake.nix` (~line 31).
 → verify: `nix develop -c b3sum --version`.
 
+## migration-audit-tooling
+
+Task 13 creates `scripts/nas-migration-audit.py` and
+`tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
+the Task 3 `b3sum` executable. Before Task 13's NAS fixture, verify Python 3 and install
+`b3sum` once there (`apt install b3sum` on Debian, or a verified upstream binary);
+record both versions with the fixture results. The helper reads datasets and writes evidence only. Copying, moving, permission
+changes, discards and disk operations remain explicit operator actions.
+
+| Subcommand | Inputs and result |
+|---|---|
+| `inventory` | Root, source/disk ID and output path → versioned JSONL inventory of all entry types; BLAKE3 for regular files, literal symlink targets, numeric UID/GID/mode, mtime and ACL/xattr evidence. Do not compare non-restorable ctime or read-sensitive atime. Record source hardlink groups where the filesystem exposes reliable identities. |
+| `compare` | Source and copy inventories; select path comparison for A's copy or content comparison for B/C discovery → missing/mismatched entries and candidate equal-content matches, preserving every source identity. It never decides that a duplicate may be discarded. |
+| `verify` | A/B/C inventories, disposition ledger and final NAS root → complete source-to-destination/content/expected-metadata reconciliation. |
+| `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
+
+The inventory and ledger use escaped JSON strings that round-trip filesystem names,
+including spaces, newlines and Cyrillic. Never follow symlinks during inventory or
+read a special device as ordinary file data. Unsupported entries require an explicit
+archive/restore or discard decision. Ledger rows identify source ID/path, disposition,
+final destination and reason; metadata transformations include before/expected values.
+Explicit directory merges and equal-content deduplication are allowed; conflicting
+file content or incompatible expected metadata at one destination fails verification.
+Reject paths escaping their declared roots; regular-file verification must not follow
+an intermediate symlink outside the final NAS root and mistake source data for a copy.
+
+Exit 0 means the command completed successfully with its acceptance criteria met;
+exit 1 means a completed comparison/audit found differences or access failures;
+exit 2 means an execution/input error, including inventory/verification I/O errors,
+failed hashes, source changes during hashing or incomplete inputs. An `access`
+permission denial is a reported policy failure (exit 1), not an incomplete scan.
+Neither nonzero exit authorizes acceptance. Write outputs outside audited roots
+through `.partial` files and publish a completed generation atomically, with
+schema/run ID, counts and completion status. Never overwrite a completed generation.
+Retries create a fresh generation; partial inventories cannot be resumed or accepted.
+Verification/access reports record the same ledger digest; any ledger or destination
+change invalidates previous acceptance and requires the relevant checks again.
+Stream inventories/reports and hash locally to avoid reading NAS data over the network.
+
+→ verify: `python3 -m unittest discover -s tests -p 'test_nas_migration_audit.py'`
+covers the command exit/output contract, partial scans/retries, failed hashes, unusual
+names, symlinks/root escapes, special files, missing/duplicate ledger rows, merges/collisions,
+equal-content distinct destinations and approved metadata transformations. The access
+fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix;
+run that identity-sensitive check on the NAS/Task 11 test environment if necessary.
+Task 13 depends on Tasks 3 and 11, uses their tool/fixture environment, and cleans up
+its clients afterward. It completes only when its checks pass, before Task 6 starts.
+
 ## nfs-media-share
 
 In `system/csi-driver-nfs/values.yaml`, replace the `volumes` entry:
@@ -159,18 +207,15 @@ In `system/csi-driver-nfs/values.yaml`, replace the `volumes` entry:
 - `capacity: 1Ti` → `capacity: 4Ti` (nominal for NFS; must be ≥ any bound PVC request)
 
 This renders PV `pv-nfs-media` (template `templates/pv-nfs.yaml` derives the name).
-`spec.nfs`/`volumeHandle` are immutable on an existing PV — but per todo.md the stack has
-never run; if `pv-nfs-videos` exists in the cluster in `Available`/`Released` state,
-delete it (reclaim policy is `Retain`; nothing on the NAS is touched).
+The share/volume handle cannot be changed in place on the old PV. Task 4 prepares the
+replacement chart on a non-deployed work branch and completes with offline rendering;
+it performs no cluster deletion or sync.
 → verify: `helm template system/csi-driver-nfs | grep -A3 volumeHandle` shows
-`…/mnt/storage/30_media`; after ArgoCD sync, `kubectl get pv pv-nfs-media` exists and
-`pv-nfs-videos` is gone.
+`…/mnt/storage/30_media`, with the intended capacity and Retain policy.
 
-Complete Task 8's parity acceptance and Task 11's export checks before production sync;
-Task 5's promotion tests must run after the included-data freeze ends.
-Land this and the [jellyfin remount](#jellyfin-remount) in **one commit/sync window**: if
-this change syncs alone, the still-deployed jellyfin chart claims the now-deleted
-`pv-nfs-videos` and degrades until the remount lands (self-healing, but avoidable).
+Task 5 consumes the prepared chart and owns one release containing both the PV and
+application changes, after Task 8 and the export checks. Keep Task 4 off the deployed
+Git revision until that release. Task 5 owns stale-resource cleanup and live acceptance.
 
 ## jellyfin-remount
 
@@ -209,7 +254,15 @@ In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
    `docs/guides/how_to_for_media_management.md`) must point at `/data/movies` and
    `/data/shows`. The guide's Jellyfin library paths change to `/media/movies`,
    `/media/shows` (preserved) + `/media/rotation/{movies,shows}` (update the guide in
-   the same commit).
+   the same release). Document operator promotion in that guide: UID/GID 1000, one NFS
+   mount of `server:/mnt/storage/30_media` on an allowed homelab client, and competing
+   activity for that item paused. Local repair requires quiescing/unmounting clients.
+6. After Task 8, release both charts together through GitOps. Inspect the old PV/PVC
+   first; unexpected use or data stops cleanup. Retire the old claim with its consumer
+   mounts, then delete the old PV only when Available/Released. Retain keeps NAS data.
+   → verify: the new claim binds to `pv-nfs-media`, old unused resources are gone, and
+   the replacement pod starts. Record the rendered rollout strategy inherited from
+   app-template and its behavior with the retained config PVC.
 
 → verify (render before sync; runtime checks after sync, in order):
   a. `helm template apps/jellyfin` — every media mount resolves to the single
@@ -228,78 +281,120 @@ In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
   d. RO proof: in the jellyfin container, `touch /media/movies/x` fails with EROFS.
   e. Run the storage-play command in [nfs-export-readiness](#nfs-export-readiness)
      and confirm its NFS tests execute. `./tests/metal.sh` is a separate cluster/network
-     smoke test; it provides no NFS coverage. Repeat the reopen/promotion checks with
-     the final mounts and confirm RO enforcement survives pod recreation.
+     smoke test; it provides no NFS coverage. On final mounts, test promotion/rescan
+     and continued seeding using disposable media, then actual playback of migrated
+     content from every configured preserved library. Confirm RO enforcement survives
+     pod recreation. These application checks are Task 5 acceptance, not Task 11 gates.
+
+## migrated-content-access
+
+Task 7 applies this policy after sorting and before final acceptance/freeze. The
+skeleton's ownership does not repair permissions inside copied trees.
+
+| Tier | Required access and metadata policy |
+|---|---|
+| `30_media/30.01_movies`, `30.02_tv`, `30.03_music` | UID/GID 1000 must list/traverse directories and read every served regular file. The operator needs directory write access for curation. Keep source metadata when compatible; otherwise record the required per-path ownership/mode/ACL transformation before applying it. Service mounts remain RO. |
+| `30_media/rotation` | Writers run as 1000:1000; Task 11 proves synthetic writes and Task 5 proves actual imports. It is not a destination for retained migrated content. |
+| Backups and other currently unserved tiers | Preserve source restoration metadata and record any deliberate transformation. No blanket recursive ownership/ACL normalization. A future consumer must declare its identity and pass its own access audit before rollout. |
+
+Inventory metadata before repair and put before/expected values in the ledger. If a
+served path shares an inode with an archive requiring unchanged metadata, separate
+the served copy first and record that transformation; changing shared inode metadata
+would also change the archive. Do not silently widen access to documents or backups.
+
+After local changes finish, mount only `30_media` read-only through NFS on an allowed
+client and run the helper's `access` probe as 1000:1000. It must inspect actual migrated
+paths, not freshly created placeholders. Unmount the audit client afterward; if a
+repair is needed, perform it with clients quiesced and rerun the affected checks.
+Complete the full final reconciliation against the ledger's expected metadata before
+freezing the dataset. Task 5 later verifies the real service identity and playback.
+
+## migration-evidence
+
+Select and record a run ID plus a controller evidence directory on a physical disk
+outside the NAS pool and drives A/B/C, with sufficient capacity for inventories/logs.
+It is the authoritative workspace and must survive every planned wipe. Keep original
+source entries unchanged; a separately named and tracked safety-copy area may receive
+new files, including on a surviving source drive, without modifying those originals.
+
+NAS-local audits may spool reports under `/var/log/snapraid/migration/<run-id>/`;
+copy each completed generation and current job evidence to the controller workspace
+before a wipe. The NAS journal alone is not the independent copy. Preserve dataset
+IDs and distinct original/safety-copy inventories so release checks cover both.
+
+`00_meta/migration/` is the NAS archive of evidence. Populate it before Task 7's freeze;
+all Task 8 size records, safety-copy receipts, logs, retry results and disposition
+updates go only to the controller workspace/NAS spool during the freeze. After release,
+archive the completed evidence to `00_meta` and retain its independent copy until the
+next normal sync protects those new archive files.
 
 ## migration-runbook
 
-Manual/operational, before production NFS consumers start. Create
-`/mnt/storage/00_meta/migration/`; keep a second copy of its evidence on a surviving
-independent device, outside the source dataset being inventoried. Freeze source writes
-and stop on any enumeration, read, hash, copy, or reconciliation failure.
+Manual/operational, after Task 13's tooling passes and before production consumers
+start. Set up the [evidence workspace](#migration-evidence), freeze original source
+entries, and stop on any enumeration, read, hash, copy, or reconciliation failure.
 
-1. **Inventory A/B/C before copying.** Record source disk-by-id and mount, tool versions,
-   regular-file hashes, symlink text, directory entries/metadata, and other file types.
-   Generate `driveA.b3`, `driveB.b3`, and `driveC.b3` at their attached machines; a failed
-   or partial scan is not a valid manifest. Use NUL-safe enumeration and the checksum
-   tool's escaped filename format/checker; do not parse filenames by whitespace or
-   silently omit non-regular entries. Never follow source symlinks during inventory.
-   Install `b3sum` once on the NAS (`apt install b3sum` on Debian, or a verified upstream
-   binary) and record the version. This remains a migration tool outside the role.
+1. **Inventory A/B/C before copying.** Use the helper's `inventory` command on each
+   attached source, recording disk ID, root and tool versions in the run evidence.
+   Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
+   scans; each records hashes, entry types and metadata per the tooling contract.
+   Check the NAS tool versions against the Task 13 fixture record; setup happened
+   before those tests. This remains migration tooling outside the storage role.
    → verify: all scans complete with zero errors and entry counts reconcile; special
    files need an explicit archive/restore or discard decision before release.
-2. **Copy A and reconcile.** Use `rsync -aHAX --info=progress2 /mnt/driveA/
-   /mnt/storage/99_tmp/driveA/`, checking success; never use `--delete`. Generate
-   `nas-copy.b3` locally on the NAS, outside the hashed staging tree. Compare all A
-   regular-file hashes and inventory entries against the copy.
+2. **Copy A and reconcile.** Run on the NAS with permission to preserve source metadata:
+   use `rsync -aHAX --info=progress2 /mnt/driveA/
+   /mnt/storage/99_tmp/driveA/`, checking success; never use `--delete`. Inventory that
+   copy locally on the NAS into `nas-copy.jsonl` outside the staging tree. Run the
+   helper's path comparison against A's inventory.
    → verify: no missing/mismatched entries, including symlinks and empty directories.
-3. **Discover B/C deltas.** Compare validated hash-sets to find content missing from
-   the NAS; copy it into `99_tmp/driveB_delta/` and `driveC_delta/`, preserving relative
+3. **Discover B/C deltas.** Use the helper's content comparison to find content missing
+   from the NAS; copy it into `99_tmp/driveB_delta/` and `driveC_delta/`, preserving relative
    paths, and hash every new copy. Keep source identities even for equal content:
    a file needed at a second final path must be copied/linked there or explicitly
    deduplicated by the operator. Equality of hashes alone is not a discard decision.
    → verify: every B/C entry has staged content or a recorded proposed disposition.
-4. **Sort with collision checks.** Maintain an escaped, machine-readable ledger (JSONL)
-   with source disk ID, relative source path, entry type, source hash/link text,
-   final path, disposition (`keep`, `deduplicate`, `discard`), and decision reason.
+4. **Sort with collision checks.** Maintain the tooling contract's JSONL ledger,
+   recording each source entry's destination/disposition and expected metadata.
    Record moves as they occur; directory-level logs may aid reconstruction but cannot
    replace each entry's final mapping. Before each move, check the destination. If
    differing content collides, stop and choose distinct unnumbered leaf paths or an
    explicit discard; never overwrite. Equal-content deduplication records the retained
    destination for every source entry. Log cruft deletion deliberately.
-   → verify on a small fixture first: different contents with the same destination,
-   equal contents at required distinct paths, nested moves, spaces/newlines in names,
-   dangling symlinks, and a failed hash must not silently lose an entry.
-5. **Reconcile everything after sorting.** Re-read every retained regular file at its
-   final path and compare its source hash; verify symlink targets and directory
-   metadata, including any explicit transformations. Reject missing entries, unlogged
-   discards, destination collisions, unresolved paths and checksum failures. Remove
+   Apply the [migrated access policy](#migrated-content-access), record repairs, and
+   run its temporary RO access probe. Task 13 already tests the collision/error cases.
+   → verify: all media access failures are resolved, transformations are explicit,
+   and the audit mount is removed before further local changes or the freeze.
+5. **Reconcile everything after sorting.** Run the helper's `verify` command against
+   all three source inventories, the ledger and the final tree. It re-hashes all kept
+   files and checks expected metadata/links and complete accounting. Remove
    empty staging directories only after their entries are reconciled.
    → verify: `99_tmp` has no unresolved entries of any type, all source entries have
    checked dispositions, and the complete final audit has zero unexplained differences.
-   Sampling is optional additional inspection, never the release gate. Store the exact
-   audit commands/helper used and its output with the manifests for reproducibility.
+   Sampling is optional additional inspection, never the release gate. Store the
+   helper revision, invocations, final access results and completed reports as evidence.
 6. **Freeze the accepted dataset.** Stop promotions and all writers to included paths
    until Task 8's final full scrub. Cross-check retained destinations against the
-   rendered SnapRAID excludes; an excluded retained item requires its own independent
-   backup or relocation into an included path before its source can be released.
-   During parity work, write new job logs/evidence outside the pool (NAS journal and
-   the independent evidence device), so updating `00_meta` cannot change the snapshot
-   under verification. Archive those logs into `00_meta/migration/` after release;
-   their independent copy protects them until the next normal parity sync.
+   final exclusions rendered in Task 2 (an explicit Task 7 prerequisite). An excluded
+   retained item requires its own independent backup or relocation into an included
+   path before its source can be released.
+   Apply the [evidence-location rule](#migration-evidence) throughout Task 8; the NAS
+   archive stays unchanged until release is complete.
    → verify: the ledger and final checksums describe the dataset used for parity.
 
 ## parity-enablement
 
 One drive at a time; **drive A last**. Tasks 2, 7, and 12 must be complete. Stop/disable
 maintenance timers and wait for running jobs before each configuration transition.
-Preserve the frozen included dataset and the independently stored audit evidence.
+Preserve the frozen included dataset. Every record below goes to the controller
+evidence workspace defined in [migration-evidence](#migration-evidence), using the
+NAS spool/journal only as a working copy; never update `00_meta` during this sequence.
 
 0. **Parity-size gate (before ANY wipe):** snapraid requires each parity device to be at
    least as large as the largest data branch. All drives are same-model 18TB Seagates
    (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
    the candidate parity drive vs every `/mnt/data*` device and record the numbers in
-   `00_meta/migration/`. Abort the wipe if the candidate is smaller.
+   the controller evidence workspace. Abort the wipe if the candidate is smaller.
 1. **Per-file redundancy gate before B:** use the ledger to identify retained content
    on B without a verified copy on A/C or another independent surviving device, apart
    from the NAS. Reserve sufficient free space there, copy those deltas into a separate

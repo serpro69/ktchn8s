@@ -4,14 +4,19 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: pending
 > Created: 2026-08-22
-> Revised: 2026-10-03 — corroborated review fixes; all implementation/operational tasks remain pending
+> Revised: 2026-10-03 — both review rounds addressed in the plan; all implementation/operational tasks remain pending
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
-Tasks 11 and 12 add prerequisites while preserving existing task IDs. Parallel markers
+Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
 describe independent repository work; serialize NAS role applications, remounts, and
 parity jobs. Production media sync waits for Task 8 so local sorting cannot bypass live
 NFS clients and promotion tests cannot change the snapshot under verification. Keep
 parity-included content frozen from Task 7 through Task 8.
+
+Execution outline: prepare the layout and tools (1–3), prove synthetic NFS behavior
+(11), finish audit tooling (13), migrate/reconcile (6–7), initialize/verify parity
+(8, after 12), then jointly release media (5, using the offline PV work from 4).
+Task 4 can finish offline on a work branch; Task 5 owns all live acceptance and sync.
 
 ## Task 1: Tree skeleton via storage role
 - **Status:** pending
@@ -31,7 +36,7 @@ parity-included content frozen from Task 7 through Task 8.
 - **Status:** pending
 - **Depends on:** —
 - **Size:** S
-- **Can run in parallel with:** Task 1, Task 3, Task 6, Task 7, Task 9, Task 11
+- **Can run in parallel with:** Task 1, Task 3, Task 4, Task 6, Task 9, Task 11, Task 13
 - **Docs:** [implementation.md#snapraid-excludes](./implementation.md#snapraid-excludes)
 
 ### Subtasks
@@ -43,29 +48,29 @@ parity-included content frozen from Task 7 through Task 8.
 - **Status:** pending
 - **Depends on:** —
 - **Size:** S
-- **Can run in parallel with:** Task 1, Task 2, Task 9, Task 11, Task 12
+- **Can run in parallel with:** Task 1, Task 2, Task 4, Task 9, Task 11, Task 12
 - **Docs:** [implementation.md#devshell-b3sum](./implementation.md#devshell-b3sum)
 
 ### Subtasks
 - [ ] 3.1 Add `b3sum` to `devShells.default` packages in `flake.nix`
 - [ ] 3.2 Verify `nix develop -c b3sum --version`
 
-## Task 4: NFS media PV (csi-driver-nfs)
+## Task 4: Prepare the NFS media PV offline
 - **Status:** pending
-- **Depends on:** Task 8, Task 11
+- **Depends on:** Task 1
 - **Size:** S
-- **Can run in parallel with:** Task 9
+- **Can run in parallel with:** Task 2, Task 3, Task 6, Task 7, Task 8, Task 9, Task 11, Task 12, Task 13
 - **Docs:** [implementation.md#nfs-media-share](./implementation.md#nfs-media-share)
-- **Note:** land Tasks 4 and 5 in ONE commit/sync window — Task 4 alone leaves the deployed chart claiming the deleted `pv-nfs-videos` (transient degradation)
+- **Slicing:** Contract-First — prepare the binding contract; Task 5 owns deployment
+- **Note:** Complete through offline rendering on a non-deployed work branch. Release together with Task 5 after parity acceptance; no deletion or sync belongs to Task 4
 
 ### Subtasks
 - [ ] 4.1 In `system/csi-driver-nfs/values.yaml` replace the `videos` volume entry with `media` / share `30_media` / capacity 4Ti
-- [ ] 4.2 Delete stale `pv-nfs-videos` from the cluster if present (Retain policy — NAS data untouched)
-- [ ] 4.3 Verify: `helm template` renders `pv-nfs-media` with volumeHandle `…/mnt/storage/30_media`; after ArgoCD sync `kubectl get pv pv-nfs-media` exists
+- [ ] 4.2 Verify offline: `helm template` renders `pv-nfs-media` with volumeHandle `…/mnt/storage/30_media`, capacity 4Ti and Retain policy; leave cluster resources unchanged
 
 ## Task 5: Jellyfin stack remount end-to-end
 - **Status:** pending
-- **Depends on:** Task 4
+- **Depends on:** Task 4, Task 8
 - **Size:** M
 - **Can run in parallel with:** Task 9
 - **Docs:** [implementation.md#jellyfin-remount](./implementation.md#jellyfin-remount)
@@ -75,40 +80,40 @@ parity-included content frozen from Task 7 through Task 8.
 - [ ] 5.2 Rework `persistence` in `apps/jellyfin/values.yaml`: single NFS claim; **ONE volumeMount per linking container** (radarr `/data`→subPath `rotation`; sonarr `/data`→subPath `rotation`; transmission `/data/downloads`→subPath `rotation/downloads`; Jellyfin all-`readOnly` incl. `/media/music`→`30.03_music`); strip media subPaths from the Ceph `data` PVC (configs only)
 - [ ] 5.3 Add `PUID: "1000"`/`PGID: "1000"` env to all lscr.io containers (transmission, radarr, sonarr, prowlarr); no `runAsUser` on them
 - [ ] 5.4 Update transmission download-dir config to `/data/downloads/complete` + `/data/downloads/incomplete`; *arr root folders `/data/movies`, `/data/shows`
-- [ ] 5.5 Update `docs/guides/how_to_for_media_management.md` (root folders, Jellyfin library paths, operator promotion through one NFS share mount)
-- [ ] 5.6 Render before sync: one media mount per linking container, RO flags and PUID/PGID. After sync inspect actual service credentials, run UID/write/link probes through `s6-setuidgid abc` in each writer, and perform a real application import while seeding continues; require EROFS in Jellyfin
-- [ ] 5.7 Run `make -C metal storage ANSIBLE_TARGETS=yggdrasil ANSIBLE_ARGS='-e validate_nfs=true'` with a working kubeconfig and require the NFS tests to execute; repeat Task 11's reopen/promotion checks on final mounts. Keep `./tests/metal.sh` identified separately as a network smoke test
+- [ ] 5.5 Update the media-management guide with paths and the operator promotion procedure; render both charts and record the inherited rollout strategy
+- [ ] 5.6 After Task 8, release both charts together, retire old consumer mounts/claim, and delete the unused old PV only after its state is safe; verify new binding and replacement-pod startup per the implementation plan
+- [ ] 5.7 Complete all live acceptance in `implementation.md#jellyfin-remount`: real app credentials/import/hardlinks/seeding, promotion/rescan, actual migrated-library playback, RO after recreation, and explicitly executed NFS tests. Network smoke testing remains separate
 
 ## Task 6: Migration — copy & cross-drive verification (manual ops)
 - **Status:** pending
-- **Depends on:** Task 1, Task 3, Task 11
+- **Depends on:** Task 1, Task 3, Task 11, Task 13
 - **Size:** M
-- **Can run in parallel with:** Task 2, Task 9, Task 12
+- **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
 - **Docs:** [implementation.md#migration-runbook](./implementation.md#migration-runbook)
 
 ### Subtasks
-- [ ] 6.1 Freeze and inventory A/B/C before copying: disk IDs, all entry types/metadata, hashes of regular files (including A), symlink text; install/record `b3sum` on the NAS. Abort on any failed or partial enumeration/hash
-- [ ] 6.2 rsync A → `99_tmp/driveA/` (`-aHAX`, no `--delete`), hash locally on the NAS and reconcile all copied entries against A; keep manifests/evidence under `00_meta/migration/` and on an independent surviving device
-- [ ] 6.3 Compare hash-sets, copy and checksum unique B/C content into `99_tmp/drive{B,C}_delta/`; record every source/path identity, including equal-content files with distinct required destinations, in the runbook's JSONL ledger
+- [ ] 6.1 Establish `implementation.md#migration-evidence` workspace; freeze original source entries and use Task 13's tested helper to publish complete A/B/C JSONL inventories, recording NAS Python/b3sum versions
+- [ ] 6.2 Copy A locally to `99_tmp/driveA/` with metadata preservation, inventory/hash the copy on the NAS, and use path comparison to reconcile all entries; publish evidence to the independent workspace
+- [ ] 6.3 Use content comparison to discover B/C deltas, copy/read-verify them, and record all source/path identities and proposed dispositions in the ledger; stop on execution/incomplete-input errors
 
 ## Task 7: Migration — sort into numbered homes (manual ops)
 - **Status:** pending
-- **Depends on:** Task 6
+- **Depends on:** Task 2, Task 6
 - **Size:** M
-- **Can run in parallel with:** Task 2, Task 9, Task 12
+- **Can run in parallel with:** Task 4, Task 9, Task 12
 - **Docs:** [implementation.md#migration-runbook](./implementation.md#migration-runbook)
 
 ### Subtasks
-- [ ] 7.1 Validate the audit procedure on fixtures (colliding versions, required duplicate paths, nested moves, unusual filenames, symlinks, hash failures); save the exact helper/commands with migration evidence
-- [ ] 7.2 Move content per the mapping, stopping before any collision; record per-entry final paths and keep/deduplicate/discard decisions. Preserve differing versions at distinct leaf paths unless explicitly discarded
-- [ ] 7.3 Delete approved cruft with source identity and reason recorded; exhaustively re-hash final regular files and reconcile symlinks/directory metadata and every source disposition. No sample-only acceptance
-- [ ] 7.4 Require no unresolved staging entries, zero unexplained differences, and evidence backed up independently; check retained content against parity excludes and freeze included paths through Task 8
+- [ ] 7.1 Curate/move content per the mapping with collision stops and explicit keep/deduplicate/discard records; tooling fixtures must already have passed Task 13
+- [ ] 7.2 Apply `implementation.md#migrated-content-access`: record necessary permission/ACL transformations, preserve archive metadata, and prove actual migrated-media reads as UID/GID 1000 through a temporary RO NFS mount; remove that client afterward
+- [ ] 7.3 Run the helper's complete final reconciliation; require metadata/content/disposition checks and access acceptance against the same ledger generation, with no unresolved staging entries
+- [ ] 7.4 Check retained content against Task 2's finalized exclusions, archive the accepted evidence before the freeze, and follow `implementation.md#migration-evidence` through Task 8
 
 ## Task 8: Parity enablement & drive release (manual ops)
 - **Status:** pending
 - **Depends on:** Task 2, Task 7, Task 12
 - **Size:** M
-- **Can run in parallel with:** Task 9
+- **Can run in parallel with:** Task 4, Task 9
 - **Docs:** [implementation.md#parity-enablement](./implementation.md#parity-enablement)
 
 ### Subtasks
@@ -117,13 +122,13 @@ parity-included content frozen from Task 7 through Task 8.
 - [ ] 8.3 Run `snapraid scrub -p full`; require successful exit, zero errors and full coverage before C's wipe. Preserve sources/safety copies on failure; never accept the routine 10% scrub unit
 - [ ] 8.4 Repeat C's per-file recovery/size checks, add `2-parity`, run the full-sync unit again without deleting prior parity/content, then full-scrub both levels and record completion
 - [ ] 8.5 Release A last only after the two-level sync/scrub and a recovery check covering safety copies and excluded retained items; record its role. Leave a cold spare unformatted; parity/data expansion requires a further sync/full scrub before claiming protection
-- [ ] 8.6 Re-enable maintenance only after acceptance; preserve independent migration evidence and record interruption/retry results and any capacity limits encountered
+- [ ] 8.6 Write all size/safety-copy/job/retry/disposition records to the controller evidence workspace during the freeze; after release archive them to `00_meta`, keep the independent copy, and re-enable maintenance
 
 ## Task 9: Legend & docs
 - **Status:** pending
 - **Depends on:** Task 1
 - **Size:** S
-- **Can run in parallel with:** Task 2, Task 3, Task 4, Task 5, Task 6, Task 7, Task 8, Task 11, Task 12
+- **Can run in parallel with:** Task 2, Task 3, Task 4, Task 5, Task 6, Task 7, Task 8, Task 11, Task 12, Task 13
 - **Docs:** [implementation.md#legend-docs](./implementation.md#legend-docs)
 
 ### Subtasks
@@ -135,7 +140,7 @@ parity-included content frozen from Task 7 through Task 8.
 - **Status:** pending
 - **Depends on:** Task 1
 - **Size:** M
-- **Can run in parallel with:** Task 2, Task 3, Task 9, Task 12
+- **Can run in parallel with:** Task 2, Task 3, Task 4, Task 9, Task 12
 - **Docs:** [implementation.md#nfs-export-readiness](./implementation.md#nfs-export-readiness)
 - **Slicing:** Risk-First — settle export behavior before data migration and production consumers
 
@@ -143,13 +148,13 @@ parity-included content frozen from Task 7 through Task 8.
 - [ ] 11.1 Update `metal/roles/storage/tasks/mergerfs.yml` with `noforget`, `inodecalc=path-hash`, normal unmount behavior, and removal of `use_ino`; apply with clients quiesced and inspect active options
 - [ ] 11.2 Extend NFS/Kubernetes validation tasks using `99_tmp` fixtures: UID-1000 nested creation/link/rename/delete, two-client reopen after idle and remount/recovery, RO rejection, NAS memory observation; correct the test pod's trailing `&&` and require tests actually execute
 - [ ] 11.3 Retain `root_squash`; prove required fixed-owner operations and record results. Permission or stale-handle failures block production rollout and require a design revision, not silent privilege relaxation
-- [ ] 11.4 Document/test operator promotion through one scoped NFS mount; prove reopened content and backing hardlinks, then tear down all validation clients before Task 6's local migration
+- [ ] 11.4 Simulate rename/promotion only inside `99_tmp/nfs-readiness`, proving reopened bytes and backing links without media applications; tear down clients/fixtures. Real seeding, production promotion and library rescans belong to Task 5
 
 ## Task 12: Explicit parity bootstrap and expansion jobs
 - **Status:** pending
 - **Depends on:** Task 2
 - **Size:** M
-- **Can run in parallel with:** Task 1, Task 3, Task 6, Task 7, Task 9, Task 11
+- **Can run in parallel with:** Task 1, Task 3, Task 4, Task 6, Task 7, Task 9, Task 11, Task 13
 - **Docs:** [implementation.md#parity-job-readiness](./implementation.md#parity-job-readiness)
 
 ### Subtasks
@@ -157,14 +162,27 @@ parity-included content frozen from Task 7 through Task 8.
 - [ ] 12.2 Update `templates/snapraid-initial-sync.service.j2` to invoke `snapraid --force-full sync` directly with journal output and no fixed 12-hour timeout; maintenance timers/handlers must respect stopped/disabled state during bootstrap
 - [ ] 12.3 In disposable multi-filesystem fixtures prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation; applying config must not start jobs, and role reruns must not reactivate disabled maintenance
 
+## Task 13: Migration inventory and audit tooling
+- **Status:** pending
+- **Depends on:** Task 3, Task 11
+- **Size:** M
+- **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
+- **Docs:** [implementation.md#migration-audit-tooling](./implementation.md#migration-audit-tooling)
+- **Slicing:** Risk-First — validate the acceptance mechanism before handling real sources
+
+### Subtasks
+- [ ] 13.1 Create `scripts/nas-migration-audit.py` with the documented inventory/compare/verify/access contract, read-only dataset handling, versioned JSONL, explicit exit codes and atomic completed generations
+- [ ] 13.2 Add `tests/test_nas_migration_audit.py` covering the specified data/metadata/error/retry cases; run standard-library unittest discovery from the dev shell
+- [ ] 13.3 Run the restrictive-permission fixture under the NAS/test identities, prove a failed access result becomes a pass only after the declared transformation, and clean up all test clients; record helper/tool revisions for Task 6
+
 ## Task 10: Final verification
 - **Status:** pending
-- **Depends on:** Task 1, Task 2, Task 3, Task 4, Task 5, Task 6, Task 7, Task 8, Task 9, Task 11, Task 12
+- **Depends on:** Task 1, Task 2, Task 3, Task 4, Task 5, Task 6, Task 7, Task 8, Task 9, Task 11, Task 12, Task 13
 - **Size:** S
 - **Can run in parallel with:** —
 
 ### Subtasks
-- [ ] 10.1 Run `/kk:test` — layout-task idempotency, offline parity configs and job lifecycle, complete migration/release evidence, explicit NFS/app identity/import/reopen/RO proofs, separate network smoke test, strict docs build
+- [ ] 10.1 Run `/kk:test` — layout idempotency, parity configs/job lifecycle, audit-helper tests, complete migration/access/release evidence, NFS and real application acceptance, separate network smoke test, strict docs build
 - [ ] 10.2 Run `/kk:document` — finalize docs, move feature out of wip when done
 - [ ] 10.3 Run `/kk:review-code` — review the ansible/helm/nix changes
 - [ ] 10.4 Run `/kk:review-spec` — verify implementation matches design/implementation docs
@@ -172,13 +190,14 @@ parity-included content frozen from Task 7 through Task 8.
 ## Dependency Graph
 
 ```
-Task 1 ─→ Task 11 ─→ Task 6 ─→ Task 7 ─→ Task 8 ─→ Task 4 ─→ Task 5
-   │                   ↑                  ↑
-   └─→ Task 9          │                  │
-Task 3 ────────────────┘                  │
-Task 2 ─→ Task 12 ────────────────────────┘
+Task 1 ─→ Task 11 ─→ Task 13 ─→ Task 6 ─→ Task 7 ─→ Task 8 ─→ Task 5
+   │                    ↑                  ↑           ↑         ↑
+   ├─→ Task 4 (offline) ──────────────────────────────────────────┘
+   └─→ Task 9           │                  │           │
+Task 3 ─────────────────┘                  │           │
+Task 2 ────────────────────────────────────┘           │
+   └─→ Task 12 ────────────────────────────────────────┘
 
-All Tasks 1–9, 11, 12 ─→ Task 10
-(Task 6 also depends directly on Task 1; Task 4 on Task 11;
- Task 8 on Task 2. Tasks 6–8 are manual/operational.)
+All Tasks 1–9, 11–13 ─→ Task 10
+(Task 6 also explicitly lists Tasks 1, 3, 11; Task 8 lists Task 2.)
 ```

@@ -142,13 +142,13 @@ So the alternative was to disable the GRUB timeout altogether.
 
 ## AD-0003 - NAS directory layout grammar
 
-AD-0003 through AD-0007 were amended on 2026-10-03 following
-[corroboration of the storage-layout review](../../feat/wip/nas-storage-layout/design-review-2026-10-03.md#corroboration-and-resolution).
+AD-0003 through AD-0007 were amended on 2026-10-03 following the
+[storage-layout follow-up corrections](../../feat/wip/nas-storage-layout/design-review-2026-10-03-follow-up.md#resolution).
 These are design decisions; the referenced implementation tasks remain pending.
 
 **Context**
 
-The NAS (`yggdrasil`) needed a directory structure before migrating ~16TB of semi-structured backups onto it. Renaming directories after creation is punished by the whole stack: snapraid re-syncs parity, rsync-style backups re-copy, and NFS-mounted PVs reference paths in Helm values. The structure must be navigable from memory at the shell (primary consumer) while services expose subtrees to the household. An earlier vault-style deep numbering scheme (`300/310/310.01`) proved heavy in practice — the third digit exists only to encode a third numbering level.
+The NAS (`yggdrasil`) needed a directory structure before migrating ~16TB of semi-structured backups onto it. Stable directory names preserve path-based backup mappings, NFS paths in Helm values, and the owner's navigation from memory. The structure must remain understandable at the shell while services expose subtrees to the household. An earlier vault-style deep numbering scheme (`300/310/310.01`) proved heavy in practice — the third digit exists only to encode a third numbering level.
 
 Full design: [NAS storage layout](../../feat/wip/nas-storage-layout/design.md).
 
@@ -232,6 +232,7 @@ The NAS layout must outlive any particular service choice (Nextcloud vs Copypart
 - We will disqualify services that require a proprietary on-disk format for the data they serve (this ruled out Seafile).
 - We will keep service-owned state (databases, upload stores, thumbnails, config) on cluster storage (Ceph), never inside the human tree.
 - We will alias share names away from the numbers (`media` → `30_media`, `photos` → `20_photos`) so external names stay stable and a future SMB layer can export the same aliases with zero restructuring.
+- We will verify access to migrated served media under the server-side service identity before freezing the migration dataset. Required permission changes are recorded per destination; archival restoration metadata is preserved. New scratch files do not stand in for this acceptance check.
 
 **Status**
 
@@ -242,7 +243,7 @@ The NAS layout must outlive any particular service choice (Nextcloud vs Copypart
 - Every file on the NAS remains readable with nothing but a filesystem — no service lock-in; a future ZFS (or any other) migration is a plain copy.
 - Once Task 11 establishes export readiness, new shares cost one values entry in `system/csi-driver-nfs`; the single root export with `fsid=1` serves subpath mounts. Node retention, inode calculation and the fixed-owner `root_squash` acceptance test are prerequisite work, not established live guarantees.
 - Service selection for documents (Nextcloud/Copyparty/OpenCloud) stays an open, deferred decision — the tree doesn't depend on it.
-- Machine-generated churn never lands on the snapraid pool, keeping parity syncs quiet and meaningful.
+- Download/rotation churn remains on the NAS but is excluded from parity calculations; service databases/configs stay on Ceph. The camera tier remains the explicit parity-included, service-fed exception described in the design.
 
 ## AD-0007 - Migration integrity via content-hash manifests and staged drive release
 
@@ -253,8 +254,9 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 **Decision**
 
 - We will inventory A/B/C, including all entry types, and hash regular files on each source and the NAS. Hash-set comparison discovers content deltas across renamed backup generations; a per-source/path ledger separately records destinations and explicit dedup/discard decisions.
+- We will implement and test a read-only inventory/reconciliation helper before operational migration (Task 13). Versioned JSONL and explicit completion/error states make the evidence reproducible; the operator still owns moves and curation.
 - We will stop on destination collisions and verify every retained final file after sorting, including a full checksum pass. Sampling and an empty staging directory alone cannot authorize source release. The additional read is an accepted integrity cost.
-- We will retain manifests, the per-entry ledger and logs in `00_meta/migration/` and on an independent surviving device. Evidence must survive loss of the NAS data disk containing `00_meta`.
+- We will keep authoritative evidence on a controller disk outside the NAS pool and A/B/C. `00_meta/migration/` is an archive populated before the parity freeze and after release. All parity-time records stay in the controller workspace/NAS spool until the freeze ends, so recording evidence cannot mutate the snapshot under verification.
 - Before **each** source wipe, every retained entry from that device must have a verified independent surviving copy in addition to the NAS, or coverage in an unchanged, fully verified parity snapshot. Before first parity exists, copy unique B content to A/C or temporary independent storage and verify capacity and checksums. A surviving source drive alone is not a per-file recovery guarantee.
 - We will release B, complete its sync and full scrub, then re-check C's coverage before its release. Adding C requires explicit full parity expansion and another complete scrub. Release A last only after both parity levels pass; retain separate copies of excluded content and audit evidence. Partial files, service startup, and the routine percentage scrub never substitute for these gates.
 

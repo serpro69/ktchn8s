@@ -1,6 +1,6 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22; revised 2026-10-03 after [corroboration and correction](./design-review-2026-10-03.md#corroboration-and-resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
 > Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Implementation and live acceptance remain pending.
 
 ## Problem statement
@@ -8,8 +8,8 @@
 **How might we design a NAS directory tree that the owner (and household members via
 services) can navigate from memory years from now — where every service (Jellyfin/*arr,
 Immich, a future documents service) mounts a scoped subtree — under the constraint that
-a directory, once created, is never renamed** (snapraid parity, rsync-style backups, and
-NFS-mounted PVs all punish renames)?
+a directory, once created, is never renamed** (path-based backups, NFS-mounted PVs,
+and navigation from memory depend on stable names)?
 
 ### Personas
 
@@ -121,15 +121,15 @@ and deliberate — never "I have three files about X".
 containers → real link; seeding continues from the original name while the library copy
 carries the clean name) → the owner promotes keepers with `mv` into `30.0x` through
 one operator NFS mount of `30_media`, containing both source and destination. This
-retains same-filesystem rename semantics without bypassing live NFS clients. Radarr/Sonarr delete-and-replace files on quality upgrades, so
+retains same-filesystem rename semantics without bypassing live NFS clients.
+Radarr/Sonarr delete-and-replace files on quality upgrades, so
 the rotation/preserved split is a **data-safety boundary**: automation physically cannot
 touch `30.0x`.
 
-Hardlinks consume storage **once** — two directory entries, one inode. The 2× case only
-occurs when a hardlink silently degrades to a copy (cross-device), which the single-PV
-topology avoids that particular failure. Task 11 verifies the NAS/export lifecycle too.
-Monitoring signal: if `30_media` usage runs ~2× expected, hardlinking has
-broken (`stat -c %h` on an imported file must be ≥2 while seeding).
+Hardlinks consume storage **once** — two directory entries, one inode. Copy fallback
+can double usage. A single mount avoids the cross-bind-mount `EXDEV` failure; Task 11
+checks the export lifecycle and Task 5 checks actual imports. Investigate unexpected
+growth by checking an imported file's link count while its download still exists.
 
 Jellyfin serves both tiers (either as separate libraries or one merged library per type).
 Known nuance: Jellyfin identifies items by path, so promotion (`mv`) typically resets
@@ -224,13 +224,17 @@ No new workloads — this feature moves mounts, it does not add containers.
 
 ## Reliability posture
 
-No new pods → probes, PDBs, spread constraints, and rollout strategy are **N/A** (nothing
-schedulable changes). What does apply:
+This feature changes the existing media workload's pod template and replaces its pod.
+It inherits the chart's probes, PDBs, placement, and rollout policy; adding new policies
+is outside this storage change. Task 5 records the rendered rollout strategy and checks
+that the replacement starts with the retained config PVC and new media mounts.
 
 - NFS mounts stay `soft,timeo=600,retrans=2` — I/O errors instead of unkillable pods when
   the NAS is down (rationale documented in `system/csi-driver-nfs/values.yaml`).
 - Static PVs use `Retain`; PVC binding via `volumeName` + `storageClassName: ""` — a
   deleted claim never destroys NAS data.
+- Task 4 is offline chart preparation on a non-deployed work branch. Task 5 owns the
+  joint PV/PVC/application release and live acceptance; Task 4 does not wait for sync.
 - Roll out the media mounts only after migration/parity release (Task 8) and the isolated
   export acceptance test (Task 11). This keeps Task 5's promotion tests outside the
   included-data freeze. Operator promotion subsequently uses one NFS mount
@@ -265,6 +269,12 @@ schedulable changes). What does apply:
 - **Read-only enforcement at mount level:** Jellyfin's media mounts and Immich's
   `20.01_library` mount declare `readOnly: true` — kernel-enforced preservation boundary,
   not service-configuration hope.
+- **Migrated content access:** before freezing the dataset, prove directory traversal
+  and file reads on the migrated Jellyfin libraries as server-side UID/GID 1000.
+  Preserve source metadata when compatible; record deliberate permission/ACL changes
+  per destination when needed. Backup trees retain restoration metadata. The
+  [per-tier policy](./implementation.md#migrated-content-access) governs these checks;
+  successful scratch-file writes alone do not establish migrated-library access.
 - **Blast radius per subtree:** no pod mounts the NAS root; the torrent-exposed subtree is
   exactly `30_media`. Documents/photos are unreachable from the media stack.
 - Pre-existing `hostPath: /dev/dri` and PSA posture of the Jellyfin chart are tracked in
@@ -305,21 +315,28 @@ device.** Before verified parity exists this requires a checksummed copy on anot
 independent device in addition to the NAS copy. A second path on the same disk is not
 redundancy. Keep included data unchanged from final reconciliation through parity
 verification; migrations run locally before production NFS consumers are enabled.
+Task 13 supplies tested inventory/reconciliation tooling before any source is scanned.
+Task 7 performs a temporary read-only NFS access audit after local sorting, then
+unmounts that audit client before the freeze; real application playback follows in
+Task 5. Original source entries stay unchanged, while separately tracked safety-copy
+areas may receive new files.
 
 1. **Skeleton via IaC** — the tree is created by the storage role (replacing the current
    `storage_dirs` list); `00_meta/README.md` is templated from the same variable, so code
    and legend cannot drift. → verify: layout tasks alone are idempotent, dirs present.
-2. **Source inventory and copy** — freeze A/B/C; inventory all entries and hash regular
-   files on each source, including A. Copy A into `99_tmp/driveA/`, hash the NAS copy
+2. **Source inventory and copy** — freeze the original A/B/C entries; use Task 13's
+   helper to inventory all entries and hash regular files on each source, including A.
+   Copy A into `99_tmp/driveA/`, hash the NAS copy
    locally, and compare. Every command must complete successfully; partial manifests
    do not authorize release.
 3. **Cross-drive comparison** — use hash-sets to discover content missing from the NAS
    regardless of backup-generation paths. Preserve source/path identity separately:
    equal hashes do not authorize dropping a distinct required pathname. Copy unique
    B/C content into source-specific delta directories and checksum those copies.
-   Retain manifests and the decision ledger in `00_meta/migration/` and on a surviving
-   source/temporary independent device. A full final read is an intentional additional
-   pass, not a claim that every dataset is read only once.
+   Maintain the authoritative evidence workspace on an independent controller disk
+   that survives all planned wipes. Archive it to `00_meta/migration/` before the
+   freeze and after release, with no parity-time writes to that archive. A full final
+   read is an intentional additional pass, not a claim that every dataset is read only once.
 4. **Sort** `99_tmp` → numbered homes per the [mapping table](#migration-mapping); each
    move recorded by source identity and final path. Stop on a destination collision;
    retain both versions at distinct leaf paths or record an explicit dedup/discard
@@ -328,8 +345,9 @@ verification; migrations run locally before production NFS consumers are enabled
    archive generations; deletions recorded in the log.
 6. **Exit criterion:** no unresolved entries in `99_tmp`; every source entry has a
    verified destination or a recorded discard; every retained regular file's final hash
-   matches its source. Verify symlink targets and retained directory metadata too.
-   The ledger must account for all entries, not a sample or only regular-file counts.
+   matches its source. Verify symlink targets, expected metadata and the migrated
+   media access policy. Task 7 depends on Task 2's final exclusions and Task 13's audit
+   helper; its ledger accounts for all entries rather than a sample or file count.
 7. **Release B:** verify device identity/size, independent-copy coverage (copy B-only
    retained content to A/C or temporary storage if needed), and available capacity.
    Only then wipe B, configure first parity, run the explicit full-sync unit and a
