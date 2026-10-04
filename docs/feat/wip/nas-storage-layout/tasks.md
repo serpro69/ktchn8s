@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Tasks 2–4 and 12 complete; Tasks 1 and 11 repository work verified; both Molecule scenarios pass; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Tasks 2–4 and 12 complete; Tasks 1, 11 and 13 repository work verified; both Molecule scenarios pass; NAS apply/preparation/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -323,7 +323,8 @@ the credential-bearing runner config is now `0600`, PID/teardown safeguards rema
 fail-loud, and runtime journals did not reproduce the proposed invocation-ID issue.
 
 ## Task 13: Migration inventory and audit tooling
-- **Status:** pending
+- **Status:** in-progress
+- **Repository work:** done; NAS preparation in 13.4 is deferred while offline
 - **Depends on:** Task 3, Task 11
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
@@ -331,10 +332,48 @@ fail-loud, and runtime journals did not reproduce the proposed invocation-ID iss
 - **Slicing:** Risk-First — validate the acceptance mechanism before handling real sources
 
 ### Subtasks
-- [ ] 13.1 Create `scripts/nas-migration-audit.py` with the documented inventory/compare/verify/access contract, read-only dataset handling, versioned JSONL, explicit exit codes and atomic completed generations
-- [ ] 13.2 Add `tests/test_nas_migration_audit.py` covering the specified data/metadata/error/retry cases; run standard-library unittest discovery from the dev shell
-- [ ] 13.3 Extend Task 11's `molecule/nfs-lifecycle` verifier with the restrictive-permission audit fixture; require UID/GID 1000 reads over a read-only NFS mount to fail before the declared repair and pass afterward, then clean up clients. Record helper/tool revisions for Task 6; keep unit tests in 13.2 and actual migrated-content acceptance in Task 7
+- [x] 13.1 Create `scripts/nas-migration-audit.py` with the documented inventory/compare/verify/access contract, read-only dataset handling, versioned JSONL, explicit exit codes and atomic completed generations
+- [x] 13.2 Add `tests/test_nas_migration_audit.py` covering the specified data/metadata/error/retry cases; run standard-library unittest discovery from the dev shell
+- [x] 13.3 Extend Task 11's `molecule/nfs-lifecycle` verifier with the restrictive-permission audit fixture; require UID/GID 1000 reads over a read-only NFS mount to fail before the declared repair and pass afterward, then clean up clients. Record helper/tool revisions for Task 6; keep unit tests in 13.2 and actual migrated-content acceptance in Task 7
 - [ ] 13.4 When the NAS is available, prepare Python 3/b3sum outside the storage role and compare their versions with the fixture record; rerun unit/access checks for differing versions before Task 6. Defer this NAS preparation while offline
+
+**Offline completion (2026-10-04):** Subtasks 13.1–13.3 are complete. Task 11's
+completed repository/scenario work supplied the offline prerequisite; its live
+acceptance remains deferred. No NAS commands ran. Subtask 13.4 remains unchecked,
+and Task 13 stays in progress until NAS preparation/version acceptance completes.
+Actual source inventories, migrated-content access and drive-release gates remain
+Tasks 6–8. See the [helper and ledger guide](../../../guides/nas_migration_audit.md).
+
+**Verification:** All 44 local storage regression tests passed, including 31 new
+audit-helper tests, with Python 3.12.10 and b3sum 1.8.2. The final `nfs-lifecycle`
+Molecule run passed configuration idempotence, the existing lifecycle checks and
+the new audit fixture. All 31 helper tests also passed with guest Python 3.11.2
+and b3sum 1.2.0. The fixture's foreign-owned `0700` directory, restrictive ACL and
+two hardlinked files produced three access/reconciliation failures before the
+declared repair and zero afterward. Real UID/GID 1000 reads used no supplementary
+groups and an RO NFS mount; mergerfs backing identities, hashes, xattrs and matching
+ledger digests were checked. Clients and VM disks were removed after verification.
+
+**Failure/retry evidence:** `NFS_AUDIT_FAIL_AFTER_DENIAL=1` deliberately failed with
+the audit client mounted; cleanup and destroy succeeded. A fresh normal run then
+passed with the final helper. Transcripts are `/tmp/nas-audit-molecule-injected.log`
+and `/tmp/nas-audit-molecule-final.log`. Final JSONL evidence remains under
+`/tmp/ktchn8s-audit-nfs-final/audit-evidence/`, with the guest unit transcript under
+`vms/nfs-server/audit-unit.log`. These local artifacts were checked after teardown.
+The tested helper SHA-256 is
+`2ab80625954ce51e68551b224917cb7390d0e4fed39b44937c69b2189164243a`;
+Task 6 must preserve the relevant tool/helper revisions with its own evidence.
+
+**Review and checks:** Independent code review approved after fixing intermediate
+symlink search semantics, empty-directory search checks and repeated ancestor
+enumeration. Resource-initialization cleanup and three-way collision regressions
+also pass. External review reported zero embedded files; its resource-cleanup
+suggestions were inspected independently, and its response is not counted as
+independent source inspection. No P0/P1 findings required indexing. YAML lint,
+offline Ansible lint and whitespace checks pass. Revised local documentation links
+pass; strict MkDocs still reports the same nine archived-review warnings tracked
+in Task 9, with none added by this task. Molecule evidence retention needed an
+explicit file glob; the final run confirmed its reports survive pruning.
 
 ## Task 10: Final verification
 - **Status:** pending
