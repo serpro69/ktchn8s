@@ -7,7 +7,7 @@
 {% if loop.first %}
 parity /mnt/parity{{ parity_num }}/snapraid.parity
 {% else %}
-{{ loop.index - 1 }}-parity /mnt/parity{{ parity_num }}/snapraid.{{ loop.index - 1 }}-parity
+{{ loop.index }}-parity /mnt/parity{{ parity_num }}/snapraid.{{ loop.index }}-parity
 {% endif %}
 {% endfor %}
 
@@ -24,21 +24,39 @@ data d{{ loop.index }} {{ dir }}
 {% endfor %}
 
 # Excludes
+# Re-downloadable media churn, including transmission downloads and *arr imports.
+exclude /30_media/rotation/
+# Transient machine-consumed documents; preserved documents stay included.
+exclude /10_documents/inbox/
+# Migration staging and scratch data, not retained content.
+exclude /99_tmp/
+# Partial files left by unsuccessful recovery.
 exclude *.unrecoverable
+# Legacy scratch directory at the data-disk root only.
 exclude /tmp/
+# Filesystem recovery artifacts, not curated storage.
 exclude /lost+found/
-exclude downloads/
-exclude appdata/
+# Incomplete synchronization files.
 exclude *.!sync
+# macOS resource-fork metadata.
 exclude .AppleDouble
+# macOS resource-fork sidecars.
 exclude ._AppleDouble
+# macOS Finder display metadata.
 exclude .DS_Store
+# macOS Finder metadata sidecars.
 exclude ._.DS_Store
+# Thumbnail cache metadata.
 exclude .Thumbs.db
+# macOS filesystem event logs.
 exclude .fseventsd
+# macOS Spotlight search index.
 exclude .Spotlight-V100
+# macOS temporary working files.
 exclude .TemporaryItems
+# macOS trash directories.
 exclude .Trashes
+# Apple filing protocol metadata database.
 exclude .AppleDB
 
 # Autosave

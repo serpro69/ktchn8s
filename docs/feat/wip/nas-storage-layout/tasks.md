@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Task 1 repository work verified; Molecule coverage planned for Tasks 3, 11–13; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Task 2 complete with offline SnapRAID checks; Task 1 repository work verified; Molecule coverage planned for Tasks 3, 11–13; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -62,16 +62,33 @@ scenario; Tasks 3, 11–13 below now own the planned tooling and integration cov
 No Molecule scenario has run yet, and Task 1.5 remains a live acceptance gate.
 
 ## Task 2: SnapRAID excludes and parity configuration
-- **Status:** pending
+- **Status:** done
 - **Depends on:** —
 - **Size:** S
 - **Can run in parallel with:** Task 1, Task 3, Task 4, Task 6, Task 9, Task 11, Task 13
 - **Docs:** [implementation.md#snapraid-excludes](./implementation.md#snapraid-excludes)
 
 ### Subtasks
-- [ ] 2.1 Add root-anchored `/30_media/rotation/`, `/10_documents/inbox/`, `/99_tmp/` excludes with rationale to `metal/roles/storage/templates/snapraid.conf.j2`; remove generic `downloads/` and `appdata/` excludes
-- [ ] 2.2 Correct additional parity directives/filenames to use `loop.index`: `parity`, `2-parity`, `3-parity`, with no repeated first level
-- [ ] 2.3 Render and parse one-, two-, and three-parity configs offline in disposable SnapRAID 13.0 fixtures; assert exact paths, included backup `downloads`/`appdata` paths, and rejection of duplicate first parity; the live config check belongs to Task 8 because the role skips it with no parity drives
+- [x] 2.1 Add root-anchored `/30_media/rotation/`, `/10_documents/inbox/`, `/99_tmp/` excludes with rationale to `metal/roles/storage/templates/snapraid.conf.j2`; remove generic `downloads/` and `appdata/` excludes
+- [x] 2.2 Correct additional parity directives/filenames to use `loop.index`: `parity`, `2-parity`, `3-parity`, with no repeated first level
+- [x] 2.3 Render and parse one-, two-, and three-parity configs offline in disposable SnapRAID 13.0 fixtures; assert exact paths, included backup `downloads`/`appdata` paths, and rejection of duplicate first parity; the live config check belongs to Task 8 because the role skips it with no parity drives
+
+**Local verification (2026-10-04):** All three tests in
+`tests/test_snapraid_config.py` passed with SnapRAID 13.0, Python 3.12.10 and Jinja
+3.1.6. The parity-count subtests parsed all three configurations and checked actual
+scan inclusion/exclusion on three temporary data roots. Duplicate first parity
+failed with the expected parser error. No parity/content files were created and no
+NAS commands ran. The test binary was built in `/tmp` from upstream tag `v13.0`
+(using its `.version` build metadata); no project dependency versions changed.
+See [the repeatable command and fixture limits](./implementation.md#snapraid-excludes).
+Live configuration acceptance remains in Task 8.
+
+**Regression and review:** Running the same suite against the original template
+produced five expected assertion failures and no execution errors. Isolated external
+code review (Gemini 3.1 Pro) found no required fixes; its optional explicit
+`check=False` suggestion was left unchanged because that is already the subprocess
+default. The code-reviewer sub-agent could not access the Nix daemon under its
+read-only permissions, so only the external reviewer completed independent review.
 
 ## Task 3: Storage test tooling in the dev shell
 - **Status:** pending
