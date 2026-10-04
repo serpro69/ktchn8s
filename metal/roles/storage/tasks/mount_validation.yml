@@ -31,25 +31,4 @@
     msg: "{{ mergerfs_mount_info.stdout | from_json }}"
   when: mergerfs_mount_info.rc == 0
 
-- name: Test write capability to mergerfs pool
-  tempfile:
-    state: file
-    path: /mnt/storage
-    prefix: .mount_test_
-    suffix: .tmp
-  register: write_test
-  changed_when: false
-
-- name: Remove write test file
-  file:
-    path: "{{ write_test.path }}"
-    state: absent
-  when: write_test.path is defined
-  changed_when: false
-
-- name: Verify write test succeeded
-  assert:
-    that:
-      - write_test is succeeded
-    success_msg: "Mergerfs pool is writable"
-    fail_msg: "Mergerfs pool is not writable - check permissions and mount status"
+# Mutating write/link probes belong to explicit NFS validation, after convergence.

@@ -1,0 +1,88 @@
+---
+- name: Prepare isolated guests and prove kernel capabilities
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for guest SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+    - name: Wait for cloud-init
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - name: Gather guest facts
+      ansible.builtin.setup:
+    - name: Require Debian and systemd
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.service_mgr == 'systemd'
+    - name: Use a dated package snapshot for the fixture
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list
+        content: |
+          deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20260924T000000Z/ bookworm main
+          deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20260924T000000Z/ bookworm-security main
+        mode: '0644'
+    - name: Remove cloud image's rolling repository definition
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/debian.sources
+        state: absent
+    - name: Install guest fixture dependencies
+      ansible.builtin.apt:
+        name: [nfs-common, nfs-kernel-server, fuse, attr, acl]
+        update_cache: true
+        cache_valid_time: 3600
+    - name: Prove NFS client kernel support
+      ansible.builtin.command: modprobe nfs
+      changed_when: false
+
+- name: Prepare disposable server filesystems
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Prove FUSE and NFS server kernel support
+      ansible.builtin.command: "modprobe {{ item }}"
+      loop: [fuse, nfsd]
+      changed_when: false
+    - name: Download checksum-pinned production mergerfs version
+      ansible.builtin.get_url:
+        url: https://github.com/trapexit/mergerfs/releases/download/2.41.1/mergerfs_2.41.1.debian-bookworm_amd64.deb
+        checksum: sha256:5bdc1df054bb27713c9fe195b97cf80f4850efdd287eef45118cc89fcceb2d27
+        dest: /tmp/mergerfs.deb
+        mode: '0644'
+    - name: Install mergerfs
+      ansible.builtin.apt:
+        deb: /tmp/mergerfs.deb
+    - name: Format only the VM's two scratch disks
+      ansible.builtin.command: "mkfs.ext4 -F /dev/{{ item }}"
+      loop: [vdb, vdc]
+      changed_when: true
+    - name: Mount distinct scratch filesystems
+      ansible.posix.mount:
+        path: "/mnt/data{{ item.index }}"
+        src: "/dev/{{ item.device }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+      loop:
+        - {index: 1, device: vdb}
+        - {index: 2, device: vdc}
+    - name: Seed directories for preservation checks before configuration
+      ansible.builtin.file:
+        path: "/mnt/data1/{{ item.path }}"
+        state: directory
+        owner: "{{ item.uid | default(1000) }}"
+        group: "{{ item.uid | default(1000) }}"
+        mode: "{{ item.mode | default('0775') }}"
+      loop:
+        - {path: 00_meta}
+        - {path: Videos}
+        - {path: 10_documents/10.01_personal/private, uid: 1234, mode: '0700'}
+    - name: Seed retirement entry and legacy bytes
+      ansible.builtin.copy:
+        dest: "/mnt/data1/{{ item }}"
+        content: "operator-owned fixture\n"
+        owner: '1000'
+        group: '1000'
+        mode: '0644'
+      loop: [00_meta/RETIRED.md, Videos/keep.txt]
