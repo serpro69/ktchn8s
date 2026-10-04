@@ -17,7 +17,9 @@
     group: root
     mode: "0644"
     backup: true
-  notify: initial snapraid sync
+
+- name: Deploy explicit bootstrap and expansion job
+  include_tasks: snapraid_initial_sync.yml
 
 - name: Create snapraid-runner script directory
   file:
@@ -38,7 +40,7 @@
     dest: /opt/snapraid-runner/snapraid-runner.conf
     owner: root
     group: root
-    mode: "0644"
+    mode: "0600" # May contain SMTP credentials when notifications are enabled.
 
 - name: Create snapraid-runner systemd service
   template:
@@ -61,10 +63,11 @@
     - reload systemd
     - restart snapraid-runner
 
-- name: Enable snapraid-runner timer
+- name: Apply snapraid-runner timer policy
   systemd:
     name: snapraid-runner.timer
     enabled: "{{ snapraid_maintenance.sync_enabled }}"
+    state: "{{ 'started' if snapraid_maintenance.sync_enabled else 'stopped' }}"
     daemon_reload: true
 
 # =================================================================
@@ -116,7 +119,6 @@
     mode: "0644"
   notify:
     - reload systemd
-  when: snapraid_maintenance.scrub_enabled
 
 - name: Create snapraid-scrub systemd timer
   template:
@@ -127,14 +129,14 @@
     mode: "0644"
   notify:
     - reload systemd
-  when: snapraid_maintenance.scrub_enabled
+    - restart snapraid-scrub
 
-- name: Enable snapraid-scrub timer
+- name: Apply snapraid-scrub timer policy
   systemd:
     name: snapraid-scrub.timer
     enabled: "{{ snapraid_maintenance.scrub_enabled }}"
+    state: "{{ 'started' if snapraid_maintenance.scrub_enabled else 'stopped' }}"
     daemon_reload: true
-  when: snapraid_maintenance.scrub_enabled
 
 # =================================================================
 # CONTENT FILE BACKUP
