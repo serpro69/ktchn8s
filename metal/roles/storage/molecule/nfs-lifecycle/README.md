@@ -37,6 +37,30 @@ another writer cycle through the second client. Mergerfs memory and guest
 versions are recorded. NFS can cache a pre-link count; the probe allows up to
 65 seconds for the count to become two, while read/stat errors fail immediately.
 
+Task 13 extends verification with `audit-access.yml`. The guest installs Python 3
+and `b3sum` from the same dated package snapshot, runs the helper's unit suite,
+and copies a foreign-owned `0700` tree with an ACL denying UID 1000 into
+`99_tmp/migration-audit/30_media`. Its ledger declares the required ownership,
+mode and ACL changes before any repair. Actual UID/GID 1000 reads with no extra
+groups must return a completed policy-failure report through an RO NFS mount.
+The client unmounts before server-local repair; local reconciliation then proves
+bytes, xattrs and backing hardlinks before a fresh RO mount must pass all reads.
+The verifier requires the same ledger digest in both access reports and final
+reconciliation. All data is synthetic and stays separate from real NAS inventory.
+
+Audit evidence is fetched even after verification failure and retained under
+`audit-evidence/{nfs-server,nfs-client-a}/` in the reported Molecule ephemeral
+directory. Headers record Python/b3sum versions and the helper SHA-256. The guest
+unit transcript is `vms/nfs-server/audit-unit.log`. Copy these records elsewhere
+before another scenario run. NAS tool setup/version comparison remains Task 13.4;
+real migrated-content acceptance remains Task 7.
+
+To exercise audit-specific failure cleanup, set `NFS_AUDIT_FAIL_AFTER_DENIAL=1`
+in the inner shell before `molecule test -s nfs-lifecycle`. This deliberately
+fails after the denied-read report, while the audit client is still mounted.
+Require a nonzero scenario exit, retained partial/before evidence, successful
+cleanup/destroy, and a subsequent normal pass from freshly recreated guests.
+
 To prove failure cleanup, run this command and require a **nonzero** exit at
 the intentional assertion, followed by successful cleanup and destroy:
 
