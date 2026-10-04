@@ -19,9 +19,9 @@ nfs:
   # Consuming apps bind with a namespaced PVC that sets
   # volumeName: pv-nfs-<name> and storageClassName: "".
   volumes:
-    - name: videos
-      share: Videos # subdirectory of basePath exported by the NAS
-      capacity: 1Ti
+    - name: media
+      share: 30_media # subdirectory of basePath exported by the NAS
+      capacity: 4Ti
 csi-driver-nfs:
   storageClass:
     create: false

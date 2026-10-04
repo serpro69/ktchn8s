@@ -330,6 +330,29 @@ Task 5 consumes the prepared chart and owns one release containing both the PV a
 application changes, after Task 8 and the export checks. Keep Task 4 off the deployed
 Git revision until that release. Task 5 owns stale-resource cleanup and live acceptance.
 
+Task 4 offline verification (2026-10-04) passed with Helm `3.19.1` and the cached
+`csi-driver-nfs 4.13.0` dependency, on work branch `feat/nas_layout`. Repeat from the
+repository root inside the dev shell:
+
+```bash
+nix develop -c helm lint --strict system/csi-driver-nfs
+nix develop -c helm template csi-driver-nfs system/csi-driver-nfs \
+  --namespace csi-driver-nfs --show-only templates/pv-nfs.yaml
+```
+
+The PV must have name `pv-nfs-media`, capacity `4Ti`, reclaim policy `Retain`, CSI
+handle `10.10.10.30/mnt/storage/30_media` and share `/mnt/storage/30_media`. The full
+render produced ten YAML resources; a parsed comparison against the pre-change
+values confirmed that only these four PV fields changed. `ReadWriteMany`, the
+class-less static binding and all mount options were also checked.
+
+`kubeconform` was absent from the dev-shell PATH, so API schema validation did not
+run. Its upstream install command is
+`go install github.com/yannh/kubeconform/cmd/kubeconform@latest` (run tooling inside
+`nix develop`); Helm rendering and YAML parsing do not replace that check. No NAS
+or cluster access was used. These results establish the offline PV contract only;
+binding, export readiness and application behavior retain their separate live gates.
+
 ## jellyfin-remount
 
 In `apps/jellyfin/values.yaml` (+ `templates/pvc-videos.yaml`):
