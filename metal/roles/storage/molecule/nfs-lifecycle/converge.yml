@@ -1,0 +1,13 @@
+---
+- name: Converge actual storage configuration without hardware or validation writes
+  hosts: nfs_servers
+  gather_facts: true
+  tasks:
+    - name: Configure the real mergerfs mount
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: mergerfs.yml
+    - name: Configure the real layout, export and NFS service
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: nfs.yml

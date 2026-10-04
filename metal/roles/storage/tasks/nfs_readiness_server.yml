@@ -1,0 +1,68 @@
+---
+- name: Inspect the active export policy
+  ansible.builtin.command: exportfs -v
+  register: nfs_readiness_exports
+  changed_when: false
+
+- name: Require the fixed-owner root-squash policy
+  ansible.builtin.assert:
+    that:
+      - "'/mnt/storage' in nfs_readiness_exports.stdout"
+      - "'root_squash' in nfs_readiness_exports.stdout"
+      - "'no_root_squash' not in nfs_readiness_exports.stdout"
+      - "'anonuid=1000' in nfs_readiness_exports.stdout"
+      - "'anongid=1000' in nfs_readiness_exports.stdout"
+
+- name: Inspect active mergerfs configuration
+  ansible.builtin.package:
+    name: attr
+    state: present
+
+- name: Read active mergerfs configuration
+  ansible.builtin.command: getfattr -d /mnt/storage/.mergerfs
+  register: nfs_readiness_options
+  changed_when: false
+
+- name: Show active mergerfs configuration
+  ansible.builtin.debug:
+    var: nfs_readiness_options.stdout_lines
+
+- name: Inspect mergerfs process memory
+  ansible.builtin.command: ps -C mergerfs -o pid=,rss=,vsz=,args=
+  register: nfs_readiness_memory
+  changed_when: false
+
+- name: Record mergerfs memory observation
+  ansible.builtin.debug:
+    var: nfs_readiness_memory.stdout_lines
+
+- name: Require running mergerfs NFS options
+  ansible.builtin.assert:
+    that:
+      - "'user.mergerfs.never-forget-nodes=\"true\"' in nfs_readiness_options.stdout"
+      - "'user.mergerfs.inodecalc=\"path-hash\"' in nfs_readiness_options.stdout"
+      - "'user.mergerfs.lazy-umount-mountpoint=\"false\"' in nfs_readiness_options.stdout"
+      - "'inodecalc=path-hash' in nfs_readiness_memory.stdout"
+      - "'noforget' in nfs_readiness_memory.stdout"
+      - "'lazy-umount-mountpoint=false' in nfs_readiness_memory.stdout"
+      - "'use_ino' not in nfs_readiness_memory.stdout"
+    fail_msg: Quiesce clients and normally remount mergerfs before validation; fstab alone is insufficient.
+
+- name: Refuse to replace an existing readiness fixture
+  ansible.builtin.stat:
+    path: /mnt/storage/99_tmp/nfs-readiness
+  register: nfs_readiness_existing
+
+- name: Require an unused fixture path
+  ansible.builtin.assert:
+    that: not nfs_readiness_existing.stat.exists
+    fail_msg: Inspect and remove the previous readiness fixture before retrying.
+
+- name: Create the scoped readiness fixture
+  ansible.builtin.file:
+    path: /mnt/storage/99_tmp/nfs-readiness
+    state: directory
+    owner: '1000'
+    group: '1000'
+    mode: '0775'
+  register: nfs_readiness_created

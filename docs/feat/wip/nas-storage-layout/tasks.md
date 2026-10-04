@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Tasks 2–4 complete with local checks; Task 1 repository work verified; Molecule scenarios planned for Tasks 11–13; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Tasks 2–4 complete; Tasks 1 and 11 repository work verified; NFS Molecule scenario passes; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -59,7 +59,8 @@ check.
 **Molecule follow-up:** Task 1's completed repository checks remain valid. Task 11
 will include layout/legend and retirement-log preservation in its reusable NFS
 scenario; Tasks 3, 11–13 below now own the planned tooling and integration coverage.
-No Molecule scenario has run yet, and Task 1.5 remains a live acceptance gate.
+Task 11's NFS Molecule scenario now covers these regressions; Task 1.5 remains a
+separate live acceptance gate.
 
 ## Task 2: SnapRAID excludes and parity configuration
 - **Status:** done
@@ -232,7 +233,8 @@ identical. Local links/anchors in the revised implementation/tasks documents and
 their dependency graph/parallel markers pass validation.
 
 ## Task 11: NFS export lifecycle acceptance
-- **Status:** pending
+- **Status:** in-progress
+- **Repository work:** done; live NAS/Kubernetes acceptance in 11.6 remains deferred
 - **Depends on:** Task 1, Task 3
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
@@ -241,11 +243,36 @@ their dependency graph/parallel markers pass validation.
 - **Offline scope:** Task 1.1–1.4 plus Task 3 suffice for scenario work; Task 1.5 is required before live NAS acceptance. Keep offline and live results separate
 
 ### Subtasks
-- [ ] 11.1 Update `metal/roles/storage/tasks/mergerfs.yml` with `noforget`, `inodecalc=path-hash`, normal unmount behavior, and removal of `use_ino`; prove active options in the Molecule guest first, then apply to the NAS with clients quiesced when available
-- [ ] 11.2 Extend NFS/Kubernetes validation tasks using `99_tmp` fixtures: UID-1000 nested creation/link/rename/delete, two-client reopen after idle and remount/recovery, RO rejection, NAS memory observation; correct the test pod's trailing `&&` and require tests actually execute. Reuse the server/client checks in `molecule/nfs-lifecycle`; live Kubernetes execution remains separate
-- [ ] 11.3 Retain `root_squash`; prove required fixed-owner operations and record results. Permission or stale-handle failures block production rollout and require a design revision, not silent privilege relaxation
-- [ ] 11.4 Simulate rename/promotion only inside `99_tmp/nfs-readiness`, proving reopened bytes and backing links without media applications; tear down clients/fixtures. Real seeding, production promotion and library rescans belong to Task 5
-- [ ] 11.5 Create `metal/roles/storage/molecule/nfs-lifecycle/` with pinned disposable VM provisioning, isolated inventory, real-role convergence/idempotence, lifecycle and layout-preservation assertions, and failure cleanup; run `molecule test -s nfs-lifecycle` from the role directory inside `nix develop` before live application, then retain the live checks above as separate acceptance
+- [x] 11.1 Update `metal/roles/storage/tasks/mergerfs.yml` with `noforget`, `inodecalc=path-hash`, normal unmount behavior, and removal of `use_ino`; prove active options in the Molecule guest
+- [x] 11.2 Extend NFS/Kubernetes validation using `99_tmp` fixtures and a shared UID-1000 probe; require actual successful pod completion and kubeconfig availability. Prove two-client idle/reopen, remount/recovery, RO rejection and memory reporting in Molecule; render the Kubernetes probes offline
+- [x] 11.3 Retain `root_squash`; prove the fixed-owner operations in the disposable guests and record results. Permission or stale-handle failures still block production rollout and require a design revision, not silent privilege relaxation
+- [x] 11.4 Simulate rename/promotion only inside `99_tmp/nfs-readiness`, proving reopened bytes and backing links without media applications; tear down VM clients/fixtures. Real seeding, production promotion and library rescans belong to Task 5
+- [x] 11.5 Create `metal/roles/storage/molecule/nfs-lifecycle/` with pinned disposable VM provisioning, isolated inventory, real-role convergence/idempotence, lifecycle and layout-preservation assertions; run the full scenario, intentional-failure cleanup and fresh recreation
+- [ ] 11.6 When the NAS returns, complete Task 1.5, quiesce clients and apply the mount changes; prove live active options, fixed-owner operations, two-client idle/reopen and controlled remount/recovery, RO rejection, backing links and NAS memory. Run the required live Kubernetes probes and verify clients/fixtures are removed. These live checks are deferred, not satisfied by the VM results
+
+**Local verification (2026-10-04):** The three-VM QEMU/KVM scenario passed with
+mergerfs 2.41.1 and a checksum-pinned Debian 12 image. The second real-role converge
+reported zero changes. Both clients passed UID/GID-1000 operations, a deliberate
+permission-denied test, 65-second idle/reopen, exact-byte reads, backing hardlink
+identity, RO rejection and normal unmount/remount recovery. All 40 directories,
+legend paths, operator retirement entries, legacy data and restrictive descendant
+metadata passed preservation checks. An injected failure after client mounts
+returned nonzero and completed cleanup/destroy; a subsequent fresh full run passed.
+Six local regression tests passed. See `metal/roles/storage/molecule/nfs-lifecycle/README.md`
+for repeatable commands, versions, resource requirements and log locations.
+
+**Validation and review:** Offline Ansible lint passed with the existing short-module
+and unprefixed-role-variable conventions excluded; shell checks and Nix flake
+evaluation passed. Both Kubernetes manifests rendered and parsed locally, including
+a delegated-controller case proving the original inventory server address survives.
+No live Kubernetes test was run. Isolated review fixes strengthened cleanup ordering,
+exact-byte/error checks, delegated server addressing and process-exit cleanup. The
+external review's proposed undefined loop-register issue did not reproduce: the
+real Ansible 2.19.4 scenario executes that loop successfully. No NAS commands ran.
+The final full VM rerun also passed after the cleanup and log-retention fixes;
+its controller transcript is `/tmp/nas-nfs-final.log`. Strict MkDocs validation
+still fails on the same nine archived-review links already tracked in Task 9;
+none of its warnings concern the revised implementation/task documents.
 
 ## Task 12: Explicit parity bootstrap and expansion jobs
 - **Status:** pending
