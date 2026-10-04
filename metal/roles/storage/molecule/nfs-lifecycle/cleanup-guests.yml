@@ -22,7 +22,19 @@
       ansible.posix.mount:
         path: "{{ item }}"
         state: absent
-      loop: [/mnt/readiness-ro, /mnt/readiness]
+      loop: [/mnt/audit-media, /mnt/readiness-ro, /mnt/readiness]
+
+    - name: Find reader audit evidence even when verification failed
+      ansible.builtin.find:
+        paths: /var/tmp/migration-audit-evidence
+        patterns: '*.jsonl*'
+      register: audit_client_evidence
+    - name: Preserve reader evidence before guest destruction
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-evidence/{{ inventory_hostname }}/"
+        flat: true
+      loop: "{{ audit_client_evidence.files }}"
 
     - name: Confirm all mounts on this client were removed
       ansible.builtin.set_fact:
@@ -51,6 +63,24 @@
         that: hostvars[item].nfs_fixture_client_clean | default(false)
         quiet: true
       loop: "{{ groups['nfs_clients'] }}"
+    - name: Find migration evidence even when verification failed
+      ansible.builtin.find:
+        paths: /var/tmp/migration-audit-evidence
+        patterns: '*.jsonl*'
+      register: audit_server_evidence
+    - name: Preserve migration evidence before removing scratch files
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-evidence/{{ inventory_hostname }}/"
+        flat: true
+      loop: "{{ audit_server_evidence.files }}"
+    - name: Remove only synthetic migration audit data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /mnt/storage/99_tmp/migration-audit
+        - /var/tmp/migration-audit-source
     - name: Remove synthetic readiness directory
       ansible.builtin.file:
         path: /mnt/storage/99_tmp/nfs-readiness

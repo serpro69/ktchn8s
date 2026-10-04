@@ -29,12 +29,24 @@
         state: absent
     - name: Install guest fixture dependencies
       ansible.builtin.apt:
-        name: [nfs-common, nfs-kernel-server, fuse, attr, acl]
+        name: [nfs-common, nfs-kernel-server, fuse, attr, acl, python3, b3sum]
         update_cache: true
         cache_valid_time: 3600
     - name: Prove NFS client kernel support
       ansible.builtin.command: modprobe nfs
       changed_when: false
+    - name: Create migration helper and regression directories
+      ansible.builtin.file:
+        path: "/tmp/nas-audit/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: [scripts, tests]
+    - name: Copy the repository migration helper and unit tests
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../../../{{ item }}"
+        dest: "/tmp/nas-audit/{{ item }}"
+        mode: '0644'
+      loop: [scripts/nas-migration-audit.py, tests/test_nas_migration_audit.py]
 
 - name: Prepare disposable server filesystems
   hosts: nfs_servers
