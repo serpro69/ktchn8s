@@ -68,7 +68,7 @@
         mode: "0755"
 
     - name: Test mount NFS export locally # noqa command-instead-of-module
-      command: "mount -t nfs4 {{ ansible_host }}:/mnt/storage/Temp /tmp/nfs_test_mount"
+      command: "mount -t nfs4 {{ ansible_host }}:/mnt/storage/99_tmp /tmp/nfs_test_mount"
       register: test_mount
       changed_when: false
       failed_when: false
