@@ -16,9 +16,26 @@
     path: "/mnt/storage/{{ item }}"
     owner: "{{ nfs_anon_uid }}"
     group: "{{ nfs_anon_gid }}"
-    mode: "0755"
+    mode: "0775"
     state: directory
   loop: "{{ storage_dirs }}"
+
+- name: Render storage layout legend
+  template:
+    src: storage-readme.j2
+    dest: /mnt/storage/00_meta/README.md
+    owner: "{{ nfs_anon_uid }}"
+    group: "{{ nfs_anon_gid }}"
+    mode: "0644"
+
+- name: Initialize storage retirement log without overwriting entries
+  copy:
+    content: ""
+    dest: /mnt/storage/00_meta/RETIRED.md
+    force: false
+    owner: "{{ nfs_anon_uid }}"
+    group: "{{ nfs_anon_gid }}"
+    mode: "0644"
 
 - name: Ensure nfs.conf.d include directory exists
   file:
