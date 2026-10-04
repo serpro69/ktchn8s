@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Task 1 repository work verified; NAS apply/acceptance deferred while the host is offline
+> Revised: 2026-10-04 — Task 1 repository work verified; Molecule coverage planned for Tasks 3, 11–13; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -17,6 +17,11 @@ Execution outline: prepare the layout and tools (1–3), prove synthetic NFS beh
 (11), finish audit tooling (13), migrate/reconcile (6–7), initialize/verify parity
 (8, after 12), then jointly release media (5, using the offline PV work from 4).
 Task 4 can finish offline on a work branch; Task 5 owns all live acceptance and sync.
+
+Molecule covers the isolated role lifecycle checks in Tasks 11–12, with Task 13
+reusing the NFS fixture for its identity-sensitive access test. Task 3 supplies the
+tooling. Follow [the scenario contract](./implementation.md#molecule-testing);
+passing a disposable scenario does not complete any deferred live acceptance.
 
 ## Task 1: Tree skeleton via storage role
 - **Status:** in-progress
@@ -51,13 +56,10 @@ suggestion was left unchanged because the standard Jinja expression works in bot
 rendering checks. If that style change is adopted later, rerun the Ansible template
 check.
 
-**Molecule consideration:** Evaluated at the owner's suggestion. There is no
-existing Molecule dependency or scenario in the project. Task 1's local fixture
-already exercises its directory/template behavior, so no framework was added.
-Revisit Molecule when implementing Tasks 11–12: reusable converge, idempotence,
-verify and cleanup scenarios on disposable test hosts could cover NFS and parity
-job lifecycles. They must use isolated storage and never target the production NAS;
-live NAS acceptance remains a separate gate.
+**Molecule follow-up:** Task 1's completed repository checks remain valid. Task 11
+will include layout/legend and retirement-log preservation in its reusable NFS
+scenario; Tasks 3, 11–13 below now own the planned tooling and integration coverage.
+No Molecule scenario has run yet, and Task 1.5 remains a live acceptance gate.
 
 ## Task 2: SnapRAID excludes and parity configuration
 - **Status:** pending
@@ -71,16 +73,18 @@ live NAS acceptance remains a separate gate.
 - [ ] 2.2 Correct additional parity directives/filenames to use `loop.index`: `parity`, `2-parity`, `3-parity`, with no repeated first level
 - [ ] 2.3 Render and parse one-, two-, and three-parity configs offline in disposable SnapRAID 13.0 fixtures; assert exact paths, included backup `downloads`/`appdata` paths, and rejection of duplicate first parity; the live config check belongs to Task 8 because the role skips it with no parity drives
 
-## Task 3: b3sum in the dev shell
+## Task 3: Storage test tooling in the dev shell
 - **Status:** pending
 - **Depends on:** —
 - **Size:** S
-- **Can run in parallel with:** Task 1, Task 2, Task 4, Task 9, Task 11, Task 12
+- **Can run in parallel with:** Task 1, Task 2, Task 4, Task 9
 - **Docs:** [implementation.md#devshell-b3sum](./implementation.md#devshell-b3sum)
 
 ### Subtasks
 - [ ] 3.1 Add `b3sum` to `devShells.default` packages in `flake.nix`
 - [ ] 3.2 Verify `nix develop -c b3sum --version`
+- [ ] 3.3 Add a Molecule package compatible with the locked Ansible/Python environment to `devShells.default` in `flake.nix`; use the pinned Nix package set rather than a global pip install
+- [ ] 3.4 Verify `nix develop -c molecule --version` and scenario CLI availability; record the resolved versions. VM backend setup and actual scenario passes belong to Tasks 11–12
 
 ## Task 4: Prepare the NFS media PV offline
 - **Status:** pending
@@ -163,31 +167,44 @@ live NAS acceptance remains a separate gate.
 - [ ] 9.2 Point `docs/info/todo.md` storage section at `docs/feat/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
 - [ ] 9.3 Run `python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check` and check revised local links; document any unrelated baseline warnings rather than weakening the check
 
+**Docs baseline (2026-10-04):** Strict build already reports nine broken-link
+warnings after the review documents were moved into `reviews/archive/`. This is
+outside the Molecule planning change. Before completing 9.3, update the review
+links in `design.md` and `docs/reference/architecture/decision_records.md`, fix the
+relative feature/ADR links inside the two dated archived reviews, and rerun strict
+mode. Do not count an unchanged warning baseline as a passing strict build.
+The Molecule planning update adds no warnings: the before/after warning sets are
+identical. Local links/anchors in the revised implementation/tasks documents and
+their dependency graph/parallel markers pass validation.
+
 ## Task 11: NFS export lifecycle acceptance
 - **Status:** pending
-- **Depends on:** Task 1
+- **Depends on:** Task 1, Task 3
 - **Size:** M
-- **Can run in parallel with:** Task 2, Task 3, Task 4, Task 9, Task 12
+- **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
 - **Docs:** [implementation.md#nfs-export-readiness](./implementation.md#nfs-export-readiness)
 - **Slicing:** Risk-First — settle export behavior before data migration and production consumers
+- **Offline scope:** Task 1.1–1.4 plus Task 3 suffice for scenario work; Task 1.5 is required before live NAS acceptance. Keep offline and live results separate
 
 ### Subtasks
-- [ ] 11.1 Update `metal/roles/storage/tasks/mergerfs.yml` with `noforget`, `inodecalc=path-hash`, normal unmount behavior, and removal of `use_ino`; apply with clients quiesced and inspect active options
-- [ ] 11.2 Extend NFS/Kubernetes validation tasks using `99_tmp` fixtures: UID-1000 nested creation/link/rename/delete, two-client reopen after idle and remount/recovery, RO rejection, NAS memory observation; correct the test pod's trailing `&&` and require tests actually execute
+- [ ] 11.1 Update `metal/roles/storage/tasks/mergerfs.yml` with `noforget`, `inodecalc=path-hash`, normal unmount behavior, and removal of `use_ino`; prove active options in the Molecule guest first, then apply to the NAS with clients quiesced when available
+- [ ] 11.2 Extend NFS/Kubernetes validation tasks using `99_tmp` fixtures: UID-1000 nested creation/link/rename/delete, two-client reopen after idle and remount/recovery, RO rejection, NAS memory observation; correct the test pod's trailing `&&` and require tests actually execute. Reuse the server/client checks in `molecule/nfs-lifecycle`; live Kubernetes execution remains separate
 - [ ] 11.3 Retain `root_squash`; prove required fixed-owner operations and record results. Permission or stale-handle failures block production rollout and require a design revision, not silent privilege relaxation
 - [ ] 11.4 Simulate rename/promotion only inside `99_tmp/nfs-readiness`, proving reopened bytes and backing links without media applications; tear down clients/fixtures. Real seeding, production promotion and library rescans belong to Task 5
+- [ ] 11.5 Create `metal/roles/storage/molecule/nfs-lifecycle/` with pinned disposable VM provisioning, isolated inventory, real-role convergence/idempotence, lifecycle and layout-preservation assertions, and failure cleanup; run `molecule test -s nfs-lifecycle` from the role directory inside `nix develop` before live application, then retain the live checks above as separate acceptance
 
 ## Task 12: Explicit parity bootstrap and expansion jobs
 - **Status:** pending
-- **Depends on:** Task 2
+- **Depends on:** Task 2, Task 3
 - **Size:** M
-- **Can run in parallel with:** Task 1, Task 3, Task 4, Task 6, Task 7, Task 9, Task 11, Task 13
+- **Can run in parallel with:** Task 1, Task 4, Task 6, Task 7, Task 9, Task 11, Task 13
 - **Docs:** [implementation.md#parity-job-readiness](./implementation.md#parity-job-readiness)
 
 ### Subtasks
 - [ ] 12.1 Update `tasks/snapraid.yml`, `tasks/snapraid_initial_sync.yml` and `handlers/main.yml`: always deploy the bootstrap unit, remove the first-parity-file completion guard and automatic config-change start, require explicit operator start after safety gates
 - [ ] 12.2 Update `templates/snapraid-initial-sync.service.j2` to invoke `snapraid --force-full sync` directly with journal output and no fixed 12-hour timeout; maintenance timers/handlers must respect stopped/disabled state during bootstrap
-- [ ] 12.3 In disposable multi-filesystem fixtures prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation; applying config must not start jobs, and role reruns must not reactivate disabled maintenance
+- [ ] 12.3 Create `metal/roles/storage/molecule/parity-lifecycle/` using a disposable systemd VM and distinct data/parity filesystems; exercise actual role tasks/handlers and prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation. Applying config must not start jobs, and role reruns must not reactivate disabled maintenance
+- [ ] 12.4 Run `molecule test -s parity-lifecycle` from the role directory inside `nix develop`; require configuration idempotence, successful and failed unit evidence, recovery after injected failure, and cleanup/recreation. Keep this scenario independent of Task 11; real NAS sync/scrub remains Task 8
 
 ## Task 13: Migration inventory and audit tooling
 - **Status:** pending
@@ -200,7 +217,8 @@ live NAS acceptance remains a separate gate.
 ### Subtasks
 - [ ] 13.1 Create `scripts/nas-migration-audit.py` with the documented inventory/compare/verify/access contract, read-only dataset handling, versioned JSONL, explicit exit codes and atomic completed generations
 - [ ] 13.2 Add `tests/test_nas_migration_audit.py` covering the specified data/metadata/error/retry cases; run standard-library unittest discovery from the dev shell
-- [ ] 13.3 Run the restrictive-permission fixture under the NAS/test identities, prove a failed access result becomes a pass only after the declared transformation, and clean up all test clients; record helper/tool revisions for Task 6
+- [ ] 13.3 Extend Task 11's `molecule/nfs-lifecycle` verifier with the restrictive-permission audit fixture; require UID/GID 1000 reads over a read-only NFS mount to fail before the declared repair and pass afterward, then clean up clients. Record helper/tool revisions for Task 6; keep unit tests in 13.2 and actual migrated-content acceptance in Task 7
+- [ ] 13.4 When the NAS is available, prepare Python 3/b3sum outside the storage role and compare their versions with the fixture record; rerun unit/access checks for differing versions before Task 6. Defer this NAS preparation while offline
 
 ## Task 10: Final verification
 - **Status:** pending
@@ -209,7 +227,7 @@ live NAS acceptance remains a separate gate.
 - **Can run in parallel with:** —
 
 ### Subtasks
-- [ ] 10.1 Run `/kk:test` — layout idempotency, parity configs/job lifecycle, audit-helper tests, complete migration/access/release evidence, NFS and real application acceptance, separate network smoke test, strict docs build
+- [ ] 10.1 Run `/kk:test` — both Molecule scenarios (including Task 13's access fixture), layout idempotency, direct parity config/audit-helper tests, complete migration/access/release evidence, live NFS and real application acceptance, separate network smoke test, strict docs build. Scenario passes do not replace live gates
 - [ ] 10.2 Run `/kk:document` — finalize docs, move feature out of wip when done
 - [ ] 10.3 Run `/kk:review-code` — review the ansible/helm/nix changes
 - [ ] 10.4 Run `/kk:review-spec` — verify implementation matches design/implementation docs
@@ -217,14 +235,16 @@ live NAS acceptance remains a separate gate.
 ## Dependency Graph
 
 ```
-Task 1 ─→ Task 11 ─→ Task 13 ─→ Task 6 ─→ Task 7 ─→ Task 8 ─→ Task 5
-   │                    ↑                  ↑           ↑         ↑
-   ├─→ Task 4 (offline) ──────────────────────────────────────────┘
-   └─→ Task 9           │                  │           │
-Task 3 ─────────────────┘                  │           │
-Task 2 ────────────────────────────────────┘           │
-   └─→ Task 12 ────────────────────────────────────────┘
+Task 1  ─→ Tasks 4 (offline), 6, 9, 11
+Task 2  ─→ Tasks 7, 8, 12
+Task 3  ─→ Tasks 6, 11, 12, 13
+Task 4  ─→ Task 5
+Task 6  ─→ Task 7
+Task 7  ─→ Task 8
+Task 8  ─→ Task 5
+Task 11 ─→ Tasks 6, 13
+Task 12 ─→ Task 8
+Task 13 ─→ Task 6
 
 All Tasks 1–9, 11–13 ─→ Task 10
-(Task 6 also explicitly lists Tasks 1, 3, 11; Task 8 lists Task 2.)
 ```
