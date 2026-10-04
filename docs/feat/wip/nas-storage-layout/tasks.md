@@ -2,9 +2,9 @@
 
 > Design: [./design.md](./design.md)
 > Implementation: [./implementation.md](./implementation.md)
-> Status: pending
+> Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-03 — both review rounds addressed in the plan; all implementation/operational tasks remain pending
+> Revised: 2026-10-04 — Task 1 repository work verified; NAS apply/acceptance deferred while the host is offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -19,18 +19,45 @@ Execution outline: prepare the layout and tools (1–3), prove synthetic NFS beh
 Task 4 can finish offline on a work branch; Task 5 owns all live acceptance and sync.
 
 ## Task 1: Tree skeleton via storage role
-- **Status:** pending
+- **Status:** in-progress
+- **Repository work:** done; live acceptance in 1.5 remains deferred
 - **Depends on:** —
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 3, Task 12
 - **Docs:** [implementation.md#tree-skeleton](./implementation.md#tree-skeleton)
 
 ### Subtasks
-- [ ] 1.1 Replace `storage_dirs` in `metal/roles/storage/vars/main.yml` with the designed tree as a flat path list (top-level dirs, `NN.MM` subdirs, `30_media/rotation/{movies,shows}`, `30_media/rotation/downloads/{complete,incomplete}` — downloads nests INSIDE rotation, `10_documents/inbox`)
-- [ ] 1.2 Ensure the `storage_dirs` loop in `tasks/nfs.yml` sets owner/group `1000:1000`, mode `0775`
-- [ ] 1.3 Add `templates/storage-readme.j2` (legend: grammar rules, working-set test, machine-vs-human convention) rendered to `00_meta/README.md` from the same variable; create `00_meta/RETIRED.md` with `force: false`
-- [ ] 1.4 Grep the role for references to old dirs (`Temp`, `Videos` in validation tasks) and repoint to `99_tmp`
+- [x] 1.1 Replace `storage_dirs` in `metal/roles/storage/vars/main.yml` with the designed tree as a flat path list (top-level dirs, `NN.MM` subdirs, `30_media/rotation/{movies,shows}`, `30_media/rotation/downloads/{complete,incomplete}` — downloads nests INSIDE rotation, `10_documents/inbox`)
+- [x] 1.2 Ensure the `storage_dirs` loop in `tasks/nfs.yml` sets owner/group `1000:1000`, mode `0775`
+- [x] 1.3 Add `templates/storage-readme.j2` (legend: grammar rules, working-set test, machine-vs-human convention) rendered to `00_meta/README.md` from the same variable; create `00_meta/RETIRED.md` with `force: false`
+- [x] 1.4 Grep the role for references to old dirs (`Temp`, `Videos` in validation tasks) and repoint to `99_tmp`
 - [ ] 1.5 Run the role against the NAS twice: second run reports zero changes for the layout/legend tasks (the pre-existing `sensors-detect` task always changes); manually remove only confirmed-empty legacy dirs and verify the new tree
+
+**Deferred operation (2026-10-04):** Subtask 1.5 is deferred at the owner's request
+because the NAS is offline. Do not run Ansible against the NAS for this task now.
+When the host is available, inspect the storage-play check/diff, apply twice, record
+layout/legend idempotence, and remove legacy directories only after confirming they
+are empty. Local validation does not satisfy this live acceptance gate.
+
+**Local verification (2026-10-04):** YAML lint, offline Ansible lint and a
+localhost-only syntax check passed. A disposable localhost fixture ran the three
+actual layout/legend tasks against a temporary root: all 40 directories had
+`1000:1000` ownership and `0775` mode; the second application made zero changes.
+Existing retirement entries, legacy data and restrictive descendant permissions
+survived. Strict template rendering matched the full path list and included an
+extra path supplied only through the variable. No NAS commands were executed.
+Isolated code review found no correctness issues. Its optional `basename` filter
+suggestion was left unchanged because the standard Jinja expression works in both
+rendering checks. If that style change is adopted later, rerun the Ansible template
+check.
+
+**Molecule consideration:** Evaluated at the owner's suggestion. There is no
+existing Molecule dependency or scenario in the project. Task 1's local fixture
+already exercises its directory/template behavior, so no framework was added.
+Revisit Molecule when implementing Tasks 11–12: reusable converge, idempotence,
+verify and cleanup scenarios on disposable test hosts could cover NFS and parity
+job lifecycles. They must use isolated storage and never target the production NAS;
+live NAS acceptance remains a separate gate.
 
 ## Task 2: SnapRAID excludes and parity configuration
 - **Status:** pending
