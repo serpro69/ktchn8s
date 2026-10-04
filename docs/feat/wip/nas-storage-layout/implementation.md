@@ -10,6 +10,55 @@ ArgoCD owns everything under `system/`, `platform/`, `apps/` after bootstrap —
 changes are applied by committing to git and syncing, never `kubectl apply`. All tooling
 runs inside `nix develop`.
 
+## molecule-testing
+
+Use Molecule for repeatable storage-role integration tests where service state,
+mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 12
+own the scenarios under `metal/roles/storage/molecule/`. This is planned work:
+Molecule and these scenarios are not installed or implemented yet.
+
+| Scenario / owner | Environment and acceptance |
+|---|---|
+| `nfs-lifecycle` / Task 11 | Disposable Linux NFS server and two clients; real mergerfs/FUSE and NFS mounts. Verify UID/GID 1000 operations, read-only rejection, idle/reopen and controlled remount/recovery, promotion links/bytes and server memory observation. Include Task 1's layout, legend and retirement-log preservation as regression checks. |
+| `parity-lifecycle` / Task 12 | Disposable Linux host with real systemd and separate scratch filesystems for data and parity. Verify configuration-only convergence, disabled maintenance, first sync, second-parity expansion, interruption/retry and failed-unit exit propagation using SnapRAID 13.0. |
+| Access fixture / Task 13 | Extend the `nfs-lifecycle` verifier with the audit helper's foreign-owned `0700` fixture and recorded permission repair. Run the reader as UID/GID 1000 with no extra groups over a read-only NFS mount. Keep Python unit tests separate. |
+
+Use disposable VMs for these kernel/service tests. At scenario implementation time,
+choose and document an available VM backend, pin its dependencies and guest image,
+and prove the required systemd/FUSE/NFS or scratch-disk capabilities before testing
+the role. Missing capabilities mean the scenario is blocked, not passed or silently
+skipped. Neither a template render nor a mocked service is lifecycle evidence.
+
+Each scenario owns its inventory, variables, guest disks and cleanup. Never use the
+production inventory, NAS disks, or production kubeconfig. Invoke the actual role
+tasks/handlers/templates; if isolation needs a focused task include, share it with
+the production role rather than copying its implementation into the test. Keep
+controller provisioning separate from guest configuration.
+
+Configure the scenario explicitly for create/prepare, converge, idempotence, verify,
+cleanup and destroy, with failure/recovery phases where needed. The
+[Molecule role guide](https://docs.ansible.com/projects/molecule/getting-started-roles/)
+and [workflow reference](https://docs.ansible.com/projects/molecule/workflow/) describe
+these actions. Require zero changes on the second configuration converge; run
+intentional writes, remounts and parity jobs in the verification/failure phases.
+Do not hide storage changes with blanket idempotence skips. Exclude unrelated
+hardware discovery such as the existing always-changing `sensors-detect` task from
+the focused configuration entry point. Preserve logs before cleanup, exercise
+cleanup after failure, and prove a fresh test can recreate its environment.
+
+Run from the repository root with
+`nix develop --command bash -c 'cd metal/roles/storage && molecule test -s nfs-lifecycle'`
+or the same command with `-s parity-lifecycle`. Record scenario/tool revisions and
+results with the owning task. Pure config parsing (Task 2), Helm rendering (Tasks
+4–5), and audit-helper unit tests (Task 13) retain their direct checks; they do not
+need a separate Molecule wrapper.
+
+Molecule results establish behavior on the disposable environment. Task 1.5 and
+Task 11's live NAS/Kubernetes acceptance remain required, as do actual application,
+migrated-data and parity-release checks in Tasks 5–8. While the NAS is offline,
+complete repository/scenario work and explicitly defer live subtasks without
+marking those acceptance gates complete.
+
 ## tree-skeleton
 
 Replace the flat `storage_dirs` list with the designed tree.
@@ -81,6 +130,14 @@ Task 11 is synthetic NFS validation, independent of the media applications. Crea
 test clients. All creates, links, renames and RO probes stay there; clean up clients
 and fixtures before NAS-local migration/sorting begins.
 
+First implement and run the `nfs-lifecycle` Molecule scenario described in
+[molecule-testing](#molecule-testing), using the Task 3 tooling. Seed operator
+retirement entries, legacy content and restrictive descendants before convergence
+to verify Task 1's preservation contract. The server/client lifecycle checks below
+must pass in this disposable environment before applying them to the NAS.
+The Kubernetes pod probe remains a separate live-cluster check; a VM client does
+not establish Kubernetes integration. Record offline and live results separately.
+
 1. In `metal/roles/storage/tasks/mergerfs.yml`, add `noforget` and
    `inodecalc=path-hash` while retaining `category.create=mfs`, remove legacy `use_ino`,
    and keep lazy unmount disabled. Apply in a maintenance window: stop/unmount clients,
@@ -140,23 +197,42 @@ Task 12 prepares bootstrap/expansion before source disks are released. Update
    alone: a timer could start another unit and terminate the active bootstrap job.
    → verify: a role rerun leaves maintenance stopped until the operator re-enables it.
 
+Implement these checks in `metal/roles/storage/molecule/parity-lifecycle/` using
+the Task 3 tooling and [scenario contract](#molecule-testing). Converge the real
+configuration and handlers without starting a sync; the verifier starts jobs
+explicitly and checks each unit invocation's exit status and journal. Use distinct
+guest filesystems, not several directories on one filesystem. Inject a failing
+SnapRAID invocation only within the disposable guest, restore the real executable,
+and require a successful retry. Adding second parity must rerun the configuration
+path and preserve existing parity/content files. This scenario must run independently
+of the NFS scenario so Task 12 does not acquire a dependency on Task 11.
+
 Task 8 records the unit invocation, completion result/exit status and logs, then runs
 an explicit full scrub. These changes do not make existence of a parity file or a
 previous successful invocation sufficient evidence for a newly added parity level.
 
 ## devshell-b3sum
 
-Add `b3sum` to the `packages` list in the `devShells.default` `mkShell` block of
-`flake.nix` (~line 31).
-→ verify: `nix develop -c b3sum --version`.
+Task 3 adds `b3sum` and Molecule to the `packages` list in the `devShells.default`
+`mkShell` block of `flake.nix`. Use the locked Nix package set and verify Molecule's
+compatibility with its Ansible/Python versions before choosing the package; do not
+rely on a global pip installation. If the locked set lacks a compatible package,
+record and resolve that dependency explicitly before scenario work. Scenario-specific
+VM backend dependencies belong to Tasks 11–12 and must be reproducible too.
+→ verify: `nix develop -c b3sum --version`, `nix develop -c molecule --version`, and
+the supported scenario CLI options. This makes tooling available; it does not count
+as passing either Molecule scenario. The scenarios run in their owning tasks.
 
 ## migration-audit-tooling
 
 Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
-the Task 3 `b3sum` executable. Before Task 13's NAS fixture, verify Python 3 and install
-`b3sum` once there (`apt install b3sum` on Debian, or a verified upstream binary);
-record both versions with the fixture results. The helper reads datasets and writes
+the Task 3 `b3sum` executable. Provide Python 3 and `b3sum` in the disposable NFS
+fixture and record both versions with the results. When the NAS is available, verify
+Python 3 and install `b3sum` once there (`apt install b3sum` on Debian, or a verified
+upstream binary) before Task 6. If its versions differ from the fixture's, rerun the
+unit/access checks with those versions and record the results before migration.
+This NAS preparation is deferred while it is offline. The helper reads datasets and writes
 evidence only. Copying, moving, permission changes, discards and disk operations remain
 explicit operator actions.
 
@@ -194,8 +270,11 @@ Stream inventories/reports and hash locally to avoid reading NAS data over the n
 covers the command exit/output contract, partial scans/retries, failed hashes, unusual
 names, symlinks/root escapes, special files, missing/duplicate ledger rows, merges/collisions,
 equal-content distinct destinations and approved metadata transformations. The access
-fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix;
-run that identity-sensitive check on the NAS/Task 11 test environment if necessary.
+fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix.
+Extend Task 11's `nfs-lifecycle` Molecule verifier for this identity-sensitive check,
+using actual UID/GID 1000 reads over a read-only NFS mount. A root-only local run
+does not satisfy it. This tests the helper's policy enforcement; Task 7 still audits
+the real migrated library and Task 5 still checks application playback.
 Task 13 depends on Tasks 3 and 11, uses their tool/fixture environment, and cleans up
 its clients afterward. It completes only when its checks pass, before Task 6 starts.
 
@@ -340,8 +419,9 @@ entries, and stop on any enumeration, read, hash, copy, or reconciliation failur
    attached source, recording disk ID, root and tool versions in the run evidence.
    Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
    scans; each records hashes, entry types and metadata per the tooling contract.
-   Check the NAS tool versions against the Task 13 fixture record; setup happened
-   before those tests. This remains migration tooling outside the storage role.
+   Check the NAS tool versions against the Task 13 fixture record; NAS tool setup
+   and any retesting for different versions must finish before these scans.
+   This remains migration tooling outside the storage role.
    → verify: all scans complete with zero errors and entry counts reconcile; special
    files need an explicit archive/restore or discard decision before release.
 2. **Copy A and reconcile.** Run on the NAS with permission to preserve source metadata:
