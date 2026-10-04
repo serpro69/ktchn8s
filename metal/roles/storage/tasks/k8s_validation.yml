@@ -61,7 +61,7 @@
             - name: nfs-volume
               nfs:
                 server: "{{ ansible_host }}"
-                path: /mnt/storage/Temp
+                path: /mnt/storage/99_tmp
             restartPolicy: Never
         dest: /tmp/nfs-test-pod.yaml
         mode: "0644"
