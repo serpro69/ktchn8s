@@ -1,0 +1,44 @@
+---
+- name: Render the scoped UID-1000 NFS pod
+  ansible.builtin.template:
+    src: nfs-readiness-pod.yml.j2
+    dest: "{{ nfs_readiness_k8s_workspace.path }}/{{ nfs_readiness_pod.name }}.yaml"
+    mode: '0600'
+
+- name: Create the acceptance pod
+  ansible.builtin.command:
+    argv: [kubectl, create, '-f', "{{ nfs_readiness_k8s_workspace.path }}/{{ nfs_readiness_pod.name }}.yaml"]
+  changed_when: true
+
+- name: Wait for actual successful pod completion
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - wait
+      - --for=jsonpath={.status.phase}=Succeeded
+      - "pod/{{ nfs_readiness_pod.name }}"
+      - -n
+      - "{{ nfs_readiness_namespace }}"
+      - --timeout=180s
+  register: nfs_readiness_pod_wait
+  changed_when: false
+  failed_when: false
+
+- name: Collect pod output even when execution failed
+  ansible.builtin.command:
+    argv: [kubectl, logs, "{{ nfs_readiness_pod.name }}", '-n', "{{ nfs_readiness_namespace }}"]
+  register: nfs_readiness_pod_logs
+  changed_when: false
+  failed_when: false
+
+- name: Report pod output
+  ansible.builtin.debug:
+    var: nfs_readiness_pod_logs.stdout_lines
+
+- name: Require both successful completion and the final probe marker
+  ansible.builtin.assert:
+    that:
+      - nfs_readiness_pod_wait.rc == 0
+      - nfs_readiness_pod_logs.rc == 0
+      - "'NFS pod acceptance passed' in nfs_readiness_pod_logs.stdout"
+    fail_msg: Kubernetes NFS validation failed; inspect the reported pod output.

@@ -1,0 +1,236 @@
+---
+- name: Verify real configuration and prepare the shared fixture
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Record guest package versions
+      ansible.builtin.command: dpkg-query --show python3 nfs-common nfs-kernel-server mergerfs systemd
+      register: guest_versions
+      changed_when: false
+    - name: Record guest kernel version
+      ansible.builtin.command: uname -r
+      register: guest_kernel
+      changed_when: false
+    - name: Report the tested guest environment
+      ansible.builtin.debug:
+        msg:
+          kernel: "{{ guest_kernel.stdout }}"
+          packages: "{{ guest_versions.stdout_lines }}"
+    - name: Run the same readiness setup used by live validation
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: nfs_readiness_server.yml
+        public: true
+    - name: Read retirement log and legacy data
+      ansible.builtin.command: "cat /mnt/storage/{{ item }}"
+      loop: [00_meta/RETIRED.md, Videos/keep.txt]
+      register: preserved
+      changed_when: false
+      failed_when: preserved.stdout != 'operator-owned fixture'
+    - name: Inspect restrictive descendant metadata
+      ansible.builtin.stat:
+        path: /mnt/storage/10_documents/10.01_personal/private
+      register: private_directory
+    - name: Require preserved descendant metadata
+      ansible.builtin.assert:
+        that:
+          - private_directory.stat.uid == 1234
+          - private_directory.stat.gid == 1234
+          - private_directory.stat.mode == '0700'
+    - name: Inspect every layout directory
+      ansible.builtin.stat:
+        path: "/mnt/storage/{{ item }}"
+      loop: "{{ storage_dirs }}"
+      register: layout
+    - name: Require the complete fixed-owner layout
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - item.stat.isdir
+          - item.stat.uid == 1000
+          - item.stat.gid == 1000
+          - item.stat.mode == '0775'
+      loop: "{{ layout.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+    - name: Reconstruct every full path from the generated legend's indented tree
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import json, pathlib, sys
+            legend = pathlib.Path('/mnt/storage/00_meta/README.md').read_text()
+            lines = legend.split('```text\n', 1)[1].split('\n```', 1)[0].splitlines()
+            assert lines[0] == '/mnt/storage/'
+            paths, stack = [], []
+            for line in lines[1:]:
+                depth = (len(line) - len(line.lstrip())) // 2
+                stack = stack[:depth - 1] + [line.strip().rstrip('/')]
+                paths.append('/'.join(stack))
+            assert paths == json.loads(sys.argv[1]), paths
+          - "{{ storage_dirs | to_json }}"
+      changed_when: false
+
+- name: Install the same writer probe used by live validation
+  hosts: nfs_clients
+  gather_facts: false
+  tasks:
+    - name: Copy the shared probe
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/files/nfs-readiness.sh"
+        dest: /tmp/nfs-readiness.sh
+        mode: '0755'
+
+- name: Mount fixture clients
+  ansible.builtin.import_playbook: mount-clients.yml
+
+- name: Exercise failure cleanup on demand
+  hosts: nfs-client-a
+  gather_facts: false
+  tasks:
+    - name: Inject a failure only after real clients have mounted
+      ansible.builtin.assert:
+        that: lookup('env', 'NFS_TEST_FAIL_AFTER_MOUNT') != '1'
+        fail_msg: Intentional failure to verify Molecule cleanup and recreation.
+
+- name: Prove an unwritable fixture fails as UID 1000
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Exercise permission rejection without relaxing the export
+      block:
+        - name: Make the scratch root deliberately unwritable
+          ansible.builtin.file:
+            path: /mnt/storage/99_tmp/nfs-readiness
+            owner: '1234'
+            group: '1234'
+            mode: '0555'
+        - name: Run the real writer probe expecting permission denial
+          ansible.builtin.command: setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh create /mnt/readiness
+          delegate_to: nfs-client-a
+          register: denied_writer
+          changed_when: false
+          failed_when: false
+        - name: Require an actual permission failure
+          ansible.builtin.assert:
+            that:
+              - denied_writer.rc != 0
+              - "'Permission denied' in denied_writer.stderr"
+      always:
+        - name: Restore fixture permissions after the negative test
+          ansible.builtin.file:
+            path: /mnt/storage/99_tmp/nfs-readiness
+            owner: '1000'
+            group: '1000'
+            mode: '0775'
+
+- name: Create, link and promote as UID/GID 1000
+  hosts: nfs-client-a
+  gather_facts: false
+  tasks:
+    - name: Run real fixed-owner writer operations
+      ansible.builtin.command: "setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh {{ item }} /mnt/readiness"
+      loop: [create, promote]
+      changed_when: true
+
+- name: Reopen on both independent NFS clients after idle
+  hosts: nfs_clients
+  gather_facts: false
+  tasks:
+    - name: Let normal NFS attribute caches expire
+      ansible.builtin.pause:
+        seconds: 65
+    - name: Require reopened bytes and hardlink counts
+      ansible.builtin.command: setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh read /mnt/readiness
+      changed_when: false
+    - name: Require EROFS rather than a generic permission failure
+      ansible.builtin.command: setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh readonly /mnt/readiness-ro
+      changed_when: false
+
+- name: Prove backing links and record memory before controlled remount
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Check the backing filesystem inode identity
+      ansible.builtin.shell: |
+        set -eu
+        found=0
+        for branch in /mnt/data1 /mnt/data2; do
+          original="$branch/99_tmp/nfs-readiness/downloads/nested/payload"
+          promoted="$branch/99_tmp/nfs-readiness/library/promoted"
+          if test -f "$original"; then
+            original_inode=$(stat -c %d:%i "$original")
+            promoted_inode=$(stat -c %d:%i "$promoted")
+            links=$(stat -c %h "$original")
+            test "$original_inode" = "$promoted_inode"
+            test "$links" = 2
+            found=$((found + 1))
+          fi
+        done
+        test "$found" = 1
+      changed_when: false
+    - name: Observe server memory with retained nodes
+      ansible.builtin.command: ps -C mergerfs -o pid=,rss=,vsz=,args=
+      register: memory_after
+      changed_when: false
+    - name: Report retained-node memory
+      ansible.builtin.debug:
+        var: memory_after.stdout_lines
+
+- name: Quiesce both clients before normal server unmount
+  hosts: nfs_clients
+  gather_facts: false
+  tasks:
+    - name: Unmount clients without lazy or force flags
+      ansible.posix.mount:
+        path: "{{ item }}"
+        state: unmounted
+      loop: [/mnt/readiness-ro, /mnt/readiness]
+
+- name: Exercise normal mergerfs and NFS recovery
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Stop NFS before unmount
+      ansible.builtin.systemd_service:
+        name: nfs-kernel-server
+        state: stopped
+    - name: Release kernel exports
+      ansible.builtin.command: exportfs -ua
+      changed_when: true
+    - name: Normally unmount mergerfs
+      ansible.posix.mount:
+        path: /mnt/storage
+        state: unmounted
+    - name: Recover through the production configuration tasks
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: mergerfs.yml
+    - name: Restore NFS
+      ansible.builtin.systemd_service:
+        name: nfs-kernel-server
+        state: started
+
+- name: Reconnect fixture clients after recovery
+  ansible.builtin.import_playbook: mount-clients.yml
+
+- name: Verify both clients recover bytes and read-only enforcement
+  hosts: nfs_clients
+  gather_facts: false
+  tasks:
+    - name: Reopen the promoted hardlink after recovery
+      ansible.builtin.command: setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh read /mnt/readiness
+      changed_when: false
+    - name: Require read-only rejection after recovery
+      ansible.builtin.command: setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh readonly /mnt/readiness-ro
+      changed_when: false
+
+- name: Prove deletion and repeat the writer lifecycle
+  hosts: nfs-client-b
+  gather_facts: false
+  tasks:
+    - name: Repeat the lifecycle through the second client
+      ansible.builtin.command: "setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh {{ item }} /mnt/readiness"
+      loop: [delete, create, promote, read, delete]
+      changed_when: true
