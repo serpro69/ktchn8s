@@ -1,0 +1,33 @@
+---
+- name: Clean guests and guarantee controller teardown if guest cleanup fails
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Clean only guests in Molecule's isolated inventory
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --inventory
+          - "{{ lookup('env', 'MOLECULE_INVENTORY_FILE') }}"
+          - "{{ molecule_scenario_directory }}/cleanup-guests.yml"
+      register: guest_cleanup
+      changed_when: true
+      failed_when: false
+    - name: Report cleanup evidence
+      ansible.builtin.debug:
+        var: guest_cleanup.stdout_lines
+    - name: Tear down owned VMs even when guest cleanup could not finish
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ molecule_scenario_directory }}/vms.py"
+          - destroy
+          - "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms"
+          - "{{ lookup('env', 'MOLECULE_INSTANCE_CONFIG') }}"
+      when: guest_cleanup.rc != 0
+      changed_when: true
+    - name: Preserve the failure status after controller cleanup
+      ansible.builtin.assert:
+        that: guest_cleanup.rc == 0
+        fail_msg: "Guest cleanup failed; owned VMs were stopped. {{ guest_cleanup.stderr }}"

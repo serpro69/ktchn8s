@@ -9,14 +9,16 @@
     state: restarted
 
 - name: restart snapraid-runner
-  service:
+  systemd:
     name: snapraid-runner.timer
-    state: restarted
-    enabled: true
+    state: "{{ 'restarted' if snapraid_maintenance.sync_enabled else 'stopped' }}"
+    enabled: "{{ snapraid_maintenance.sync_enabled }}"
 
-- name: initial snapraid sync
-  include_tasks: snapraid_initial_sync.yml
-  listen: initial snapraid sync
+- name: restart snapraid-scrub
+  systemd:
+    name: snapraid-scrub.timer
+    state: "{{ 'restarted' if snapraid_maintenance.scrub_enabled else 'stopped' }}"
+    enabled: "{{ snapraid_maintenance.scrub_enabled }}"
 
 - name: reload nfs exports # noqa: no-changed-when
   command: exportfs -ra

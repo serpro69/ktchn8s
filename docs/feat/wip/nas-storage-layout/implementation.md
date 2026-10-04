@@ -17,7 +17,9 @@ mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 1
 own the scenarios under `metal/roles/storage/molecule/`. The Task 11
 `nfs-lifecycle` scenario uses QEMU/KVM and a checksum-pinned Debian guest image;
 its `metal/roles/storage/molecule/nfs-lifecycle/README.md` documents prerequisites
-and commands. Task 12's parity scenario remains pending.
+and commands. Task 12's independent `parity-lifecycle` scenario uses one systemd
+guest with four scratch disks; its sibling `README.md` documents the same lifecycle
+commands and the parity failure/retry checks.
 
 | Scenario / owner | Environment and acceptance |
 |---|---|
@@ -254,6 +256,38 @@ of the NFS scenario so Task 12 does not acquire a dependency on Task 11.
 Task 8 records the unit invocation, completion result/exit status and logs, then runs
 an explicit full scrub. These changes do not make existence of a parity file or a
 previous successful invocation sufficient evidence for a newly added parity level.
+
+The configuration path now always deploys the static full-sync unit when SnapRAID
+is configured. It never starts or enables that unit. Both maintenance timers are
+deployed even when disabled; their tasks and config-change handlers enforce the
+declared `sync_enabled` and `scrub_enabled` flags. During bootstrap/expansion,
+set **both flags to `false` in the complete `snapraid_maintenance` mapping** used
+for every role application. Preserve the other default fields: Ansible replaces
+this mapping rather than merging a partial inventory dictionary with defaults.
+Manually stopping/disabling timers alone does not override inventory policy.
+Stop the timers before changing configuration and wait for any running runner
+or scrub job to finish; the role does not terminate those jobs for you.
+
+After the Task 8 safety gates, start explicitly with
+`systemctl restart --no-block snapraid-initial-sync.service`. Follow
+`journalctl -fu snapraid-initial-sync.service`, and record this invocation's
+`InvocationID`, `ExecMainStartTimestamp`, `ExecMainExitTimestamp`, `Result`,
+`ExecMainCode` and `ExecMainStatus` via `systemctl show`. While the oneshot runs
+its state is `activating`; successful completion is `active (exited)`,
+`Result=success`, `ExecMainCode=1` and `ExecMainStatus=0`, with `MainPID=0`.
+`RemainAfterExit=yes` retains the result: the disposable systemd 252 guest otherwise
+garbage-collected the inactive unit's exit metadata immediately after completion.
+Always use **restart**, including after adding a parity level: `start` on a completed
+active unit does nothing. Require a new invocation ID/start timestamp. Do not restart
+an invocation that is still running. Preserve its journal and timestamps before
+another invocation; stopped/failed jobs need explicit retry and full scrub.
+Re-enable both maintenance flags only after parity acceptance.
+
+Run `molecule test -s parity-lifecycle` from `metal/roles/storage` inside
+`nix develop`. The scenario builds checksum-pinned SnapRAID 13.0 and verifies
+configuration idempotence, first sync, expansion, interruption, exact nonzero
+exit propagation and recovery with real systemd and separate filesystems.
+No live NAS work is included; the fixture README describes evidence and cleanup.
 
 ## devshell-b3sum
 
@@ -572,7 +606,7 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    (`make -C metal storage ANSIBLE_TARGETS=yggdrasil`). The role formats/mounts
    `/mnt/parity1`, renders the corrected config and deploys the Task 12 unit; it does
    not start it. Inspect `/etc/snapraid.conf`, excludes, and `snapraid status` here.
-   Start `snapraid-initial-sync` explicitly. Record this invocation's journal and
+   Run `systemctl restart --no-block snapraid-initial-sync` explicitly. Record this invocation's journal and
    `systemctl show` result/exit status; wait for successful completion, not file creation.
    → verify: success for the current dataset/configuration, no active competing job,
    and `snapraid diff` reports no included changes before proceeding.

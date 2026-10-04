@@ -1,13 +1,16 @@
 [Unit]
-Description=SnapRAID Initial Parity Sync
+Description=SnapRAID Explicit Full Parity Sync (Bootstrap or Expansion)
 After=multi-user.target
 Conflicts=snapraid-runner.service snapraid-scrub.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c '/usr/local/bin/snapraid sync 2>&1 | tee -a /var/log/snapraid/initial-sync.log'
+# Retain this invocation's exit status for operator acceptance. Use restart for
+# each new bootstrap/expansion attempt; start on an exited unit is a no-op.
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/snapraid --force-full sync
 User=root
 Group=root
 StandardOutput=journal
 StandardError=journal
-TimeoutStartSec=43200
+TimeoutStartSec=infinity

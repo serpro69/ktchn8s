@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Tasks 2–4 complete; Tasks 1 and 11 repository work verified; NFS Molecule scenario passes; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Tasks 2–4 and 12 complete; Tasks 1 and 11 repository work verified; both Molecule scenarios pass; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -275,17 +275,52 @@ still fails on the same nine archived-review links already tracked in Task 9;
 none of its warnings concern the revised implementation/task documents.
 
 ## Task 12: Explicit parity bootstrap and expansion jobs
-- **Status:** pending
+- **Status:** done
 - **Depends on:** Task 2, Task 3
 - **Size:** M
 - **Can run in parallel with:** Task 1, Task 4, Task 6, Task 7, Task 9, Task 11, Task 13
 - **Docs:** [implementation.md#parity-job-readiness](./implementation.md#parity-job-readiness)
 
 ### Subtasks
-- [ ] 12.1 Update `tasks/snapraid.yml`, `tasks/snapraid_initial_sync.yml` and `handlers/main.yml`: always deploy the bootstrap unit, remove the first-parity-file completion guard and automatic config-change start, require explicit operator start after safety gates
-- [ ] 12.2 Update `templates/snapraid-initial-sync.service.j2` to invoke `snapraid --force-full sync` directly with journal output and no fixed 12-hour timeout; maintenance timers/handlers must respect stopped/disabled state during bootstrap
-- [ ] 12.3 Create `metal/roles/storage/molecule/parity-lifecycle/` using a disposable systemd VM and distinct data/parity filesystems; exercise actual role tasks/handlers and prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation. Applying config must not start jobs, and role reruns must not reactivate disabled maintenance
-- [ ] 12.4 Run `molecule test -s parity-lifecycle` from the role directory inside `nix develop`; require configuration idempotence, successful and failed unit evidence, recovery after injected failure, and cleanup/recreation. Keep this scenario independent of Task 11; real NAS sync/scrub remains Task 8
+- [x] 12.1 Update `tasks/snapraid.yml`, `tasks/snapraid_initial_sync.yml` and `handlers/main.yml`: always deploy the bootstrap unit, remove the first-parity-file completion guard and automatic config-change start, require explicit operator start after safety gates
+- [x] 12.2 Update `templates/snapraid-initial-sync.service.j2` to invoke `snapraid --force-full sync` directly with journal output and no fixed 12-hour timeout; maintenance timers/handlers must respect stopped/disabled state during bootstrap
+- [x] 12.3 Create `metal/roles/storage/molecule/parity-lifecycle/` using a disposable systemd VM and distinct data/parity filesystems; exercise actual role tasks/handlers and prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation. Applying config must not start jobs, and role reruns must not reactivate disabled maintenance
+- [x] 12.4 Run `molecule test -s parity-lifecycle` from the role directory inside `nix develop`; require configuration idempotence, successful and failed unit evidence, recovery after injected failure, and cleanup/recreation. Keep this scenario independent of Task 11; real NAS sync/scrub remains Task 8
+
+**Local verification (2026-10-04):** The independent QEMU/KVM scenario passed with
+SnapRAID 13.0, systemd 252.39 and four distinct scratch filesystems on the pinned
+Debian 12 image. The second configuration converge reported zero changes. First
+sync, second-parity expansion, two full scrubs, real-process interruption/retry,
+and injected exit-42 failure/recovery passed with six distinct invocation IDs.
+Configuration preserved existing parity/content bytes and inodes, never started
+jobs, and stopped previously enabled maintenance; changed timer handlers kept
+disabled maintenance stopped. Original payload SHA-256 hashes matched before and
+after every invocation. An intentional failure after first sync returned nonzero
+and completed evidence collection/cleanup/destroy; fresh recreation then passed.
+No NAS commands ran. Live configuration, sync/scrub and drive release remain Task 8.
+
+**Evidence and commands:** See
+`metal/roles/storage/molecule/parity-lifecycle/README.md`. Controller transcripts
+are `/tmp/nas-parity-injected.log` and `/tmp/nas-parity-final.log`; retained guest
+journals, JSON results, baseline hashes, versions and scrub output are under
+`/tmp/nas-parity-evidence/`. These are local artifacts, not committed evidence.
+All 13 local storage regression tests passed (three config, six NFS, four parity
+evidence tests). YAML/offline Ansible lint and whitespace checks passed; the existing
+short-module, role-variable and lowercase-handler conventions were retained.
+All 29 implementation/task document links and anchors passed. Strict MkDocs still
+fails on the same nine archived-review links tracked in Task 9, with no new warnings.
+
+**Implementation adjustment and review:** Successful inactive oneshot units lost
+their exit metadata immediately in the guest. `RemainAfterExit=yes` now retains
+`active (exited)` results; every explicit attempt uses `systemctl restart --no-block`
+and must have a new invocation ID/start timestamp. Plain `start` after completion
+does not run again. The independent reviewer approved after adding payload-baseline
+checks and preserving original errors when evidence capture fails. The final VM
+pass exercised payload checks and journal-error handling; the subsequent JSON-write
+error guard passed the local regression suite. External review reported zero
+embedded files, so its proposals were checked against source independently:
+the credential-bearing runner config is now `0600`, PID/teardown safeguards remain
+fail-loud, and runtime journals did not reproduce the proposed invocation-ID issue.
 
 ## Task 13: Migration inventory and audit tooling
 - **Status:** pending

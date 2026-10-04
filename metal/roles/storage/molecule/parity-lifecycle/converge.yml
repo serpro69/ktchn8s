@@ -1,0 +1,7 @@
+---
+- name: Converge real parity configuration without computing parity
+  hosts: parity_servers
+  gather_facts: true
+  tasks:
+    - name: Apply configuration only
+      ansible.builtin.include_tasks: tasks/configure.yml
