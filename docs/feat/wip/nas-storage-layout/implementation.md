@@ -318,6 +318,11 @@ not establish that their backend executables or required collections are install
 
 ## migration-audit-tooling
 
+The helper's [CLI, JSONL schema and ledger guide](../../../guides/nas_migration_audit.md)
+documents the implemented operator workflow and its acceptance limits. Use
+`--identity mergerfs` for local pool inventories/reconciliation so hardlink checks
+use backing identities rather than the configured path-hash inode numbers.
+
 Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
 the Task 3 `b3sum` executable. Provide Python 3 and `b3sum` in the disposable NFS
@@ -370,6 +375,24 @@ does not satisfy it. This tests the helper's policy enforcement; Task 7 still au
 the real migrated library and Task 5 still checks application playback.
 Task 13 depends on Tasks 3 and 11, uses their tool/fixture environment, and cleans up
 its clients afterward. It completes only when its checks pass, before Task 6 starts.
+
+Task 13's repository checks passed on 2026-10-04: 31 helper tests on both controller
+Python 3.12.10/b3sum 1.8.2 and guest Python 3.11.2/b3sum 1.2.0, all 44 local storage
+tests, and the extended NFS Molecule scenario including failure cleanup/recreation.
+The [task record](./tasks.md#task-13-migration-inventory-and-audit-tooling) contains
+the tested helper digest and evidence locations. Python 3.11 is the tested minimum.
+NAS setup/version comparison in 13.4 remains deferred; these results do not accept
+actual migrated content. Reproduce the scenario with an explicit evidence location:
+
+```bash
+nix develop -c bash -c 'cd metal/roles/storage && MOLECULE_EPHEMERAL_DIRECTORY=/tmp/ktchn8s-audit-nfs-final molecule test -s nfs-lifecycle'
+```
+
+Copy existing evidence elsewhere before reusing that directory. The helper uses
+SQLite for bounded-memory joins and successful directory-listing records, while
+still opening and reading every declared served file. It checks directory search
+permission separately from listing and preserves kernel traversal semantics when
+resolving served symlinks; lexical `..` simplification alone is insufficient.
 
 ## nfs-media-share
 
