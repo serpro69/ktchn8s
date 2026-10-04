@@ -1,0 +1,124 @@
+---
+- name: Prepare migration evidence on the disposable server
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Install the fixture driver
+      ansible.builtin.copy:
+        src: "{{ molecule_scenario_directory }}/audit-fixture.py"
+        dest: /tmp/nas-audit/audit-fixture.py
+        mode: '0644'
+    - name: Run helper regressions on the guest Python and b3sum versions
+      ansible.builtin.command: python3 -B -m unittest discover -s /tmp/nas-audit/tests -p test_nas_migration_audit.py -v
+      register: audit_unit_tests
+      changed_when: false
+    - name: Retain guest regression output
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms/nfs-server/audit-unit.log"
+        content: "{{ audit_unit_tests.stdout }}\n{{ audit_unit_tests.stderr }}\n"
+        mode: '0600'
+      delegate_to: localhost
+    - name: Seed restrictive copied metadata and publish the planned repair ledger
+      ansible.builtin.command: python3 /tmp/nas-audit/audit-fixture.py seed
+      changed_when: true
+    - name: Fetch the exact ledger for the reader client
+      ansible.builtin.fetch:
+        src: /var/tmp/migration-audit-evidence/ledger.jsonl
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-transfer/ledger.jsonl"
+        flat: true
+
+- name: Audit copied media before the declared repair
+  hosts: nfs-client-a
+  gather_facts: false
+  tasks:
+    - name: Create UID-1000 evidence workspace outside the read-only mount
+      ansible.builtin.file:
+        path: /var/tmp/migration-audit-evidence
+        state: directory
+        owner: '1000'
+        group: '1000'
+        mode: '0755'
+    - name: Install the same ledger generation on the client
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-transfer/ledger.jsonl"
+        dest: /var/tmp/migration-audit-evidence/ledger.jsonl
+        mode: '0444'
+    - name: Mount only the fake media subtree read-only
+      ansible.posix.mount:
+        path: /mnt/audit-media
+        src: 10.0.2.2:/mnt/storage/99_tmp/migration-audit/30_media
+        fstype: nfs4
+        opts: ro,vers=4.2,port=23049,soft,timeo=50,retrans=2
+        state: mounted
+    - name: Require a completed policy failure from actual UID-1000 reads
+      ansible.builtin.command: >-
+        setpriv --reuid=1000 --regid=1000 --clear-groups
+        python3 /tmp/nas-audit/scripts/nas-migration-audit.py access
+        --root /mnt/audit-media --ledger /var/tmp/migration-audit-evidence/ledger.jsonl
+        --run-id molecule-access --output /var/tmp/migration-audit-evidence/access-before.jsonl
+      register: audit_denied
+      changed_when: false
+      failed_when: audit_denied.rc != 1
+    - name: Exercise cleanup after a completed denied audit when requested
+      ansible.builtin.assert:
+        that: lookup('env', 'NFS_AUDIT_FAIL_AFTER_DENIAL') != '1'
+        fail_msg: Intentional failure with the read-only audit client still mounted.
+    - name: Quiesce the audit client before local repair
+      ansible.posix.mount:
+        path: /mnt/audit-media
+        state: unmounted
+
+- name: Apply only the recorded repair with audit clients absent
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Repair the synthetic tree and reconcile bytes metadata ACLs and hardlinks
+      ansible.builtin.command: python3 /tmp/nas-audit/audit-fixture.py repair
+      changed_when: true
+
+- name: Prove actual reads after the declared repair
+  hosts: nfs-client-a
+  gather_facts: false
+  tasks:
+    - name: Remount the fake media subtree read-only after repair
+      ansible.posix.mount:
+        path: /mnt/audit-media
+        src: 10.0.2.2:/mnt/storage/99_tmp/migration-audit/30_media
+        fstype: nfs4
+        opts: ro,vers=4.2,port=23049,soft,timeo=50,retrans=2
+        state: mounted
+    - name: Require complete UID-1000 file reads with no supplementary groups
+      ansible.builtin.command: >-
+        setpriv --reuid=1000 --regid=1000 --clear-groups
+        python3 /tmp/nas-audit/scripts/nas-migration-audit.py access
+        --root /mnt/audit-media --ledger /var/tmp/migration-audit-evidence/ledger.jsonl
+        --run-id molecule-access --output /var/tmp/migration-audit-evidence/access-after.jsonl
+      changed_when: false
+    - name: Fetch both reader reports
+      ansible.builtin.fetch:
+        src: "/var/tmp/migration-audit-evidence/{{ item }}"
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-transfer/{{ item }}"
+        flat: true
+      loop: [access-before.jsonl, access-after.jsonl]
+    - name: Remove the audit client after acceptance
+      ansible.posix.mount:
+        path: /mnt/audit-media
+        state: absent
+
+- name: Cross-check access and reconciliation evidence
+  hosts: nfs_servers
+  gather_facts: false
+  tasks:
+    - name: Copy reader evidence back to the verifier workspace
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/audit-transfer/{{ item }}"
+        dest: "/var/tmp/migration-audit-evidence/{{ item }}"
+        mode: '0600'
+      loop: [access-before.jsonl, access-after.jsonl]
+    - name: Require matching ledger digest and fail-before pass-after evidence
+      ansible.builtin.command: python3 /tmp/nas-audit/audit-fixture.py check
+      register: audit_acceptance
+      changed_when: false
+    - name: Report the exact tested helper and tool versions
+      ansible.builtin.debug:
+        var: audit_acceptance.stdout

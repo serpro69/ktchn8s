@@ -234,3 +234,6 @@
       ansible.builtin.command: "setpriv --reuid=1000 --regid=1000 --clear-groups /tmp/nfs-readiness.sh {{ item }} /mnt/readiness"
       loop: [delete, create, promote, read, delete]
       changed_when: true
+
+- name: Verify migration audit tooling through a read-only NFS mount
+  ansible.builtin.import_playbook: audit-access.yml

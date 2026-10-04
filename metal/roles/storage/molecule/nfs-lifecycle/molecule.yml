@@ -10,6 +10,7 @@ driver:
     - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/*/*.log
     - ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
     - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/base.qcow2
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/audit-evidence/*/*.jsonl*
 platforms:
   - name: nfs-server
     groups: [nfs_servers]
