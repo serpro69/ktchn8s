@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Task 2 complete with offline SnapRAID checks; Task 1 repository work verified; Molecule coverage planned for Tasks 3, 11–13; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Tasks 2–3 complete with local checks; Task 1 repository work verified; Molecule scenarios planned for Tasks 11–13; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -91,17 +91,34 @@ default. The code-reviewer sub-agent could not access the Nix daemon under its
 read-only permissions, so only the external reviewer completed independent review.
 
 ## Task 3: Storage test tooling in the dev shell
-- **Status:** pending
+- **Status:** done
 - **Depends on:** —
 - **Size:** S
 - **Can run in parallel with:** Task 1, Task 2, Task 4, Task 9
 - **Docs:** [implementation.md#devshell-b3sum](./implementation.md#devshell-b3sum)
 
 ### Subtasks
-- [ ] 3.1 Add `b3sum` to `devShells.default` packages in `flake.nix`
-- [ ] 3.2 Verify `nix develop -c b3sum --version`
-- [ ] 3.3 Add a Molecule package compatible with the locked Ansible/Python environment to `devShells.default` in `flake.nix`; use the pinned Nix package set rather than a global pip install
-- [ ] 3.4 Verify `nix develop -c molecule --version` and scenario CLI availability; record the resolved versions. VM backend setup and actual scenario passes belong to Tasks 11–12
+- [x] 3.1 Add `b3sum` to `devShells.default` packages in `flake.nix`
+- [x] 3.2 Verify `nix develop -c b3sum --version`
+- [x] 3.3 Add a Molecule package compatible with the locked Ansible/Python environment to `devShells.default` in `flake.nix`; use the pinned Nix package set rather than a global pip install
+- [x] 3.4 Verify `nix develop -c molecule --version` and scenario CLI availability; record the resolved versions. VM backend setup and actual scenario passes belong to Tasks 11–12
+
+**Local verification (2026-10-04):** The locked packages provide `b3sum 1.8.2`
+and Molecule `25.11.1` with Python `3.13.11`, Ansible Core `2.19.4` and
+`molecule-plugins 23.5.3`. Version and scenario-help commands passed; executable
+paths and package metadata confirm the Nix runtimes satisfy Molecule's requirements.
+See [the commands and environment limits](./implementation.md#devshell-b3sum).
+No NAS commands or Molecule scenarios ran; backend provisioning and scenario
+acceptance remain in Tasks 11–12.
+
+**Validation and review:** `nix flake check --no-build --no-update-lock-file`
+passed for `x86_64-linux`; other platforms were not checked. Revised Markdown
+link targets passed. Git whitespace checks passed with only the user-level
+`indent-with-non-tab` rule disabled, preserving the existing Nix space indentation.
+The isolated code-reviewer found no issues in the supplied patch; its read-only
+environment could not access the Nix daemon, so runtime verification remained with
+the implementing session. The external reviewer returned no findings but reported
+zero embedded files; its response is not counted as independent source inspection.
 
 ## Task 4: Prepare the NFS media PV offline
 - **Status:** pending

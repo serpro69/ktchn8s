@@ -30,6 +30,7 @@
         devShells.default = mkShell {
           packages = [
             # dev tools
+            b3sum
             bat
             delta
             diffutils
@@ -47,6 +48,7 @@
             # provisioning/configuration tools
             ansible
             ansible-lint
+            molecule
             opentofu
             minicom
             tflint

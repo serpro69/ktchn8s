@@ -14,8 +14,8 @@ runs inside `nix develop`.
 
 Use Molecule for repeatable storage-role integration tests where service state,
 mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 12
-own the scenarios under `metal/roles/storage/molecule/`. This is planned work:
-Molecule and these scenarios are not installed or implemented yet.
+own the scenarios under `metal/roles/storage/molecule/`. Molecule is available in
+the dev shell; the scenarios and their VM backends are not implemented yet.
 
 | Scenario / owner | Environment and acceptance |
 |---|---|
@@ -231,15 +231,30 @@ previous successful invocation sufficient evidence for a newly added parity leve
 
 ## devshell-b3sum
 
-Task 3 adds `b3sum` and Molecule to the `packages` list in the `devShells.default`
-`mkShell` block of `flake.nix`. Use the locked Nix package set and verify Molecule's
-compatibility with its Ansible/Python versions before choosing the package; do not
-rely on a global pip installation. If the locked set lacks a compatible package,
-record and resolve that dependency explicitly before scenario work. Scenario-specific
-VM backend dependencies belong to Tasks 11–12 and must be reproducible too.
-→ verify: `nix develop -c b3sum --version`, `nix develop -c molecule --version`, and
-the supported scenario CLI options. This makes tooling available; it does not count
-as passing either Molecule scenario. The scenarios run in their owning tasks.
+Task 3 provides `b3sum` and Molecule through the `packages` list in the
+`devShells.default` `mkShell` block of `flake.nix`, using the existing `flake.lock`.
+No global pip installation is needed. Scenario-specific VM backend dependencies
+belong to Tasks 11–12 and must be reproducible too.
+
+Local CLI verification (2026-10-04, x86_64-linux), with nixpkgs revision
+`23d72dabcb3b12469f57b37170fcbc1789bd7457`:
+
+- `nix develop -c b3sum --version`: `b3sum 1.8.2`.
+- `nix develop -c molecule --version`: Molecule `25.11.1`, Python `3.13.11`,
+  Ansible Core `2.19.4`; bundled `molecule-plugins` version `23.5.3`.
+- `nix develop -c molecule test --help` and `nix develop -c molecule list --help`:
+  both succeed and expose `-s, --scenario-name`. The test command also exposes
+  `--driver-name` and `--destroy`.
+
+The installed Molecule metadata requires Python >=3.10 and Ansible Core >=2.15;
+its Nix runtime satisfies both. All three executables resolve to `/nix/store`.
+The pre-existing virtualenv still exposes Python `3.12.10` via `python3`, and its
+stale pip launcher still warns on shell entry (see [environment repair](#deferred-follow-ups-explicit)).
+Molecule and Ansible use their Nix-packaged Python `3.13.11` independently.
+
+These checks establish CLI availability only. No VM backend, scenario or NAS
+acceptance ran; Tasks 11–12 own those separate checks. Listed driver plugins do
+not establish that their backend executables or required collections are installed.
 
 ## migration-audit-tooling
 
