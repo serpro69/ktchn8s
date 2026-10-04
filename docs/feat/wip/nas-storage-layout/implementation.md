@@ -123,6 +123,24 @@ The role skips `snapraid.yml` entirely while `parity_drives` is empty. Inspect t
 `/etc/snapraid.conf` and run `snapraid status` only in Task 8 after adding the first
 parity device; Task 2 completes with offline validation, not that later live check.
 
+The regression suite in `tests/test_snapraid_config.py` renders the actual template
+with strict Jinja undefined handling and runs SnapRAID `status`/`diff` against temporary
+directories. Supply a [SnapRAID 13.0](https://github.com/amadvance/snapraid/releases/tag/v13.0)
+binary; the locked Nix package set currently provides 12.4, which the test rejects:
+
+```bash
+nix develop --command env SNAPRAID_BIN=/path/to/snapraid-13.0/snapraid \
+  python3 -B -m unittest discover -s tests -p test_snapraid_config.py -v
+```
+
+The fixture relocates data, parity and content paths without changing exclusion
+patterns. `--test-skip-device` allows these parser/scan checks on one temporary
+filesystem; this does not prove parity storage or lifecycle behavior. No sync runs.
+Checks cover exact parity paths, root-only exclusions, preserved backup paths,
+unchanged cruft-file exclusions and rejection of duplicate first parity. The existing
+slashless cruft patterns match files, not whole directory trees; this task preserves
+that behavior. Task 12 owns the separate-filesystem lifecycle tests.
+
 ## nfs-export-readiness
 
 Task 11 is synthetic NFS validation, independent of the media applications. Create
