@@ -14,8 +14,10 @@ runs inside `nix develop`.
 
 Use Molecule for repeatable storage-role integration tests where service state,
 mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 12
-own the scenarios under `metal/roles/storage/molecule/`. Molecule is available in
-the dev shell; the scenarios and their VM backends are not implemented yet.
+own the scenarios under `metal/roles/storage/molecule/`. The Task 11
+`nfs-lifecycle` scenario uses QEMU/KVM and a checksum-pinned Debian guest image;
+its `metal/roles/storage/molecule/nfs-lifecycle/README.md` documents prerequisites
+and commands. Task 12's parity scenario remains pending.
 
 | Scenario / owner | Environment and acceptance |
 |---|---|
@@ -188,6 +190,30 @@ not establish Kubernetes integration. Record offline and live results separately
 
 References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
 and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
+
+Task 11's offline implementation uses the actual mergerfs/NFS role tasks and a
+shared `files/nfs-readiness.sh` probe in both VM and live validation. Configuration
+convergence no longer hides scratch writes inside `mount_validation.yml`; writes
+belong to explicit verification. Both rpcbind units are stopped, disabled and
+masked: stopping only the service allowed socket activation to break idempotence.
+Live validation preserves its fixture if local or Kubernetes client teardown fails.
+
+The verified guest stack is Debian 12 build `20260923-2610`, kernel
+`6.1.0-53-amd64`, mergerfs `2.41.1~debian-bookworm`, NFS utils
+`1:2.6.2-4+deb12u1`, Python package `3.11.2-1+b1` and systemd
+`252.39-1~deb12u2`. Guest packages use the 2026-09-24 Debian snapshot; the image and
+mergerfs release asset have checked-in checksums. QEMU 10.1.2 comes from the
+existing Nix lock. The small lifecycle fixture observed roughly 3.6 MiB mergerfs
+RSS; this is an observation, not a capacity bound for the NAS working set.
+
+Run fast regressions with `nix develop -c python3 -B -m unittest discover -s tests
+-p test_nfs_readiness.py -v` (payload tests require controller UID/GID 1000).
+The scenario README documents the full pass and deliberate-failure commands.
+NFS can temporarily cache a link count of one after `ln`; the probe requires two
+within 65 seconds and independently proves backing inode identity. It does not
+disable caching or relax `root_squash` to make tests pass. A permission-denied
+fixture is an expected negative test; unexpected permission or stale-handle errors
+remain acceptance failures. NAS and live Kubernetes execution remain Task 11.6.
 
 ## parity-job-readiness
 

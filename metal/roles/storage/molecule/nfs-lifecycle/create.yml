@@ -1,0 +1,29 @@
+---
+- name: Create disposable NFS VMs on the controller
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fixture_state: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms"
+  tasks:
+    - name: Create isolated state directory
+      ansible.builtin.file:
+        path: "{{ fixture_state }}"
+        state: directory
+        mode: '0700'
+    - name: Download the pinned Debian 12 generic guest image
+      ansible.builtin.get_url:
+        url: https://cloud.debian.org/images/cloud/bookworm/20260923-2610/debian-12-generic-amd64-20260923-2610.qcow2
+        dest: "{{ fixture_state }}/base.qcow2"
+        checksum: sha512:b789a983661b93ae280dcebbcecc425e7a05f15ab4a60d08e0bf130759a4f84dd26de39bd0e77e33b3f513910e5c5e84bdb335324b5138b4c43a0899a1733455
+        mode: '0600'
+        timeout: 120
+    - name: Boot scenario-owned QEMU guests
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ molecule_scenario_directory }}/vms.py"
+          - create
+          - "{{ fixture_state }}"
+          - "{{ lookup('env', 'MOLECULE_INSTANCE_CONFIG') }}"
+      changed_when: true
