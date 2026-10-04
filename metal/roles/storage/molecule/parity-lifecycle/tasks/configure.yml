@@ -1,0 +1,26 @@
+---
+# Shared by converge and expansion/disabled-policy regression phases. Includes
+# the production tasks and handlers, never a copy of the production behavior.
+- name: Read maintenance defaults for a complete isolated override
+  ansible.builtin.include_vars:
+    file: "{{ molecule_scenario_directory }}/../../defaults/main.yml"
+    name: fixture_defaults
+
+- name: Set fixture maintenance policy
+  ansible.builtin.set_fact:
+    snapraid_maintenance: >-
+      {{ fixture_defaults.snapraid_maintenance | combine({
+        'sync_enabled': fixture_maintenance_enabled | default(false),
+        'scrub_enabled': fixture_maintenance_enabled | default(false),
+        'content_backup_enabled': false,
+        'sync_time': fixture_sync_time | default('02:00'),
+        'scrub_schedule': fixture_scrub_schedule | default('Sun *-*-1..7 03:00:00')
+      }) }}
+
+- name: Configure actual SnapRAID tasks and handlers
+  ansible.builtin.include_role:
+    name: storage
+    tasks_from: snapraid.yml
+
+- name: Execute actual notified handlers before assertions
+  ansible.builtin.meta: flush_handlers
