@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Tasks 2–3 complete with local checks; Task 1 repository work verified; Molecule scenarios planned for Tasks 11–13; NAS apply/acceptance deferred while offline
+> Revised: 2026-10-04 — Tasks 2–4 complete with local checks; Task 1 repository work verified; Molecule scenarios planned for Tasks 11–13; NAS apply/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -121,7 +121,7 @@ the implementing session. The external reviewer returned no findings but reporte
 zero embedded files; its response is not counted as independent source inspection.
 
 ## Task 4: Prepare the NFS media PV offline
-- **Status:** pending
+- **Status:** done
 - **Depends on:** Task 1
 - **Size:** S
 - **Can run in parallel with:** Task 2, Task 3, Task 6, Task 7, Task 8, Task 9, Task 11, Task 12, Task 13
@@ -130,8 +130,28 @@ zero embedded files; its response is not counted as independent source inspectio
 - **Note:** Complete through offline rendering on a non-deployed work branch. Release together with Task 5 after parity acceptance; no deletion or sync belongs to Task 4
 
 ### Subtasks
-- [ ] 4.1 In `system/csi-driver-nfs/values.yaml` replace the `videos` volume entry with `media` / share `30_media` / capacity 4Ti
-- [ ] 4.2 Verify offline: `helm template` renders `pv-nfs-media` with volumeHandle `…/mnt/storage/30_media`, capacity 4Ti and Retain policy; leave cluster resources unchanged
+- [x] 4.1 In `system/csi-driver-nfs/values.yaml` replace the `videos` volume entry with `media` / share `30_media` / capacity 4Ti
+- [x] 4.2 Verify offline: `helm template` renders `pv-nfs-media` with volumeHandle `…/mnt/storage/30_media`, capacity 4Ti and Retain policy; leave cluster resources unchanged
+
+**Local verification (2026-10-04):** Helm `3.19.1` strict lint and offline rendering
+passed using the cached `csi-driver-nfs 4.13.0` dependency. Parsed all ten rendered
+resources and compared them with the pre-change values: only the PV name, capacity,
+CSI handle and share changed. Assertions verified `pv-nfs-media`, `4Ti`, `Retain`,
+`ReadWriteMany`, the class-less static binding and unchanged mount options.
+`kubeconform` was unavailable, so Kubernetes API schema validation was skipped;
+see [repeatable commands and coverage limits](./implementation.md#nfs-media-share).
+The changes remain on `feat/nas_layout`; the checked-in ArgoCD configuration targets
+`master`. No NAS, Ansible or cluster commands ran. Task 5 still owns joint release,
+old-resource cleanup and live acceptance after Task 8.
+
+**Review:** The isolated code reviewer found no actionable issues in the supplied
+patch and source snapshots. Its read-only environment could not access the Nix
+daemon, so filesystem inspection and test execution remained with the implementing
+session. The external reviewer returned no findings but reported zero embedded
+files; that response is not counted as independent source inspection. No findings
+needed indexing. All 29 local links/anchors in the implementation and task documents
+passed; whitespace checks passed with the user-level `indent-with-non-tab` rule
+disabled to preserve existing YAML indentation.
 
 ## Task 5: Jellyfin stack remount end-to-end
 - **Status:** pending
