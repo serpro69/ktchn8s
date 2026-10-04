@@ -1,0 +1,57 @@
+---
+- name: Unmount disposable clients before server teardown
+  hosts: nfs_clients
+  gather_facts: false
+  pre_tasks:
+    - name: Skip guest work when creation did not publish connection details
+      ansible.builtin.meta: end_host
+      when: ansible_host | default('') != '127.0.0.1'
+  tasks:
+    - name: Track client teardown before touching server data
+      ansible.builtin.set_fact:
+        nfs_fixture_client_clean: false
+    - name: Record surviving client entries before cleanup
+      ansible.builtin.command: stat -c '%n links=%h inode=%i owner=%u:%g' /mnt/readiness/downloads/nested/payload /mnt/readiness/library/promoted
+      register: cleanup_stats
+      changed_when: false
+      failed_when: false
+    - name: Report surviving entry metadata
+      ansible.builtin.debug:
+        var: cleanup_stats.stdout_lines
+    - name: Remove fixture client mounts
+      ansible.posix.mount:
+        path: "{{ item }}"
+        state: absent
+      loop: [/mnt/readiness-ro, /mnt/readiness]
+
+    - name: Confirm all mounts on this client were removed
+      ansible.builtin.set_fact:
+        nfs_fixture_client_clean: true
+
+- name: Remove only synthetic fixture data after clients are gone
+  hosts: nfs_servers
+  gather_facts: false
+  pre_tasks:
+    - name: Skip guest work when creation did not publish connection details
+      ansible.builtin.meta: end_host
+      when: ansible_host | default('') != '127.0.0.1'
+  tasks:
+    - name: Collect NFS service journal before destroying the guest
+      ansible.builtin.command: journalctl -u nfs-kernel-server --no-pager
+      register: nfs_journal
+      changed_when: false
+    - name: Preserve the guest journal on the controller
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms/nfs-server/nfs.log"
+        content: "{{ nfs_journal.stdout }}\n"
+        mode: '0600'
+      delegate_to: localhost
+    - name: Require every client to finish teardown before removing the fixture
+      ansible.builtin.assert:
+        that: hostvars[item].nfs_fixture_client_clean | default(false)
+        quiet: true
+      loop: "{{ groups['nfs_clients'] }}"
+    - name: Remove synthetic readiness directory
+      ansible.builtin.file:
+        path: /mnt/storage/99_tmp/nfs-readiness
+        state: absent
