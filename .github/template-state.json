@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "upstream_repo": "serpro69/claude-toolbox",
-  "template_version": "c2d28c9e3064a0a71a0e5ac3748a9616c794eb61",
-  "synced_at": "2026-10-03T19:26:15Z",
+  "template_version": "c1894e1ecf6be001a90697e170554c15972dc039",
+  "synced_at": "2026-10-16T06:53:20Z",
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
