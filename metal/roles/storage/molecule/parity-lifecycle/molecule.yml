@@ -1,0 +1,45 @@
+---
+prerun: false
+shared_state: false
+dependency:
+  name: galaxy
+  enabled: false
+driver:
+  name: default
+  safe_files:
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/*/*.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/*/*.json
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/base.qcow2
+platforms:
+  - name: parity-server
+    groups: [parity_servers]
+provisioner:
+  name: ansible
+  log: true
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..
+  config_options:
+    defaults:
+      host_key_checking: false
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+      parity_servers:
+        data_drives: [/dev/vdb, /dev/vdc]
+        disk_directories: [/mnt/data1, /mnt/data2]
+        parity_drives: [/dev/vdd]
+        parity_devices: [/dev/vdd]
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - destroy
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

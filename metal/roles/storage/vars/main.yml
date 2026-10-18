@@ -12,11 +12,46 @@ snapraid_runner_commit: 8f78f9f1af8ca5a9b6469a6c142cab2577157331
 snapraid_runner_url: "https://raw.githubusercontent.com/Chronial/snapraid-runner/{{ snapraid_runner_commit }}/snapraid-runner.py"
 snapraid_runner_checksum: "sha256:0aa60a88b0b5da06daffe1cda348721ffd579af4334f6a5f2ba3dc41447fe667"
 
-# Storage directories
+# Storage layout and generated legend; keep parents before their children.
+# Numbered directories are permanent: never rename or recycle their numbers.
 storage_dirs:
-  - Backups
-  - Documents
-  - Music
-  - Pictures
-  - Temp # for testing/validation tasks mostly
-  - Videos
+  - 00_meta
+  - 10_documents
+  - 10_documents/inbox
+  - 10_documents/10.01_personal
+  - 10_documents/10.02_family
+  - 10_documents/10.03_finance
+  - 10_documents/10.04_work
+  - 10_documents/10.05_health
+  - 20_photos
+  - 20_photos/20.01_library
+  - 20_photos/20.02_camera
+  - 20_photos/20.03_home_video
+  - 30_media
+  - 30_media/30.01_movies
+  - 30_media/30.02_tv
+  - 30_media/30.03_music
+  - 30_media/30.04_audiobooks
+  - 30_media/rotation
+  - 30_media/rotation/downloads
+  - 30_media/rotation/downloads/complete
+  - 30_media/rotation/downloads/incomplete
+  - 30_media/rotation/movies
+  - 30_media/rotation/shows
+  - 40_library
+  - 40_library/40.01_books
+  - 40_library/40.02_courses
+  - 40_library/40.03_reference
+  - 50_topics
+  - 50_topics/50.01_dnd
+  - 50_topics/50.02_airsoft
+  - 60_software
+  - 70_backups
+  - 70_backups/70.01_machines
+  - 70_backups/70.02_apps
+  - 70_backups/70.03_mobile
+  - 70_backups/70.04_exports
+  - 70_backups/70.05_code
+  - 80_vault
+  - 90_inbox
+  - 99_tmp

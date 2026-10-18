@@ -1,0 +1,23 @@
+---
+- name: Read maintenance timer policy and current state # noqa command-instead-of-module
+  ansible.builtin.command: "systemctl show {{ item }} --property=ActiveState,UnitFileState"
+  loop: [snapraid-runner.timer, snapraid-scrub.timer]
+  register: fixture_timers
+  changed_when: false
+- name: Require disabled and stopped maintenance after real handlers
+  ansible.builtin.assert:
+    that:
+      - "'ActiveState=inactive' in item.stdout_lines"
+      - "'UnitFileState=disabled' in item.stdout_lines"
+  loop: "{{ fixture_timers.results }}"
+- name: Read all parity-computing service states # noqa command-instead-of-module
+  ansible.builtin.command: "systemctl show {{ item }} --property=SubState,MainPID"
+  loop: [snapraid-initial-sync.service, snapraid-runner.service, snapraid-scrub.service]
+  register: fixture_services
+  changed_when: false
+- name: Require no active parity job
+  ansible.builtin.assert:
+    that:
+      - "'MainPID=0' in item.stdout_lines"
+      - "item.stdout_lines | intersect(['SubState=dead', 'SubState=exited', 'SubState=failed']) | length == 1"
+  loop: "{{ fixture_services.results }}"

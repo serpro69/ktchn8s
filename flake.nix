@@ -30,6 +30,7 @@
         devShells.default = mkShell {
           packages = [
             # dev tools
+            b3sum
             bat
             delta
             diffutils
@@ -47,6 +48,7 @@
             # provisioning/configuration tools
             ansible
             ansible-lint
+            molecule
             opentofu
             minicom
             tflint
@@ -87,6 +89,8 @@
             # k8s tools
           ] ++ lib.optionals pkgs.stdenv.isLinux [
             # NOTE: Linux-only packages for cross-platform compatibility
+            # Disposable storage-role Molecule VMs; version pinned by flake.lock.
+            qemu
             # networking tools
             iproute2
             # k8s tools

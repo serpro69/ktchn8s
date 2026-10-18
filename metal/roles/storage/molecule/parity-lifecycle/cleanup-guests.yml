@@ -1,0 +1,35 @@
+---
+- name: Save guest evidence and stop only disposable parity work
+  hosts: parity_servers
+  gather_facts: false
+  pre_tasks:
+    - name: Skip guest work when creation did not publish connection details
+      ansible.builtin.meta: end_host
+      when: ansible_host | default('') != '127.0.0.1'
+  tasks:
+    - name: Collect complete journal even after an assertion failure
+      ansible.builtin.command: journalctl -u snapraid-initial-sync -u snapraid-runner -u snapraid-scrub --no-pager
+      register: fixture_journal
+      changed_when: false
+    - name: Preserve journal on controller before stopping the guest
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms/parity-server/journal.log"
+        content: "{{ fixture_journal.stdout }}\n"
+        mode: '0600'
+      delegate_to: localhost
+    - name: Find completed invocation evidence
+      ansible.builtin.find:
+        paths: /var/log/parity-fixture
+        patterns: ['*.json', '*.log']
+      register: fixture_evidence
+    - name: Preserve invocation results on controller
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms/parity-server/"
+        flat: true
+      loop: "{{ fixture_evidence.files }}"
+    - name: Stop disposable jobs before removing their VM disks
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+      loop: [snapraid-runner.timer, snapraid-scrub.timer, snapraid-initial-sync.service, snapraid-runner.service, snapraid-scrub.service]

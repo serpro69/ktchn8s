@@ -1,0 +1,15 @@
+---
+- name: Destroy only scenario-owned QEMU guests
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Stop owned VMs and remove scratch disks while preserving logs
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ molecule_scenario_directory }}/vms.py"
+          - destroy
+          - "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms"
+          - "{{ lookup('env', 'MOLECULE_INSTANCE_CONFIG') }}"
+      changed_when: true

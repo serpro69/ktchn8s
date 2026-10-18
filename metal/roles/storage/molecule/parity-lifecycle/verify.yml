@@ -1,0 +1,192 @@
+---
+- name: Verify real parity lifecycle and configuration-only reruns
+  hosts: parity_servers
+  gather_facts: true
+  tasks:
+    - name: Verify systemd unit syntax
+      ansible.builtin.command: systemd-analyze verify /etc/systemd/system/snapraid-initial-sync.service
+      changed_when: false
+    - name: Check maintenance after initial convergence and idempotence
+      ansible.builtin.include_tasks: tasks/assert-quiescent.yml
+    - name: Check jobs have never been invoked by configuration # noqa command-instead-of-module
+      ansible.builtin.command: "systemctl show {{ item }} --property=ExecMainStartTimestampMonotonic --value"
+      loop: [snapraid-initial-sync.service, snapraid-runner.service, snapraid-scrub.service]
+      register: fixture_unstarted
+      changed_when: false
+    - name: Require no prior invocation
+      ansible.builtin.assert:
+        that: item.stdout == '0'
+      loop: "{{ fixture_unstarted.results }}"
+    - name: Require no parity or content created by convergence
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/mnt/parity1/snapraid.parity, /mnt/parity2/snapraid.2-parity, /mnt/data1/snapraid.content, /mnt/data2/snapraid.content, /var/snapraid.content]
+      register: fixture_absent
+    - name: Assert fresh configuration has not computed parity
+      ansible.builtin.assert:
+        that: not item.stat.exists
+      loop: "{{ fixture_absent.results }}"
+    - name: Start explicit first full sync and require this invocation to succeed
+      ansible.builtin.command: /usr/local/bin/parity-fixture-job initial success
+      changed_when: true
+    - name: Inject optional scenario failure after real first parity creation
+      ansible.builtin.assert:
+        that: lookup('env', 'PARITY_TEST_FAIL_AFTER_SYNC') != '1'
+        fail_msg: Intentional scenario failure to prove evidence collection and VM destruction
+    - name: Exercise explicit maintenance enablement before disabling it for expansion
+      ansible.builtin.include_tasks: tasks/configure.yml
+      vars:
+        fixture_maintenance_enabled: true
+    - name: Read enabled maintenance timer state # noqa command-instead-of-module
+      ansible.builtin.command: "systemctl show {{ item }} --property=ActiveState,UnitFileState"
+      loop: [snapraid-runner.timer, snapraid-scrub.timer]
+      register: fixture_enabled_timers
+      changed_when: false
+    - name: Require the role to activate explicitly enabled timers
+      ansible.builtin.assert:
+        that:
+          - "'ActiveState=active' in item.stdout_lines"
+          - "'UnitFileState=enabled' in item.stdout_lines"
+      loop: "{{ fixture_enabled_timers.results }}"
+    - name: Stop and disable timers before changing parity configuration
+      ansible.builtin.include_tasks: tasks/configure.yml
+    - name: Prove the role stopped previously active maintenance
+      ansible.builtin.include_tasks: tasks/assert-quiescent.yml
+    - name: Preserve existing parity and content fingerprints before expansion
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        checksum_algorithm: sha256
+      loop: [/mnt/parity1/snapraid.parity, /mnt/data1/snapraid.content, /mnt/data2/snapraid.content, /var/snapraid.content]
+      register: fixture_before_expansion
+    - name: Record previous full-sync invocation # noqa command-instead-of-module
+      ansible.builtin.command: systemctl show snapraid-initial-sync.service --property=ExecMainStartTimestampMonotonic --value
+      register: fixture_previous_start
+      changed_when: false
+    - name: Add second parity and change both timer templates with maintenance disabled
+      ansible.builtin.set_fact:
+        parity_drives: [/dev/vdd, /dev/vde]
+        parity_devices: [/dev/vdd, /dev/vde]
+        fixture_sync_time: '04:00'
+        fixture_scrub_schedule: 'Sun *-*-1..7 05:00:00'
+    - name: Reapply real role with first parity already present
+      ansible.builtin.include_tasks: tasks/configure.yml
+    - name: Check disabled policy after config-change handlers
+      ansible.builtin.include_tasks: tasks/assert-quiescent.yml
+    - name: Fingerprint retained parity and content after configuration
+      ansible.builtin.stat:
+        path: "{{ item.item }}"
+        checksum_algorithm: sha256
+      loop: "{{ fixture_before_expansion.results }}"
+      register: fixture_after_expansion
+    - name: Require configuration to preserve existing parity and content bytes and inodes
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.size > 0
+          - item.stat.inode == item.item.stat.inode
+          - item.stat.checksum == item.item.stat.checksum
+      loop: "{{ fixture_after_expansion.results }}"
+    - name: Check applying changed config did not start the full-sync unit # noqa command-instead-of-module
+      ansible.builtin.command: systemctl show snapraid-initial-sync.service --property=ExecMainStartTimestampMonotonic --value
+      register: fixture_current_start
+      changed_when: false
+    - name: Require unchanged invocation
+      ansible.builtin.assert:
+        that: fixture_current_start.stdout == fixture_previous_start.stdout
+    - name: Require second parity to await explicit start
+      ansible.builtin.stat:
+        path: /mnt/parity2/snapraid.2-parity
+      register: fixture_second_parity
+    - name: Assert expansion has not started automatically
+      ansible.builtin.assert:
+        that: not fixture_second_parity.stat.exists
+    - name: Start explicit expansion and require a new successful invocation
+      ansible.builtin.command: /usr/local/bin/parity-fixture-job expanded success
+      changed_when: true
+    - name: Verify both parity files contain initialized data
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/mnt/parity1/snapraid.parity, /mnt/parity2/snapraid.2-parity]
+      register: fixture_expanded
+    - name: Require both levels and retained first-parity inode
+      ansible.builtin.assert:
+        that:
+          - fixture_expanded.results[0].stat.size > 0
+          - fixture_expanded.results[1].stat.size > 0
+          - fixture_expanded.results[0].stat.inode == fixture_before_expansion.results[0].stat.inode
+    - name: Full scrub both real parity levels
+      ansible.builtin.command: /usr/local/bin/snapraid scrub -p full
+      register: fixture_scrub
+      changed_when: true
+    - name: Save full scrub evidence
+      ansible.builtin.copy:
+        dest: /var/log/parity-fixture/expanded-scrub.log
+        content: "{{ fixture_scrub.stdout }}\n{{ fixture_scrub.stderr }}\n"
+        mode: '0600'
+    - name: Exercise interruption of the real executable with deterministic CPU throttling
+      block:
+        - name: Create guest-only runtime unit override directory
+          ansible.builtin.file:
+            path: /run/systemd/system/snapraid-initial-sync.service.d
+            state: directory
+            mode: '0755'
+        - name: Slow only this test invocation so it can be interrupted after disk writes
+          ansible.builtin.copy:
+            dest: /run/systemd/system/snapraid-initial-sync.service.d/fixture.conf
+            content: "[Service]\nCPUQuota=1%\n"
+            mode: '0644'
+        - name: Load test throttle
+          ansible.builtin.systemd_service:
+            daemon_reload: true
+        - name: Interrupt real SnapRAID after it begins writing and require a failed invocation
+          ansible.builtin.command: /usr/local/bin/parity-fixture-job interrupted interrupt
+          changed_when: true
+      always:
+        - name: Remove guest-only throttle
+          ansible.builtin.file:
+            path: /run/systemd/system/snapraid-initial-sync.service.d/fixture.conf
+            state: absent
+        - name: Reload restored production unit
+          ansible.builtin.systemd_service:
+            daemon_reload: true
+    - name: Reapply real configuration after interruption
+      ansible.builtin.include_tasks: tasks/configure.yml
+    - name: Confirm retry remains operator controlled
+      ansible.builtin.include_tasks: tasks/assert-quiescent.yml
+    - name: Retry full sync with existing parity and content
+      ansible.builtin.command: /usr/local/bin/parity-fixture-job retried success
+      changed_when: true
+    - name: Exercise nonzero executable exit without modifying the unit
+      block:
+        - name: Preserve real executable inside disposable guest
+          ansible.builtin.command: mv /usr/local/bin/snapraid /usr/local/bin/snapraid.real
+          changed_when: true
+        - name: Inject deterministic executable failure
+          ansible.builtin.copy:
+            dest: /usr/local/bin/snapraid
+            content: "#!/bin/sh\necho 'intentional parity fixture failure' >&2\nexit 42\n"
+            mode: '0755'
+        - name: Require exact nonzero exit to propagate through systemd
+          ansible.builtin.command: /usr/local/bin/parity-fixture-job failed failure
+          changed_when: true
+      always:
+        - name: Restore real executable
+          ansible.builtin.command: mv /usr/local/bin/snapraid.real /usr/local/bin/snapraid
+          changed_when: true
+    - name: Prove recovery with real executable and existing parity
+      ansible.builtin.command: /usr/local/bin/parity-fixture-job recovered success
+      changed_when: true
+    - name: Require unchanged included dataset after all lifecycle phases
+      ansible.builtin.command: /usr/local/bin/snapraid diff
+      changed_when: false
+    - name: Full scrub after recovery
+      ansible.builtin.command: /usr/local/bin/snapraid scrub -p full
+      register: fixture_recovery_scrub
+      changed_when: true
+    - name: Save recovery scrub evidence
+      ansible.builtin.copy:
+        dest: /var/log/parity-fixture/recovery-scrub.log
+        content: "{{ fixture_recovery_scrub.stdout }}\n{{ fixture_recovery_scrub.stderr }}\n"
+        mode: '0600'
+    - name: Check final disabled maintenance state
+      ansible.builtin.include_tasks: tasks/assert-quiescent.yml

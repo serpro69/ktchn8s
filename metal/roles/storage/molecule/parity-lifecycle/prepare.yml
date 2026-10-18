@@ -1,0 +1,124 @@
+---
+- name: Prepare disposable parity guest
+  hosts: parity_servers
+  gather_facts: false
+  tasks:
+    - name: Wait for guest SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+    - name: Wait for cloud-init
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - name: Gather guest facts
+      ansible.builtin.setup:
+    - name: Require isolated Debian systemd guest
+      ansible.builtin.assert:
+        that:
+          - ansible_host == '127.0.0.1'
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.service_mgr == 'systemd'
+    - name: Use dated fixture package repositories
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list
+        content: |
+          deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20260924T000000Z/ bookworm main
+          deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20260924T000000Z/ bookworm-security main
+        mode: '0644'
+    - name: Remove rolling repositories
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/debian.sources
+        state: absent
+    - name: Install build prerequisites from the snapshot
+      ansible.builtin.apt:
+        name: [build-essential, autoconf, automake, logrotate]
+        update_cache: true
+        cache_valid_time: 3600
+    - name: Download checksum-pinned SnapRAID 13.0 sources
+      ansible.builtin.get_url:
+        url: https://codeload.github.com/amadvance/snapraid/tar.gz/refs/tags/v13.0
+        checksum: sha256:f947413876cce959cfe1905eff8a02e2aff8b184f2487acd46a1fa2459d52abf
+        dest: /tmp/snapraid.tar.gz
+        mode: '0644'
+    - name: Extract source
+      ansible.builtin.unarchive:
+        src: /tmp/snapraid.tar.gz
+        dest: /tmp
+        remote_src: true
+    - name: Set upstream archive version metadata
+      ansible.builtin.copy:
+        dest: /tmp/snapraid-13.0/.version
+        content: "13.0\n"
+        mode: '0644'
+    - name: Build and install the real SnapRAID executable
+      ansible.builtin.shell: |
+        set -eu
+        autoreconf -fi
+        ./configure
+        make -j2
+        make install
+      args:
+        chdir: /tmp/snapraid-13.0
+        creates: /usr/local/bin/snapraid
+    - name: Format only attached disposable guest disks
+      ansible.builtin.command: "mkfs.ext4 -F /dev/{{ item }}"
+      loop: [vdb, vdc, vdd, vde]
+      changed_when: true
+    - name: Mount distinct data and parity filesystems
+      ansible.posix.mount:
+        path: "/mnt/{{ item.name }}"
+        src: "/dev/{{ item.device }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+      loop:
+        - {name: data1, device: vdb}
+        - {name: data2, device: vdc}
+        - {name: parity1, device: vdd}
+        - {name: parity2, device: vde}
+    - name: Prove distinct filesystems including the third content copy on root
+      ansible.builtin.command: stat -c %d /mnt/data1 /mnt/data2 /mnt/parity1 /mnt/parity2 /var
+      register: fixture_devices
+      changed_when: false
+    - name: Require five distinct devices
+      ansible.builtin.assert:
+        that: fixture_devices.stdout_lines | unique | length == 5
+    - name: Seed included payloads
+      ansible.builtin.command: "dd if=/dev/urandom of=/mnt/{{ item }}/payload bs=1M count=64 status=none"
+      loop: [data1, data2]
+      changed_when: true
+    - name: Install guest verification helper
+      ansible.builtin.copy:
+        src: job.py
+        dest: /usr/local/bin/parity-fixture-job
+        mode: '0755'
+    - name: Create evidence directory outside protected data
+      ansible.builtin.file:
+        path: /var/log/parity-fixture
+        state: directory
+        mode: '0700'
+    - name: Hash original payload bytes before any parity computation
+      ansible.builtin.command: sha256sum /mnt/data1/payload /mnt/data2/payload
+      register: fixture_payload_hashes
+      changed_when: false
+    - name: Preserve independent payload baseline outside protected filesystems
+      ansible.builtin.copy:
+        dest: /var/log/parity-fixture/payloads.sha256.log
+        content: "{{ fixture_payload_hashes.stdout }}\n"
+        mode: '0600'
+    - name: Record exact guest versions
+      ansible.builtin.shell: |
+        set -eu
+        /usr/local/bin/snapraid --version
+        systemctl --version
+        uname -r
+        dpkg-query -W gcc libc6 python3 systemd
+      register: fixture_versions
+      changed_when: false
+    - name: Require production SnapRAID version
+      ansible.builtin.assert:
+        that: "'snapraid v13.0' in fixture_versions.stdout"
+    - name: Save guest versions
+      ansible.builtin.copy:
+        dest: /var/log/parity-fixture/versions.log
+        content: "{{ fixture_versions.stdout }}\n"
+        mode: '0600'
