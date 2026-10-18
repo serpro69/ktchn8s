@@ -184,9 +184,12 @@ The codebase follows a layered architecture with clear separation of concerns:
 - **VLANs**:
   - VLAN 2 (Home Network): `192.168.1.0/24`
   - VLAN 10 (Homelab/Lab Network): `10.10.10.0/24`
+  - VLAN 20 (Smarthome/IoT Network): `10.10.20.0/24` - isolated; devices reach the internet only, Home/Homelab can reach them one-way
 - **Key IPs**:
   - Router (C1111): `10.10.10.1`
   - Switch (C3560): `10.10.10.2`
+  - Smarthome gateway (C1111): `10.10.20.1`
+  - Smarthome AP (TP-Link AC1200 in AP mode, on C1111 port Gi0/1/6): `10.10.20.2`
   - Control plane VIP: `10.10.10.100` (kube-vip managed)
   - Control nodes: `10.10.10.10-19`
   - Worker nodes: `10.10.10.20-29`
@@ -198,7 +201,7 @@ The codebase follows a layered architecture with clear separation of concerns:
 
 - **Nodes**: Mix of Lenovo Tiny PCs (M720q, M70q Gen 2/3)
 - **Storage**: NAS with 6x18TB drives
-- **Network**: Cisco C1111 router, C3560 switch, Eero 6 AP
+- **Network**: Cisco C1111 router, C3560 switch, Eero 6 AP (home WiFi), TP-Link AC1200 router in AP mode (smarthome WiFi)
 
 ## Important Concepts
 
