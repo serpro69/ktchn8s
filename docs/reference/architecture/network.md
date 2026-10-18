@@ -48,6 +48,7 @@ graph TB
              **Default Gateway**
              *midgard*: <code>192.168.1.1</code>
              *asgard*:  <code>10.10.10.1</code>
+             *smarthome*: <code>10.10.20.1</code>
              <br>
              **Domain Name**: <code>midgard.local</code>
         " }
@@ -122,8 +123,20 @@ graph TB
         C1111 o--o |g0/1/1::g0/9| C3560
     end
 
+    subgraph GrSH["Smarthome (Vlan20)<br>(10.10.20.0/24)"]
+        direction TB
+
+        TPL@{ shape: circle, label: "TP-Link AC1200<br>(AP mode)<br>(10.10.20.2)" }
+        GOV@{ shape: rect, label: "🌡️ Govee H5179<br>(10.10.20.x)" }
+
+        %% declared after TPL so the node is owned by this subgraph, not by Midgard
+        C1111 o--o |g0/1/6::LAN| TPL
+        GOV   o--o |WiFi 2.4GHz| TPL
+    end
+
     ISP   o--o |fiber| ISPM
     C1111  --> GrI
+    GOV    --> |Govee Cloud| GrI
 
     subgraph GrI[Internet]
         direction LR
@@ -147,7 +160,7 @@ graph TB
     class homelab_info text
 
     class W3,CF cloud
-    class A,B,C,D,E,F,G,H,I,J,K,L,M,S1,C1111,C3560,DV,ISPM,EER device
+    class A,B,C,D,E,F,G,H,I,J,K,L,M,S1,C1111,C3560,DV,ISPM,EER,TPL,GOV device
     class IC,CFD,LB,PD pod
 
     %% legend elements separately for readability

@@ -16,6 +16,7 @@ title: Network Configuration
 - Cisco C1111-8P Router
 - Cisco C3560-GS-8P Switch
 - Eero 6 Router
+- (Optional, [Stage 5](#stage-5)) Any spare WiFi router or access point for the isolated smarthome network - I re-use an old TP-Link AC1200 router in Access Point mode
 - Serial Console Cable
 - "Controller" PC
     - Any OS can be used, but since I work on Linux I won't provide serial console connectivity specifics for other OSes (which can also easily be found online). PRs with docs improvements are always welcome!
@@ -1142,6 +1143,330 @@ end
 
 !!! tip
     Some of the above tests can be run with this [script](https://github.com/serpro69/ktchn8s/blob/master/tests/network_stage4.sh).
+
+### Stage 5 - Isolated Smarthome (IoT) VLAN with a Dedicated Access Point {#stage-5}
+
+* **Goal:** Add a third network for WiFi smart-home devices (e.g. Govee H5179 thermo-hygrometers) that is isolated from both the Home and the Homelab networks:
+    * Smarthome devices can reach the internet (which is all that cloud-based devices need), but can **not** initiate connections to the Home Network, the Homelab Network, or the router itself.
+    * Home and Homelab devices _can_ reach the Smarthome Network (one-way), e.g. to open the AP's admin page from a laptop, or for a future Home Assistant in the cluster to poll devices. Only TCP replies and ping replies are allowed back.
+    * SSH to the router is restricted to Home and Homelab source addresses, on all router interfaces.
+
+!!! info "Why a separate access point?"
+    Eero in bridge mode cannot map SSIDs to VLANs. It offers a main SSID and a guest SSID, and guest clients are NATed behind the Eero's own IP address, so the upstream router cannot tell them apart from the Eero itself.
+    The only way to get a real third L2 segment for WiFi devices is a separate AP plugged into a switchport that is assigned to the new VLAN. The AP itself stays "dumb" (no VLAN support required) - the Cisco switchport does the VLAN assignment.
+    Any old consumer router that supports an _Access Point_ mode works; I'm re-using an old TP-Link AC1200 router.
+
+#### Addressing Plan
+
+| Item                                 | Value                                                   |
+| ------------------------------------ | ------------------------------------------------------- |
+| VLAN ID / name                       | `20` / `SMARTHOME_IOT`                                  |
+| Subnet                               | `10.10.20.0/24`                                         |
+| Gateway (C1111 SVI `Vlan20`)         | `10.10.20.1`                                            |
+| Access Point management IP           | `10.10.20.2` (static, configured on the AP)             |
+| Reserved for static IPs/reservations | `10.10.20.1` - `10.10.20.19` (excluded from DHCP)       |
+| DHCP pool                            | `10.10.20.20` - `10.10.20.254`                          |
+| C1111 access port for the AP         | `GigabitEthernet0/1/6` (adjust to a free port)          |
+
+#### Physical Connection
+
+Connect the AP's LAN port (or whichever port your AP's _Access Point mode_ instructions specify) to a free switchport on the C1111, e.g. `GigabitEthernet0/1/6`.
+
+!!! note
+    [Stage 3](#stage-3) suggested putting `GigabitEthernet0/1/2 - 7` into VLAN 10 for additional servers. Stage 5 reassigns `Gi0/1/6` to VLAN 20 - the `switchport access vlan 20` command below simply overrides the stage 3 assignment, nothing needs to be removed first. If that port is actually in use, pick any other unused `Gi0/1/x` port and adjust the commands accordingly.
+
+!!! tip "No free port on the C1111?"
+    If all `GigabitEthernet0/1/x` ports are taken, plug the AP into a free port on the C3560 instead and follow [the trunk alternative](#stage-5-trunk) below. Everything else in this stage stays the same.
+
+!!! tip "Order of operations"
+    1. Configure the TP-Link standalone (AP mode, static IP, WiFi settings) as described in [Access Point Configuration](#access-point-configuration-tp-link-ac1200-in-access-point-mode) - do **not** connect it to the C1111 yet.
+    2. On the C1111: VLAN, SVI, access port, DHCP and NAT (first config block below).
+    3. On the C1111: the smarthome ACL and the VTY `access-class` (second and third config blocks). Until the ACL is applied, VLAN 20 is unrestricted, so do this _before_ any device joins the smarthome SSID.
+    4. Connect the AP to `Gi0/1/6` and open `http://10.10.20.2` from a Home Network device. Strictly speaking only the `vlan 20` definition, the access port and the `Vlan20` SVI from step 2 are required for this (the AP has a static IP, so DHCP, NAT and the ACL play no role in reaching it), and no additional ACL rules are needed: Home -> Smarthome is already permitted by rule `999` of `ACL_FROM_HOME_NETWORK`, and once the new ACL is applied the AP's replies are covered by its rule `101`. The only requirement on the AP side is that its default gateway is set to `10.10.20.1`, otherwise it cannot answer clients outside its own subnet. From a client on the `smarthome` SSID the admin page is reachable with no C1111 configuration at all, since that is the same L2 segment.
+    5. Onboard devices, run the verification steps, then save and back up the configuration.
+
+#### C1111 Configuration Steps
+
+```cisco
+! Enter global configuration mode
+configure terminal
+
+! --- Smarthome VLAN Definition ---
+vlan 20
+ name SMARTHOME_IOT
+exit
+
+! --- Smarthome Switched Virtual Interface (SVI) for Layer 3 ---
+interface Vlan20
+ description Gateway_for_Smarthome_Network_10.10.20.0
+ ip address 10.10.20.1 255.255.255.0
+ ! Include this interface in NAT so smarthome devices can reach the internet
+ ip nat inside
+ no shutdown
+exit
+
+! --- Access Port for the Smarthome AP ---
+! Skip this block if the AP is connected to the C3560 (see the trunk alternative below)
+interface GigabitEthernet0/1/6
+ description LAN_to_Smarthome_AP_VLAN20
+ switchport mode access
+ switchport access vlan 20
+ ! Edge port: from STP's point of view the AP is an end device
+ spanning-tree portfast
+ no shutdown
+exit
+
+! --- DHCP Server Configuration for the Smarthome Network (VLAN 20) ---
+! Reserve the gateway, the AP's static IP and a few addresses for DHCP reservations
+ip dhcp excluded-address 10.10.20.1 10.10.20.19
+
+ip dhcp pool SMARTHOME_POOL_VLAN20
+ network 10.10.20.0 255.255.255.0
+ default-router 10.10.20.1
+ ! Public DNS only - smarthome devices must not depend on anything inside the Homelab
+ dns-server 1.1.1.1 8.8.8.8
+ ! No domain-name on purpose: smarthome devices have no business resolving *.midgard.local
+ lease 1
+exit
+
+! --- NAT: add the Smarthome Network to the existing NAT ACL ---
+! This change is additive, so unlike in stage 2 there is no need to clear existing translations
+ip access-list standard ACL_NAT_TRAFFIC_ALL_LANS
+ 30 permit 10.10.20.0 0.0.0.255
+exit
+
+end
+```
+
+Then define the firewall rules for the new network. The ACL follows the same conventions as the stage 4 ACLs (explicit sequence numbers, rules grouped by category in increments of 100, implicit deny at the end):
+
+```cisco
+conf t
+
+! --- Define ACL for traffic FROM Smarthome Network ---
+ip access-list extended ACL_FROM_SMARTHOME_NETWORK
+ 10 remark === ACL: FROM SMARTHOME NETWORK (10.10.20.x) ===
+ 10 remark ================================================
+
+ 20 remark --- PERMIT DHCP TRAFFIC (MUST BE EARLY) ---
+ 21 remark Permit -> DHCP Discover/Request from clients to broadcast (0.0.0.0 or 10.10.20.x to 255.255.255.255)
+ 21 permit udp any host 255.255.255.255 eq bootps
+ 22 remark Permit -> DHCP Request/Renew from clients directly to the gateway (10.10.20.x to 10.10.20.1)
+ 22 permit udp any host 10.10.20.1 eq bootps
+ 23 remark (DHCP Offer/ACK from the router is locally generated and is never evaluated by an inbound ACL - no rule needed)
+ 99 remark --- END ---
+
+ 100 remark --- RETURN TRAFFIC for connections initiated FROM Home / Homelab (one-way reachability) ---
+ 101 remark -> Permit TCP replies to Home (e.g. the AP admin page opened from a laptop)
+ 101 permit tcp 10.10.20.0 0.0.0.255 192.168.1.0 0.0.0.255 established
+ 102 remark -> Permit ping replies to Home
+ 102 permit icmp 10.10.20.0 0.0.0.255 192.168.1.0 0.0.0.255 echo-reply
+ 103 remark -> Permit TCP replies to Homelab (e.g. a future Home Assistant in the cluster polling devices)
+ 103 permit tcp 10.10.20.0 0.0.0.255 10.10.10.0 0.0.0.255 established
+ 104 remark -> Permit ping replies to Homelab
+ 104 permit icmp 10.10.20.0 0.0.0.255 10.10.10.0 0.0.0.255 echo-reply
+ 199 remark --- END ---
+
+ 200 remark --- ICMP Rules for Smarthome Network ---
+ 201 remark -> Permit smarthome devices to ping their own gateway (troubleshooting from the smarthome WiFi)
+ 201 permit icmp 10.10.20.0 0.0.0.255 host 10.10.20.1 echo
+ 299 remark --- END ---
+
+ 900 remark --- DENY everything else towards the router and the other LANs ---
+ 901 remark -> Deny and log Smarthome -> router's Smarthome SVI (SSH etc.; DHCP and ping are already permitted above)
+ 901 deny ip 10.10.20.0 0.0.0.255 host 10.10.20.1 log
+ 902 remark -> Deny and log Smarthome -> Home Network
+ 902 deny ip 10.10.20.0 0.0.0.255 192.168.1.0 0.0.0.255 log
+ 903 remark -> Deny and log Smarthome -> Homelab Network
+ 903 deny ip 10.10.20.0 0.0.0.255 10.10.10.0 0.0.0.255 log
+
+ 999 remark -> Permit Smarthome Network to ALL other destinations (Internet)
+ 999 permit ip 10.10.20.0 0.0.0.255 any
+exit
+
+! --- Apply the ACL to the Smarthome SVI ---
+interface Vlan20
+ ip access-group ACL_FROM_SMARTHOME_NETWORK in
+exit
+
+end
+```
+
+!!! note "Home -> Smarthome and Homelab -> Smarthome need no new rules"
+    Both `ACL_FROM_HOME_NETWORK` and `ACL_FROM_HOMELAB_NETWORK` end with a `permit ip <network> any` rule, so traffic _towards_ `10.10.20.0/24` is already allowed from both networks. The `established` / `echo-reply` rules above let the replies back.
+    If you want the Homelab to be unable to reach smarthome devices as well, add `997 deny ip 10.10.10.0 0.0.0.255 10.10.20.0 0.0.0.255 log` to `ACL_FROM_HOMELAB_NETWORK` and drop rules `103`/`104` from the ACL above.
+
+Finally, restrict SSH access to the router itself:
+
+```cisco
+conf t
+
+! --- Restrict SSH to the router to Home and Homelab sources ---
+! The Smarthome ACL denies traffic to 10.10.20.1, but its rule 999 still lets smarthome devices
+! reach the router's WAN address (and therefore its SSH daemon). The same gap exists for the Homelab ACL.
+! An access-class on the VTY lines closes it regardless of which router address a client connects to.
+ip access-list standard ACL_MGMT_SSH_SOURCES
+ 10 remark Home Network
+ 10 permit 192.168.1.0 0.0.0.255
+ 20 remark Homelab Network
+ 20 permit 10.10.10.0 0.0.0.255
+exit
+
+line vty 0 4
+ access-class ACL_MGMT_SSH_SOURCES in
+exit
+
+end
+```
+
+!!! warning "Lock-out risk"
+    `access-class` only applies to _new_ SSH sessions, so your current session keeps working even if you get it wrong. **Before** running `write memory`, open a _new_ SSH session to the router from a Home device and from a Homelab device and confirm both still work. If they don't, `no access-class ACL_MGMT_SSH_SOURCES in` on the VTY lines from your existing session.
+    Also run `show line` and check whether your IOS version has more VTY lines than `0 4` (e.g. `5 15`); if so, apply the same `access-class` to those as well.
+
+Once everything is verified, save and back up the configuration:
+
+```cisco
+write memory
+copy startup-config bootflash:/startup-config_stage5.bak
+```
+
+#### Alternative: AP on the C3560 via an 802.1Q Trunk {#stage-5-trunk}
+
+Use this variant only if the C1111 has no free switchport. The link between the C1111 and the C3560 (currently an access port in VLAN 10 on both ends) becomes an 802.1Q trunk carrying VLANs 10 and 20, and the AP connects to a free port on the C3560.
+
+!!! tip "Why VLAN 10 is the native VLAN"
+    With `native vlan 10`, VLAN 10 frames stay _untagged_ on the trunk. That makes a trunk port fully compatible with an access port in VLAN 10 on the other end of the link, so you can reconfigure the two ends in either order _over SSH_ without losing connectivity to the switch half-way through. Only VLAN 20 is tagged, and it simply doesn't pass until both ends are trunks.
+    Best practice is to use an unused VLAN as the native VLAN; once both ends are trunks you can optionally switch to e.g. `native vlan 999` on both sides (do it from the console, as this step _does_ break connectivity until both sides match).
+
+On the **C1111**:
+
+```cisco
+conf t
+
+interface GigabitEthernet0/1/1
+ description Trunk_To_C3560_Homelab_Switch_VLAN10_native_VLAN20_tagged
+ switchport mode trunk
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,20
+ ! PortFast is for edge ports only - this is now a switch-to-switch trunk
+ no spanning-tree portfast
+exit
+
+end
+```
+
+On the **C3560**:
+
+```cisco
+conf t
+
+! --- Smarthome VLAN Definition on Switch ---
+! VTP is off (stage 2), so the VLAN has to be created locally
+vlan 20
+ name SMARTHOME_IOT
+exit
+
+! --- Uplink to the C1111 becomes a trunk ---
+interface GigabitEthernet0/9
+ description Trunk_To_C1111_Router_VLAN10_native_VLAN20_tagged
+ ! The 3560 supports both ISL and 802.1Q, so the encapsulation must be pinned
+ ! BEFORE 'switchport mode trunk', otherwise the command is rejected
+ switchport trunk encapsulation dot1q
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,20
+ switchport mode trunk
+exit
+
+! --- Access Port for the Smarthome AP ---
+! Any free port works. Gi0/10 is the spare VLAN 10 port from stage 3 - pick another one if you still need it for PXE provisioning
+interface GigabitEthernet0/10
+ description Smarthome_AP_Port_VLAN20
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ no shutdown
+exit
+
+end
+```
+
+Verify the trunk on both devices with `show interfaces trunk` - VLANs `10,20` should be listed as allowed _and_ active on both ends, with native VLAN `10`. Then save and back up the configuration on both devices as described above.
+
+#### Access Point Configuration (TP-Link AC1200 in Access Point mode)
+
+The exact menus differ between models and firmware versions (the AC1200 is a dual-band router, so expect separate 2.4 GHz and 5 GHz wireless sections); the settings below are what matters:
+
+- **Start clean:** factory-reset the device and install the latest firmware available for the model, even if it's old.
+- **Initial access (configure it standalone, _before_ connecting it to the C1111):** in its default router mode the TP-Link runs its own DHCP server, and plugging it into VLAN 20 at this point would put a second DHCP server on the smarthome network. Instead, connect a laptop by cable to one of the TP-Link's LAN ports (or join the default WiFi printed on its label) and turn the laptop's other network connections off - the TP-Link's default LAN subnet is `192.168.0.0/24` or `192.168.1.0/24` depending on the model, and the latter overlaps with the Home Network. Open `http://tplinkwifi.net` or the default IP from the label (`http://192.168.0.1` or `http://192.168.1.1`) and log in with the default credentials from the label (older firmware: `admin`/`admin`; newer firmware asks you to set an admin password on first login).
+- **Operation mode:** set it to _Access Point_ (newer firmware: `Advanced -> Operation Mode`). On old firmware without an explicit AP mode, the manual equivalent is: disable the DHCP server, set the LAN IP as below, and connect the uplink to one of the _LAN_ ports (not the WAN port).
+- **LAN IP:** static `10.10.20.2`, mask `255.255.255.0`, gateway `10.10.20.1`, DNS `1.1.1.1` (the AP uses it for NTP/time only).
+- **2.4 GHz WiFi:** a dedicated SSID (e.g. `smarthome`), security `WPA2-PSK` with `AES` only (no TKIP, no WPA/WPA2 mixed mode, no WPA3 mixed mode - many IoT devices choke on those), channel width `20 MHz`, and a _fixed_ channel (`1`, `6` or `11`) that doesn't overlap the Eero's 2.4 GHz channel (check it in the Eero app). Don't hide the SSID - it adds no security and some IoT devices fail to join hidden networks.
+- **5 GHz WiFi:** disable the radio unless you need it. Govee sensors and most IoT devices are 2.4 GHz only, and one less radio means one less thing to debug.
+- **AP / client isolation:** enable it (`Wireless -> Advanced -> AP Isolation` on most TP-Link firmware). The router ACL cannot protect smarthome devices from _each other_ since they share one L2 segment - this setting does that on the WiFi side.
+- **Disable:** WPS, TP-Link Cloud / remote management, guest network, WDS/bridging, UPnP (irrelevant in AP mode, but off is off).
+- **Admin access:** set a strong admin password; local management only.
+- **Admin UI once it's in AP mode and connected to the C1111:** the TP-Link's admin page is at `http://10.10.20.2`, reachable from any Home Network device (that's what the one-way reachability rules are for) or from a client on the `smarthome` SSID. `tplinkwifi.net` does not resolve from the Home Network, use the IP. If you left the AP's LAN IP on "obtain automatically" instead of static, it gets a `10.10.20.2x` address from the C1111 instead - find it with `show ip dhcp binding` on the C1111, log in there, and switch the LAN IP to static `10.10.20.2`.
+
+!!! warning "The AP's admin page lives on the smarthome network"
+    Every smarthome device can reach the AP's web UI at `10.10.20.2` on the same L2 segment, and the firmware of an old consumer router is likely unpatched. The strong admin password is the only thing standing between a compromised IoT device and the AP configuration.
+    This is an acceptable risk for a test setup. If the model is [supported by OpenWrt](https://openwrt.org/toh/start), flashing it gets you current security patches and VLAN-tagged SSIDs for free.
+
+#### Onboarding a Govee Device
+
+- Keep your phone on the Home WiFi and open the Govee Home app. Add the device; the H5179 pairs over Bluetooth, after which the app asks for the WiFi network the device should join. Pick the `smarthome` SSID and enter its password.
+- If the app insists that the phone is on the same WiFi network as the device, temporarily join the `smarthome` SSID with the phone (the ACL does not block phone -> internet, so the app keeps working), complete the setup, then switch back to the Home WiFi.
+- On the C1111, `show ip dhcp binding` shows the device's lease. Optionally pin it to a reserved address so that ACL deny logs are recognizable:
+
+    ```cisco
+    conf t
+    ! One manual-binding pool per device; the address must be inside the excluded range reserved above
+    ip dhcp pool SMARTHOME_GOVEE_H5179_1
+     host 10.10.20.11 255.255.255.0
+     ! "01" + the device's MAC address - matches devices that send a DHCP client identifier (option 61)
+     client-identifier 01aa.bbcc.ddee.ff
+     ! Many IoT devices send no client identifier at all. If 'show ip dhcp binding' shows a plain MAC
+     ! (aabb.ccdd.eeff) instead of a 01... identifier, use this line INSTEAD of client-identifier:
+     ! hardware-address aabb.ccdd.eeff
+     default-router 10.10.20.1
+     dns-server 1.1.1.1 8.8.8.8
+    exit
+    end
+    ```
+
+#### Verification Steps
+
+- **On the C1111:**
+    * `show vlan brief`: VLAN 20 `SMARTHOME_IOT` is active with the AP port (`Gi0/1/6`) assigned (or, for the trunk variant, `show interfaces trunk` lists VLANs `10,20` on `Gi0/1/1`).
+    * `show ip interface brief`: `Vlan20` is `up`, `up` with IP `10.10.20.1`.
+    * `show ip dhcp binding`: the AP (if it uses DHCP) and the Govee device have leases in `10.10.20.0/24`.
+    * `show ip access-lists ACL_FROM_SMARTHOME_NETWORK`: rule hit counters increase as you run the tests below.
+    * `show logging | include ACL_FROM_SMARTHOME`: deny hits from the tests below show up here. Expect some background noise from IoT devices probing for `192.168.x.x` addresses - that is exactly what the ACL is for.
+- **From a phone or laptop joined to the `smarthome` SSID:**
+    * It gets a `10.10.20.x` address with gateway `10.10.20.1`.
+    * `ping 10.10.20.1`: **Should SUCCEED** (rule `201`).
+    * `ping 1.1.1.1` and browsing the internet: **Should SUCCEED** (rule `999` + NAT).
+    * `ping 192.168.1.1` and `ping 10.10.10.1`: **Should FAIL/TIMEOUT** (rules `902`/`903`).
+    * `curl http://10.10.10.50` (or whatever your ingress LB IP is): **Should FAIL/TIMEOUT**.
+    * `ssh 10.10.20.1`: **Should FAIL/TIMEOUT** (rule `901`, and `access-class` as a second line of defence).
+- **From a device on the Home Network (e.g. laptop on `192.168.1.x`):**
+    * `ping 10.10.20.2` and opening `http://10.10.20.2` (AP admin page): **Should SUCCEED** (one-way reachability).
+    * `ssh 10.10.10.1` in a _new_ session: **Should SUCCEED** (`access-class` permits Home sources).
+- **From a device on the Homelab Network (e.g. a k8s node):**
+    * `ssh 10.10.10.1` in a _new_ session: **Should SUCCEED** (`access-class` permits Homelab sources).
+- **The Govee Home app** shows live temperature and humidity readings from the device (the readings travel device -> internet -> Govee cloud -> app, never across the local VLANs).
+
+!!! tip
+    The [stage 4 test script](https://github.com/serpro69/ktchn8s/blob/master/tests/network_stage4.sh) does **not** cover stage 5 yet. The "from the smarthome SSID" tests in particular need a WiFi client on that network, which the script (running on the controller) doesn't have. TODO: extend the test script with the Home -> Smarthome and Homelab -> Smarthome checks, which _can_ be run from the controller.
+
+#### Important Considerations
+
+* **Stateless ACLs:** Like the stage 4 rules, the `established` keyword does not track connection state - it matches any TCP segment with the ACK or RST flag set. Two consequences:
+    * A compromised smarthome device can send forged bare-ACK packets to any Home/Homelab TCP port (rules `101`/`103`) and use the RST replies to port-scan those networks. It still cannot open a session, because the initial SYN is dropped by rules `902`/`903`, so the exposure is reconnaissance, not access. If you don't need the one-way reachability towards Home, drop rules `101`/`102` (and `103`/`104` for the Homelab, see the note above) - then nothing at all flows from smarthome to the other LANs.
+    * UDP has no `established` equivalent, so UDP-based protocols initiated from Home/Homelab towards smarthome devices (e.g. CoAP, or UDP-based discovery/control APIs) will not get their replies through.
+    * When either becomes a problem, reflexive ACLs (`reflect`/`evaluate`) or the Zone-Based Firewall provide real stateful filtering for both TCP and UDP.
+* **No cross-VLAN discovery:** mDNS/SSDP do not cross VLANs, so a phone on the Home WiFi will not auto-discover smarthome devices. Cloud-based apps like Govee's don't need it; local-control integrations will need devices added by IP (and thus DHCP reservations).
+* **Device-to-device traffic:** The router only sees traffic that leaves the VLAN. Isolation _within_ the smarthome network relies entirely on the AP's client isolation setting.
+* **Rollback:** If you backed up the stage 4 configuration as suggested in the [rollout tip](#configuration-rollout) (`copy startup-config bootflash:/startup-config_stage4.bak`), the quickest way back is `copy bootflash:/startup-config_stage4.bak startup-config` followed by `reload`. The sanitized [stage 4 config](https://github.com/serpro69/ktchn8s/blob/master/docs/installation/.files/muspell_startup-config_stage4.txt) in this repository is the reference if the bootflash copy is missing. To roll back selectively: remove the `access-class` from the VTY lines, `no ip access-list extended ACL_FROM_SMARTHOME_NETWORK`, `no ip dhcp pool SMARTHOME_POOL_VLAN20`, `no ip dhcp excluded-address 10.10.20.1 10.10.20.19`, remove rule `30` from `ACL_NAT_TRAFFIC_ALL_LANS`, `no interface Vlan20`, `no vlan 20`, and reset the AP port (`default interface GigabitEthernet0/1/6`).
 
 ### Troubleshooting
 
