@@ -1439,8 +1439,8 @@ The exact menus differ between models and firmware versions (the AC1200 is a dua
     * `show vlan brief`: VLAN 20 `SMARTHOME_IOT` is active with the AP port (`Gi0/1/6`) assigned (or, for the trunk variant, `show interfaces trunk` lists VLANs `10,20` on `Gi0/1/1`).
     * `show ip interface brief`: `Vlan20` is `up`, `up` with IP `10.10.20.1`.
     * `show ip dhcp binding`: the AP (if it uses DHCP) and the Govee device have leases in `10.10.20.0/24`.
-    * `show ip access-lists ACL_FROM_SMARTHOME_NETWORK`: rule hit counters increase as you run the tests below.
-    * `show logging | include ACL_FROM_SMARTHOME`: deny hits from the tests below show up here. Expect some background noise from IoT devices probing for `192.168.x.x` addresses - that is exactly what the ACL is for.
+    * `show ip access-lists ACL_FROM_SMARTHOME_NETWORK`: rule hit counters increase as you run the tests below. The counters are the source of truth - IOS logs only the first packet matching a `log` rule and then a summary every five minutes, so the deny counters will be higher than the number of log lines you see.
+    * `show logging | include ACL_FROM_SMARTHOME`: deny hits from the tests below show up here. Expect some background noise from IoT devices probing for `192.168.x.x` addresses - that is exactly what the ACL is for. If you test with your own laptop, also expect a steady stream of denied `tcp ... -> 10.10.10.100(6443)` entries: that is a shell prompt, `k9s`, an IDE plugin or similar polling the k8s API in the background. It is not a misconfiguration - the laptop _is_ an untrusted device while it sits on the smarthome SSID.
 - **From a phone or laptop joined to the `smarthome` SSID:**
     * It gets a `10.10.20.x` address with gateway `10.10.20.1`.
     * `ping 10.10.20.1`: **Should SUCCEED** (rule `201`).
