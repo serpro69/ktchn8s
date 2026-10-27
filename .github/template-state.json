@@ -1,12 +1,12 @@
 {
   "schema_version": "1",
   "upstream_repo": "serpro69/claude-toolbox",
-  "template_version": "c094850bf09bbff7637e1d738382a7387a020d06",
-  "synced_at": "2026-10-26T21:22:00Z",
+  "template_version": "7f46612bc67ebbfa0a676524886d5f230e273a3b",
+  "synced_at": "2026-10-27T10:25:00Z",
   "variables": {
     "PROJECT_NAME": "ktchn8s",
     "LANGUAGES": "bash,go,nix,python,terraform,toml,yaml",
-    "CC_MODEL": "claude-opus-4-8[1m]",
+    "CC_MODEL": "claude-opus-5-5",
     "CC_EFFORT_LEVEL": "high",
     "CC_PERMISSION_MODE": "default",
     "CC_STATUSLINE": "enhanced",
