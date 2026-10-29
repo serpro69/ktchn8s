@@ -226,6 +226,10 @@ title: ToDo
         - `metal/roles/storage/defaults/main.yml` hardcodes workstation IP `192.168.1.100/32` in role defaults — belongs in inventory/host_vars
         - `metal/roles/storage/tasks/k8s_validation.yml` pipes shell into `kubectl apply` — prefer `kubernetes.core.k8s` module
 
+- [ ] Add the workstation's DHCP reservation to the committed router config
+    - **Problem:** the workstation relies on a manual binding for `192.168.1.100` in `HOME_POOL_VLAN2` (see [HowTo add DHCP reservations](../guides/how_to_add_dhcp_reservations.md)), but `docs/installation/.files/muspell_startup-config_stage3.txt` and `..._stage4.txt` don't contain it. Rebuilding the C1111 from them silently drops the reservation, which breaks phone SSH ([HowTo SSH into the workstation from Android](../guides/how_to_ssh_into_workstation_from_android.md)) and the storage role's `192.168.1.100/32` allow-rule.
+    - **Next step:** confirm the live binding with `show ip dhcp binding 192.168.1.100` (type `Manual`), then add `address 192.168.1.100 client-id <id>` under `ip dhcp pool HOME_POOL_VLAN2` in the stage4 config (and stage3 if it's meant to be complete).
+
 - [ ] Investigate and fix CGNAT / Double NAT from ISP
   - **Problem:** ISP assigns a CGNAT address (`100.64.0.0/10` range) instead of a public IP, resulting in double NAT (ISP NAT + C1111 NAT). This can affect P2P/torrents (reduced peer connectivity), some VOIP providers, and gaming (strict NAT type).
   - **How to detect:**

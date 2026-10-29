@@ -34,8 +34,10 @@ First things to try:
 - Check if the operating system ISO file is mounted
 - Check the controller's firewall config to make sure that the following ports are open:
     - DHCP (67/68)
+    - proxyDHCP (4011)
     - TFTP (69)
     - HTTP (80)
+    - With `ufw`, see the rules in [HowTo SSH into the workstation from Android](./how_to_ssh_into_workstation_from_android.md#1-enable-the-firewall)
 - Check [PXE server Docker logs](#pxe-server-logs)
 - Check if the servers are booting to the correct OS (Fedora Server installer instead of the previously installed OS)
     - If not, try to select it manually or remove the previous OS boot entry

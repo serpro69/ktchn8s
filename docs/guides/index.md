@@ -24,6 +24,7 @@ title: Guides
 - [Manage your Media](./how_to_for_media_management.md)
 - [Install Debian on Storage Node](./how_to_install_debian_on_storage_node.md)
 - [Run Commands on Nodes](./how_to_run_commands_on_multiple_nodes.md)
+- [SSH into the Workstation from Android](./how_to_ssh_into_workstation_from_android.md)
 - [Update Dependencies](./how_to_update_dependencies.md)
 - [Update Documentation](./how_to_update_documentation.md)
 - [Update Device Firmware](./how_to_update_firmware.md)

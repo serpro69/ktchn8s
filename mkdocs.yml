@@ -173,6 +173,7 @@ nav:
           - guides/how_to_install_debian_on_storage_node.md
           - guides/how_to_run_cluster_with_a_single_node.md
           - guides/how_to_run_commands_on_multiple_nodes.md
+          - guides/how_to_ssh_into_workstation_from_android.md
           - guides/how_to_update_dependencies.md
           - guides/how_to_update_documentation.md
           - guides/how_to_update_firmware.md
