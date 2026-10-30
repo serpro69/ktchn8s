@@ -199,6 +199,45 @@ nmcli -f 802-11-wireless.cloned-mac-address con show "<wifi connection name>"
 !!! warning
     The committed router configs (`docs/installation/.files/muspell_startup-config_stage{3,4}.txt`) don't contain this reservation. Rebuilding the router from them loses it — see the ToDo list.
 
+## Minimalistic Termux Configuration
+
+```bash
+pkg install bash-completion
+pkg install git man vim zsh
+
+chsh -s zsh          # needs terminal restart
+
+pkg install openssh
+pkg install termux-services 
+
+sv-enable ssh-agent  # enable ssh-agent
+
+termux-setup-storage # allow access to internal storage
+
+cat <<EOT >>"~/.ssh/config"
+Host 192.168.1.100 serenity
+  HostName 192.168.1.100
+  User sergio
+  IdentityFile ~/.ssh/id_ed25519
+EOT
+```
+
+### Configure extra keys
+
+Add extra `~`, `_` keys in addition to default ones:
+
+```bash
+cat <<EOT >>~/.termux/termux.properties
+
+extra-keys = [ \
+  ['ESC','/','~','-','HOME','UP','END','PGUP'], \
+  ['TAB','CTRL','ALT','_','LEFT','DOWN','RIGHT','PGDN']
+]
+EOT
+```
+
+> Ref: https://mobile-coding-hub.github.io/termux/customisation/extra_keys/
+
 ## Tips
 
 ### ssh-agent on the phone
@@ -267,6 +306,9 @@ Create a phone-only window with ++ctrl+b++ ++c++. The workstation is only affect
 
     This detects dead connections faster and helps with Wi-Fi power saving, but can't stop Android from killing the app.
 
+!!! note
+    On my Google Pixel 9 Pro XL, having optimized battery + tmux (on the server) does not terminate the connection.
+
 ### Swipe typing in Termux
 
 Termux deliberately tells the keyboard to send keys one at a time, which disables swipe typing, autocorrect and suggestions in the terminal. It can't be turned off, but Termux has a built-in text input box for this:
@@ -288,6 +330,12 @@ sudo ufw allow from 192.168.1.0/24 to any port 60000:61000 proto udp comment 'mo
 ```
 
 Start with tmux and the battery setting; add mosh only if disconnects are still a problem.
+
+### Termux Styling
+
+- Install "Termux:Styling" plugin from F-Droid
+- Long-tap anywhere on the terminal -> More... -> Style
+- Select theme and font
 
 ## Troubleshooting
 
