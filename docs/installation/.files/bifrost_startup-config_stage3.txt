@@ -1,3 +1,8 @@
+
+!
+! Last configuration change at 07:09:23 UTC Sun Nov 1 2026 by cisco
+! NVRAM config last updated at 07:09:23 UTC Sun Nov 1 2026 by cisco
+!
 version 15.2
 no service pad
 service timestamps debug datetime msec
@@ -16,8 +21,11 @@ no aaa new-model
 system mtu routing 1500
 !
 !
+ip domain-lookup source-interface Vlan10
 ip domain-name midgard.local
-vtp mode transparent
+ip name-server 1.1.1.1
+ip name-server 8.8.8.8
+vtp mode off
 !
 !
 !
@@ -143,5 +151,8 @@ line vty 0 4
 line vty 5 15
  login
 !
+ntp server 2.pool.ntp.org
+ntp server 0.pool.ntp.org prefer
+ntp server 1.pool.ntp.org
 !
 end
