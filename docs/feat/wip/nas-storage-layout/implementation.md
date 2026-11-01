@@ -10,6 +10,59 @@ ArgoCD owns everything under `system/`, `platform/`, `apps/` after bootstrap —
 changes are applied by committing to git and syncing, never `kubectl apply`. All tooling
 runs inside `nix develop`.
 
+## molecule-testing
+
+Use Molecule for repeatable storage-role integration tests where service state,
+mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 12
+own the scenarios under `metal/roles/storage/molecule/`. The Task 11
+`nfs-lifecycle` scenario uses QEMU/KVM and a checksum-pinned Debian guest image;
+its `metal/roles/storage/molecule/nfs-lifecycle/README.md` documents prerequisites
+and commands. Task 12's independent `parity-lifecycle` scenario uses one systemd
+guest with four scratch disks; its sibling `README.md` documents the same lifecycle
+commands and the parity failure/retry checks.
+
+| Scenario / owner | Environment and acceptance |
+|---|---|
+| `nfs-lifecycle` / Task 11 | Disposable Linux NFS server and two clients; real mergerfs/FUSE and NFS mounts. Verify UID/GID 1000 operations, read-only rejection, idle/reopen and controlled remount/recovery, promotion links/bytes and server memory observation. Include Task 1's layout, legend and retirement-log preservation as regression checks. |
+| `parity-lifecycle` / Task 12 | Disposable Linux host with real systemd and separate scratch filesystems for data and parity. Verify configuration-only convergence, disabled maintenance, first sync, second-parity expansion, interruption/retry and failed-unit exit propagation using SnapRAID 13.0. |
+| Access fixture / Task 13 | Extend the `nfs-lifecycle` verifier with the audit helper's foreign-owned `0700` fixture and recorded permission repair. Run the reader as UID/GID 1000 with no extra groups over a read-only NFS mount. Keep Python unit tests separate. |
+
+Use disposable VMs for these kernel/service tests. At scenario implementation time,
+choose and document an available VM backend, pin its dependencies and guest image,
+and prove the required systemd/FUSE/NFS or scratch-disk capabilities before testing
+the role. Missing capabilities mean the scenario is blocked, not passed or silently
+skipped. Neither a template render nor a mocked service is lifecycle evidence.
+
+Each scenario owns its inventory, variables, guest disks and cleanup. Never use the
+production inventory, NAS disks, or production kubeconfig. Invoke the actual role
+tasks/handlers/templates; if isolation needs a focused task include, share it with
+the production role rather than copying its implementation into the test. Keep
+controller provisioning separate from guest configuration.
+
+Configure the scenario explicitly for create/prepare, converge, idempotence, verify,
+cleanup and destroy, with failure/recovery phases where needed. The
+[Molecule role guide](https://docs.ansible.com/projects/molecule/getting-started-roles/)
+and [workflow reference](https://docs.ansible.com/projects/molecule/workflow/) describe
+these actions. Require zero changes on the second configuration converge; run
+intentional writes, remounts and parity jobs in the verification/failure phases.
+Do not hide storage changes with blanket idempotence skips. Exclude unrelated
+hardware discovery such as the existing always-changing `sensors-detect` task from
+the focused configuration entry point. Preserve logs before cleanup, exercise
+cleanup after failure, and prove a fresh test can recreate its environment.
+
+Run from the repository root with
+`nix develop --command bash -c 'cd metal/roles/storage && molecule test -s nfs-lifecycle'`
+or the same command with `-s parity-lifecycle`. Record scenario/tool revisions and
+results with the owning task. Pure config parsing (Task 2), Helm rendering (Tasks
+4–5), and audit-helper unit tests (Task 13) retain their direct checks; they do not
+need a separate Molecule wrapper.
+
+Molecule results establish behavior on the disposable environment. Task 1.5 and
+Task 11's live NAS/Kubernetes acceptance remain required, as do actual application,
+migrated-data and parity-release checks in Tasks 5–8. While the NAS is offline,
+complete repository/scenario work and explicitly defer live subtasks without
+marking those acceptance gates complete.
+
 ## tree-skeleton
 
 Replace the flat `storage_dirs` list with the designed tree.
@@ -74,12 +127,38 @@ The role skips `snapraid.yml` entirely while `parity_drives` is empty. Inspect t
 `/etc/snapraid.conf` and run `snapraid status` only in Task 8 after adding the first
 parity device; Task 2 completes with offline validation, not that later live check.
 
+The regression suite in `tests/test_snapraid_config.py` renders the actual template
+with strict Jinja undefined handling and runs SnapRAID `status`/`diff` against temporary
+directories. Supply a [SnapRAID 13.0](https://github.com/amadvance/snapraid/releases/tag/v13.0)
+binary; the locked Nix package set currently provides 12.4, which the test rejects:
+
+```bash
+nix develop --command env SNAPRAID_BIN=/path/to/snapraid-13.0/snapraid \
+  python3 -B -m unittest discover -s tests -p test_snapraid_config.py -v
+```
+
+The fixture relocates data, parity and content paths without changing exclusion
+patterns. `--test-skip-device` allows these parser/scan checks on one temporary
+filesystem; this does not prove parity storage or lifecycle behavior. No sync runs.
+Checks cover exact parity paths, root-only exclusions, preserved backup paths,
+unchanged cruft-file exclusions and rejection of duplicate first parity. The existing
+slashless cruft patterns match files, not whole directory trees; this task preserves
+that behavior. Task 12 owns the separate-filesystem lifecycle tests.
+
 ## nfs-export-readiness
 
 Task 11 is synthetic NFS validation, independent of the media applications. Create
 `99_tmp/nfs-readiness/{downloads,library}` and expose that one fixture subtree to its
 test clients. All creates, links, renames and RO probes stay there; clean up clients
 and fixtures before NAS-local migration/sorting begins.
+
+First implement and run the `nfs-lifecycle` Molecule scenario described in
+[molecule-testing](#molecule-testing), using the Task 3 tooling. Seed operator
+retirement entries, legacy content and restrictive descendants before convergence
+to verify Task 1's preservation contract. The server/client lifecycle checks below
+must pass in this disposable environment before applying them to the NAS.
+The Kubernetes pod probe remains a separate live-cluster check; a VM client does
+not establish Kubernetes integration. Record offline and live results separately.
 
 1. In `metal/roles/storage/tasks/mergerfs.yml`, add `noforget` and
    `inodecalc=path-hash` while retaining `category.create=mfs`, remove legacy `use_ino`,
@@ -114,6 +193,30 @@ and fixtures before NAS-local migration/sorting begins.
 References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
 and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
 
+Task 11's offline implementation uses the actual mergerfs/NFS role tasks and a
+shared `files/nfs-readiness.sh` probe in both VM and live validation. Configuration
+convergence no longer hides scratch writes inside `mount_validation.yml`; writes
+belong to explicit verification. Both rpcbind units are stopped, disabled and
+masked: stopping only the service allowed socket activation to break idempotence.
+Live validation preserves its fixture if local or Kubernetes client teardown fails.
+
+The verified guest stack is Debian 12 build `20260923-2610`, kernel
+`6.1.0-53-amd64`, mergerfs `2.41.1~debian-bookworm`, NFS utils
+`1:2.6.2-4+deb12u1`, Python package `3.11.2-1+b1` and systemd
+`252.39-1~deb12u2`. Guest packages use the 2026-09-24 Debian snapshot; the image and
+mergerfs release asset have checked-in checksums. QEMU 10.1.2 comes from the
+existing Nix lock. The small lifecycle fixture observed roughly 3.6 MiB mergerfs
+RSS; this is an observation, not a capacity bound for the NAS working set.
+
+Run fast regressions with `nix develop -c python3 -B -m unittest discover -s tests
+-p test_nfs_readiness.py -v` (payload tests require controller UID/GID 1000).
+The scenario README documents the full pass and deliberate-failure commands.
+NFS can temporarily cache a link count of one after `ln`; the probe requires two
+within 65 seconds and independently proves backing inode identity. It does not
+disable caching or relax `root_squash` to make tests pass. A permission-denied
+fixture is an expected negative test; unexpected permission or stale-handle errors
+remain acceptance failures. NAS and live Kubernetes execution remain Task 11.6.
+
 ## parity-job-readiness
 
 Task 12 prepares bootstrap/expansion before source disks are released. Update
@@ -140,23 +243,94 @@ Task 12 prepares bootstrap/expansion before source disks are released. Update
    alone: a timer could start another unit and terminate the active bootstrap job.
    → verify: a role rerun leaves maintenance stopped until the operator re-enables it.
 
+Implement these checks in `metal/roles/storage/molecule/parity-lifecycle/` using
+the Task 3 tooling and [scenario contract](#molecule-testing). Converge the real
+configuration and handlers without starting a sync; the verifier starts jobs
+explicitly and checks each unit invocation's exit status and journal. Use distinct
+guest filesystems, not several directories on one filesystem. Inject a failing
+SnapRAID invocation only within the disposable guest, restore the real executable,
+and require a successful retry. Adding second parity must rerun the configuration
+path and preserve existing parity/content files. This scenario must run independently
+of the NFS scenario so Task 12 does not acquire a dependency on Task 11.
+
 Task 8 records the unit invocation, completion result/exit status and logs, then runs
 an explicit full scrub. These changes do not make existence of a parity file or a
 previous successful invocation sufficient evidence for a newly added parity level.
 
+The configuration path now always deploys the static full-sync unit when SnapRAID
+is configured. It never starts or enables that unit. Both maintenance timers are
+deployed even when disabled; their tasks and config-change handlers enforce the
+declared `sync_enabled` and `scrub_enabled` flags. During bootstrap/expansion,
+set **both flags to `false` in the complete `snapraid_maintenance` mapping** used
+for every role application. Preserve the other default fields: Ansible replaces
+this mapping rather than merging a partial inventory dictionary with defaults.
+Manually stopping/disabling timers alone does not override inventory policy.
+Stop the timers before changing configuration and wait for any running runner
+or scrub job to finish; the role does not terminate those jobs for you.
+
+After the Task 8 safety gates, start explicitly with
+`systemctl restart --no-block snapraid-initial-sync.service`. Follow
+`journalctl -fu snapraid-initial-sync.service`, and record this invocation's
+`InvocationID`, `ExecMainStartTimestamp`, `ExecMainExitTimestamp`, `Result`,
+`ExecMainCode` and `ExecMainStatus` via `systemctl show`. While the oneshot runs
+its state is `activating`; successful completion is `active (exited)`,
+`Result=success`, `ExecMainCode=1` and `ExecMainStatus=0`, with `MainPID=0`.
+`RemainAfterExit=yes` retains the result: the disposable systemd 252 guest otherwise
+garbage-collected the inactive unit's exit metadata immediately after completion.
+Always use **restart**, including after adding a parity level: `start` on a completed
+active unit does nothing. Require a new invocation ID/start timestamp. Do not restart
+an invocation that is still running. Preserve its journal and timestamps before
+another invocation; stopped/failed jobs need explicit retry and full scrub.
+Re-enable both maintenance flags only after parity acceptance.
+
+Run `molecule test -s parity-lifecycle` from `metal/roles/storage` inside
+`nix develop`. The scenario builds checksum-pinned SnapRAID 13.0 and verifies
+configuration idempotence, first sync, expansion, interruption, exact nonzero
+exit propagation and recovery with real systemd and separate filesystems.
+No live NAS work is included; the fixture README describes evidence and cleanup.
+
 ## devshell-b3sum
 
-Add `b3sum` to the `packages` list in the `devShells.default` `mkShell` block of
-`flake.nix` (~line 31).
-→ verify: `nix develop -c b3sum --version`.
+Task 3 provides `b3sum` and Molecule through the `packages` list in the
+`devShells.default` `mkShell` block of `flake.nix`, using the existing `flake.lock`.
+No global pip installation is needed. Scenario-specific VM backend dependencies
+belong to Tasks 11–12 and must be reproducible too.
+
+Local CLI verification (2026-10-04, x86_64-linux), with nixpkgs revision
+`23d72dabcb3b12469f57b37170fcbc1789bd7457`:
+
+- `nix develop -c b3sum --version`: `b3sum 1.8.2`.
+- `nix develop -c molecule --version`: Molecule `25.11.1`, Python `3.13.11`,
+  Ansible Core `2.19.4`; bundled `molecule-plugins` version `23.5.3`.
+- `nix develop -c molecule test --help` and `nix develop -c molecule list --help`:
+  both succeed and expose `-s, --scenario-name`. The test command also exposes
+  `--driver-name` and `--destroy`.
+
+The installed Molecule metadata requires Python >=3.10 and Ansible Core >=2.15;
+its Nix runtime satisfies both. All three executables resolve to `/nix/store`.
+The pre-existing virtualenv still exposes Python `3.12.10` via `python3`, and its
+stale pip launcher still warns on shell entry (see [environment repair](#deferred-follow-ups-explicit)).
+Molecule and Ansible use their Nix-packaged Python `3.13.11` independently.
+
+These checks establish CLI availability only. No VM backend, scenario or NAS
+acceptance ran; Tasks 11–12 own those separate checks. Listed driver plugins do
+not establish that their backend executables or required collections are installed.
 
 ## migration-audit-tooling
 
+The helper's [CLI, JSONL schema and ledger guide](../../../guides/nas_migration_audit.md)
+documents the implemented operator workflow and its acceptance limits. Use
+`--identity mergerfs` for local pool inventories/reconciliation so hardlink checks
+use backing identities rather than the configured path-hash inode numbers.
+
 Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
-the Task 3 `b3sum` executable. Before Task 13's NAS fixture, verify Python 3 and install
-`b3sum` once there (`apt install b3sum` on Debian, or a verified upstream binary);
-record both versions with the fixture results. The helper reads datasets and writes
+the Task 3 `b3sum` executable. Provide Python 3 and `b3sum` in the disposable NFS
+fixture and record both versions with the results. When the NAS is available, verify
+Python 3 and install `b3sum` once there (`apt install b3sum` on Debian, or a verified
+upstream binary) before Task 6. If its versions differ from the fixture's, rerun the
+unit/access checks with those versions and record the results before migration.
+This NAS preparation is deferred while it is offline. The helper reads datasets and writes
 evidence only. Copying, moving, permission changes, discards and disk operations remain
 explicit operator actions.
 
@@ -194,10 +368,31 @@ Stream inventories/reports and hash locally to avoid reading NAS data over the n
 covers the command exit/output contract, partial scans/retries, failed hashes, unusual
 names, symlinks/root escapes, special files, missing/duplicate ledger rows, merges/collisions,
 equal-content distinct destinations and approved metadata transformations. The access
-fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix;
-run that identity-sensitive check on the NAS/Task 11 test environment if necessary.
+fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix.
+Extend Task 11's `nfs-lifecycle` Molecule verifier for this identity-sensitive check,
+using actual UID/GID 1000 reads over a read-only NFS mount. A root-only local run
+does not satisfy it. This tests the helper's policy enforcement; Task 7 still audits
+the real migrated library and Task 5 still checks application playback.
 Task 13 depends on Tasks 3 and 11, uses their tool/fixture environment, and cleans up
 its clients afterward. It completes only when its checks pass, before Task 6 starts.
+
+Task 13's repository checks passed on 2026-10-04: 31 helper tests on both controller
+Python 3.12.10/b3sum 1.8.2 and guest Python 3.11.2/b3sum 1.2.0, all 44 local storage
+tests, and the extended NFS Molecule scenario including failure cleanup/recreation.
+The [task record](./tasks.md#task-13-migration-inventory-and-audit-tooling) contains
+the tested helper digest and evidence locations. Python 3.11 is the tested minimum.
+NAS setup/version comparison in 13.4 remains deferred; these results do not accept
+actual migrated content. Reproduce the scenario with an explicit evidence location:
+
+```bash
+nix develop -c bash -c 'cd metal/roles/storage && MOLECULE_EPHEMERAL_DIRECTORY=/tmp/ktchn8s-audit-nfs-final molecule test -s nfs-lifecycle'
+```
+
+Copy existing evidence elsewhere before reusing that directory. The helper uses
+SQLite for bounded-memory joins and successful directory-listing records, while
+still opening and reading every declared served file. It checks directory search
+permission separately from listing and preserves kernel traversal semantics when
+resolving served symlinks; lexical `..` simplification alone is insufficient.
 
 ## nfs-media-share
 
@@ -217,6 +412,29 @@ it performs no cluster deletion or sync.
 Task 5 consumes the prepared chart and owns one release containing both the PV and
 application changes, after Task 8 and the export checks. Keep Task 4 off the deployed
 Git revision until that release. Task 5 owns stale-resource cleanup and live acceptance.
+
+Task 4 offline verification (2026-10-04) passed with Helm `3.19.1` and the cached
+`csi-driver-nfs 4.13.0` dependency, on work branch `feat/nas_layout`. Repeat from the
+repository root inside the dev shell:
+
+```bash
+nix develop -c helm lint --strict system/csi-driver-nfs
+nix develop -c helm template csi-driver-nfs system/csi-driver-nfs \
+  --namespace csi-driver-nfs --show-only templates/pv-nfs.yaml
+```
+
+The PV must have name `pv-nfs-media`, capacity `4Ti`, reclaim policy `Retain`, CSI
+handle `10.10.10.30/mnt/storage/30_media` and share `/mnt/storage/30_media`. The full
+render produced ten YAML resources; a parsed comparison against the pre-change
+values confirmed that only these four PV fields changed. `ReadWriteMany`, the
+class-less static binding and all mount options were also checked.
+
+`kubeconform` was absent from the dev-shell PATH, so API schema validation did not
+run. Its upstream install command is
+`go install github.com/yannh/kubeconform/cmd/kubeconform@latest` (run tooling inside
+`nix develop`); Helm rendering and YAML parsing do not replace that check. No NAS
+or cluster access was used. These results establish the offline PV contract only;
+binding, export readiness and application behavior retain their separate live gates.
 
 ## jellyfin-remount
 
@@ -340,8 +558,9 @@ entries, and stop on any enumeration, read, hash, copy, or reconciliation failur
    attached source, recording disk ID, root and tool versions in the run evidence.
    Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
    scans; each records hashes, entry types and metadata per the tooling contract.
-   Check the NAS tool versions against the Task 13 fixture record; setup happened
-   before those tests. This remains migration tooling outside the storage role.
+   Check the NAS tool versions against the Task 13 fixture record; NAS tool setup
+   and any retesting for different versions must finish before these scans.
+   This remains migration tooling outside the storage role.
    → verify: all scans complete with zero errors and entry counts reconcile; special
    files need an explicit archive/restore or discard decision before release.
 2. **Copy A and reconcile.** Run on the NAS with permission to preserve source metadata:
@@ -410,7 +629,7 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    (`make -C metal storage ANSIBLE_TARGETS=yggdrasil`). The role formats/mounts
    `/mnt/parity1`, renders the corrected config and deploys the Task 12 unit; it does
    not start it. Inspect `/etc/snapraid.conf`, excludes, and `snapraid status` here.
-   Start `snapraid-initial-sync` explicitly. Record this invocation's journal and
+   Run `systemctl restart --no-block snapraid-initial-sync` explicitly. Record this invocation's journal and
    `systemctl show` result/exit status; wait for successful completion, not file creation.
    → verify: success for the current dataset/configuration, no active competing job,
    and `snapraid diff` reports no included changes before proceeding.

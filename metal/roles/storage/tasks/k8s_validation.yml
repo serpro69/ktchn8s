@@ -1,119 +1,61 @@
 ---
-# =================================================================
-# KUBERNETES CONNECTIVITY TEST (Optional)
-# =================================================================
-
-- name: Check if kubectl is available
-  command: which kubectl
-  register: kubectl_check
+# validate_nfs=true requests acceptance: missing prerequisites are failures.
+- name: Require kubectl on the controller
+  ansible.builtin.command: kubectl version --client
   changed_when: false
-  failed_when: false
 
-- name: Check if kubeconfig exists
-  stat:
+- name: Inspect the explicitly selected kubeconfig
+  ansible.builtin.stat:
     path: "{{ lookup('env', 'KUBECONFIG') }}"
-  register: kubeconfig_check
-  when: kubectl_check.rc == 0
+  register: nfs_readiness_kubeconfig
 
-- name: Kubernetes NFS validation
-  when:
-    - kubectl_check.rc == 0
-    - kubeconfig_check.stat.exists | default(false)
+- name: Require a real kubeconfig before running acceptance
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'KUBECONFIG') | length > 0
+      - nfs_readiness_kubeconfig.stat.isreg | default(false)
+    fail_msg: Set KUBECONFIG to the intended cluster config; NFS acceptance cannot skip Kubernetes.
+
+- name: Create a controller workspace for this probe
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: nfs-readiness-
+  register: nfs_readiness_k8s_workspace
+
+- name: Test two Kubernetes clients as UID 1000
+  vars:
+    nfs_readiness_namespace: "{{ nfs_readiness_k8s_workspace.path | basename | lower | replace('_', '-') }}"
   block:
-    - name: Create NFS test namespace
-      command: kubectl create namespace nfs-validation-test --dry-run=client -o yaml
-      register: namespace_yaml
-      changed_when: false
+    - name: Require confirmed teardown once Kubernetes provisioning begins
+      ansible.builtin.set_fact:
+        nfs_readiness_k8s_clean: false
 
-    - name: Apply NFS test namespace
-      shell: |
-        set -o pipefail
-        echo '{{ namespace_yaml.stdout }}' | kubectl apply -f -
+    - name: Create a fresh test namespace
+      ansible.builtin.command:
+        argv: [kubectl, create, namespace, "{{ nfs_readiness_namespace }}"]
+      register: nfs_readiness_namespace_created
       changed_when: true
 
-    - name: Create NFS test pod manifest
-      copy:
-        content: |
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: nfs-test-pod
-            namespace: nfs-validation-test
-          spec:
-            containers:
-            - name: nfs-test
-              # for a short-lived validation pod that just runs echo and cat,
-              # busybox is stable enough that version differences are negligible,
-              # so using latest is safe
-              image: busybox:latest
-              command: ["/bin/sh", "-c"]
-              args:
-                - |
-                  echo "Testing NFS mount..." &&
-                  echo "NFS test from Kubernetes - $(date)" > /mnt/nfs/.k8s_nfs_test &&
-                  cat /mnt/nfs/.k8s_nfs_test &&
-                  rm /mnt/nfs/.k8s_nfs_test &&
-                  echo "NFS test passed!" &&
-              volumeMounts:
-              - name: nfs-volume
-                mountPath: /mnt/nfs
-            volumes:
-            - name: nfs-volume
-              nfs:
-                server: "{{ ansible_host }}"
-                path: /mnt/storage/Temp
-            restartPolicy: Never
-        dest: /tmp/nfs-test-pod.yaml
-        mode: "0644"
-
-    - name: Deploy NFS test pod
-      command: kubectl apply -f /tmp/nfs-test-pod.yaml
+    - name: Execute and require successful writer and reader pods
+      ansible.builtin.include_tasks: k8s_readiness_pod.yml
+      loop:
+        - {name: writer, actions: [create, promote, read, readonly]}
+        - {name: reader, actions: [read, readonly, delete]}
+      loop_control:
+        loop_var: nfs_readiness_pod
+  always:
+    - name: Remove this run's Kubernetes clients before deleting server fixtures
+      ansible.builtin.command:
+        argv: [kubectl, delete, namespace, "{{ nfs_readiness_namespace }}", '--wait=true', '--timeout=120s']
+      when: nfs_readiness_namespace_created is defined and nfs_readiness_namespace_created is succeeded
       changed_when: true
 
-    - name: Wait for NFS test pod to complete
-      command: kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/nfs-test-pod -n nfs-validation-test --timeout=60s
-      register: pod_wait
-      failed_when: false
-      changed_when: false
+    - name: Record successful Kubernetes client teardown
+      ansible.builtin.set_fact:
+        nfs_readiness_k8s_clean: true
+      when: nfs_readiness_namespace_created is defined and nfs_readiness_namespace_created is succeeded
 
-    - name: Get NFS test pod logs
-      command: kubectl logs nfs-test-pod -n nfs-validation-test
-      register: pod_logs
-      failed_when: false
-      changed_when: false
-
-    - name: Display NFS test pod logs
-      debug:
-        msg: "{{ pod_logs.stdout_lines }}"
-      when: pod_logs.rc == 0
-
-    - name: Cleanup NFS test pod
-      command: kubectl delete pod nfs-test-pod -n nfs-validation-test --ignore-not-found
-      changed_when: false
-      failed_when: false
-
-    - name: Cleanup NFS test namespace
-      command: kubectl delete namespace nfs-validation-test --ignore-not-found
-      changed_when: false
-      failed_when: false
-
-    - name: Remove test pod manifest
-      file:
-        path: /tmp/nfs-test-pod.yaml
+    - name: Remove the controller workspace
+      ansible.builtin.file:
+        path: "{{ nfs_readiness_k8s_workspace.path }}"
         state: absent
-
-    - name: Verify Kubernetes NFS test succeeded
-      assert:
-        that:
-          - pod_logs.rc == 0
-          - "'NFS test passed!' in pod_logs.stdout"
-        success_msg: "Kubernetes NFS connectivity test passed"
-        fail_msg: "Kubernetes NFS connectivity test failed"
-      # The when condition makes the assert skip when the pod fails.
-      # So if the pod fails to get logs (rc != 0), the assert is skipped and the playbook reports success.
-      # when: pod_logs.rc == 0
-
-- name: Skip Kubernetes test if kubectl not available
-  debug:
-    msg: "Skipping Kubernetes NFS validation - kubectl not available or kubeconfig not found"
-  when: kubectl_check.rc != 0 or not (kubeconfig_check.stat.exists | default(false))
