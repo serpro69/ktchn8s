@@ -1,7 +1,7 @@
 
 !
-! Last configuration change at 08:28:12 UTC Sun Oct 18 2026 by cisco
-! NVRAM config last updated at 06:58:19 UTC Sun Nov 1 2026 by cisco
+! Last configuration change at 07:31:48 UTC Sun Nov 1 2026 by cisco
+! NVRAM config last updated at 07:33:00 UTC Sun Nov 1 2026 by cisco
 !
 version 17.3
 service timestamps debug datetime msec
@@ -42,6 +42,7 @@ ip dhcp pool HOME_POOL_VLAN2
  default-router 192.168.1.1 
  dns-server 1.1.1.1 8.8.8.8 
  domain-name midgard.local
+   address 192.168.1.100 client-id 01ab.cdef.0011.42
 !
 ip dhcp pool HOMELAB_POOL_VLAN10
  network 10.10.10.0 255.255.255.0
