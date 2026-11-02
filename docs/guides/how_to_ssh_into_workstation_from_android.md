@@ -9,7 +9,7 @@ This guide makes the workstation (the Ansible/PXE controller) reachable over SSH
 
 The security model:
 
-- **LAN only.** SSH is accepted from the home network (VLAN 2, `192.168.1.0/24`) and nothing else — enforced by `ufw` on Linux and by sshd's `AllowUsers` on macOS. No port forwarding on the router, ever. For access from outside the house, use Tailscale (`sudo tailscale up`) instead of exposing port 22.
+- **LAN only.** SSH is accepted from the home network (VLAN 2, `192.168.1.0/24`) and nothing else — enforced by `ufw` on Linux and by sshd's `AllowUsers` on macOS (which also admits the tailnet if you [use Tailscale](#option-b-tailscale-magicdns)). No port forwarding on the router, ever. For access from outside the house, use Tailscale instead of exposing port 22.
 - **Key only.** Password and keyboard-interactive auth are disabled, root login is disabled, and only one user is allowed.
 - **The private key never leaves the phone.** It's generated on the phone; only the public key is copied to the workstation.
 
@@ -18,7 +18,7 @@ The workstation-side steps come in two flavours, in tabs:
 - **Linux** — a Debian-family workstation (Pop!_OS 22.04 at the time of writing), Wi-Fi interface `wlp0s20f3`.
 - **macOS** — a MacBook (macOS 26 on Apple Silicon at the time of writing), Wi-Fi interface `en0`. Also read [macOS-specific caveats](#macos-specific-caveats): sleep, file access and the Keychain behave differently over SSH.
 
-Both assume user `sergio` and the workstation IP `192.168.1.100`. Adjust as needed. The phone-side steps are the same for both.
+Both assume user `sergio`. The Linux workstation is reached at its reserved IP `192.168.1.100`; the Mac (`razorback`) is reached by name — `razorback.local` or its Tailscale name — so it doesn't need a DHCP reservation (see [step 6](#6-give-the-workstation-a-stable-address)). Wherever the phone-side commands below say `192.168.1.100`, use the Mac's name instead. Adjust names and addresses as needed. The phone-side steps are otherwise the same for both.
 
 !!! warning "A Mac can't be the PXE controller"
     `make metal` runs the PXE containers with `network_mode: host` (`metal/roles/pxe_server/files/docker-compose.yml`). On macOS, Docker runs inside a Linux VM, so "host" is the VM's network, not the Mac's — the nodes never see the proxyDHCP/TFTP replies. A Mac works as a workstation for SSH, `kubectl`, Ansible and the rest, but provisioning bare metal needs a Linux machine. That's why the PXE firewall rules below exist only on the Linux side.
@@ -126,7 +126,7 @@ Both assume user `sergio` and the workstation IP `192.168.1.100`. Adjust as need
 
     `/etc/ssh/sshd_config` includes `sshd_config.d/*` at the top and the **first** value for a setting wins. `10-hardening.conf` sorts ahead of the stock `100-macos.conf` (which sets `UsePAM yes` — PAM is how passwords would get in, hence disabling `KbdInteractiveAuthentication` as well).
 
-    The `@192.168.1.0/24` part matches the client's IP address, so the same key from any other network is refused. For [Tailscale](https://tailscale.com/) access, add its range: `AllowUsers sergio@192.168.1.0/24 sergio@100.64.0.0/10`.
+    The `@192.168.1.0/24` part matches the client's IP address, so the same key from any other network is refused. If you [connect over Tailscale](#option-b-tailscale-magicdns), add its range: `AllowUsers sergio@192.168.1.0/24 sergio@100.64.0.0/10`.
 
     !!! tip "No restart needed"
         launchd starts a fresh `sshd` for every incoming connection, so config changes apply to the next connection. Keep a session open while you edit anyway, in case you lock yourself out.
@@ -208,10 +208,10 @@ Both assume user `sergio` and the workstation IP `192.168.1.100`. Adjust as need
     sudo lsof -nP -iTCP:22 -sTCP:LISTEN
     ssh -o BatchMode=yes -o PubkeyAuthentication=no \
         -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
-        sergio@192.168.1.100 true
+        sergio@"$(ipconfig getifaddr en0)" true
     ```
 
-    `lsof` shows `launchd` holding the socket — that's expected, it hands each connection to a new `sshd`. The `ssh` command must fail with `Permission denied (publickey).` — `publickey` being the only method offered means password auth is off. (Connecting to `192.168.1.100` from the Mac itself comes from `192.168.1.100`, so it passes the `AllowUsers` address check.)
+    `lsof` shows `launchd` holding the socket — that's expected, it hands each connection to a new `sshd`. The `ssh` command must fail with `Permission denied (publickey).` — `publickey` being the only method offered means password auth is off. Run it while on the home Wi-Fi: the connection then comes from the Mac's own LAN address, the same path the phone takes. (`localhost` would come from `127.0.0.1`, which `AllowUsers` rejects regardless of auth method, so it proves nothing.)
 
 ## 4. Generate the key on the phone and authorize it
 
@@ -255,25 +255,44 @@ Get the workstation's host key fingerprint **before** the first connection (same
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-Then, with the phone on home Wi-Fi (connections from mobile data are refused):
+Then, with the phone on home Wi-Fi (connections from mobile data are refused — unless you go through Tailscale):
 
 === "Termux"
 
     ```bash
-    ssh sergio@192.168.1.100
+    ssh sergio@192.168.1.100      # Linux workstation, reserved IP
+    ssh sergio@razorback.local    # Mac, Bonjour name
+    ssh sergio@razorback          # Mac, Tailscale MagicDNS name
     ```
 
 === "Termius"
 
-    New host: address `192.168.1.100`, username `sergio`, the key from step 4, no password.
+    New host: address `192.168.1.100` (or the Mac's name, as above), username `sergio`, the key from step 4, no password.
 
-On first connect the client shows a fingerprint and asks whether to trust it. Accept only if it matches the one above exactly — that comparison is the only thing proving the phone reached the workstation and not something else. If you accepted without comparing, check afterwards with `ssh-keygen -lF 192.168.1.100` in Termux.
+On first connect the client shows a fingerprint and asks whether to trust it. Accept only if it matches the one above exactly — that comparison is the only thing proving the phone reached the workstation and not something else. If you accepted without comparing, check afterwards with `ssh-keygen -lF <address or name you connected to>` in Termux.
+
+The phone remembers the key under the exact name or address you typed, so `razorback.local` and `razorback` are verified separately — compare the fingerprint the first time for each.
 
 The host key is regenerated if the OS is reinstalled, so the phone will warn about a changed key after a reinstall. That's expected only then; any other time, stop and investigate.
 
-## 6. Keep the workstation's IP fixed
+## 6. Give the workstation a stable address
 
-The phone's saved host only works if the workstation keeps `192.168.1.100`. SSH connects to an IP address, not a MAC — the MAC only matters to the router, which uses it to hand out the same IP every time. Reserve it on the C1111 as described in [HowTo add DHCP reservations](./how_to_add_dhcp_reservations.md). Check the current binding:
+The phone's saved host has to keep pointing at the workstation. Left alone, DHCP may hand the workstation a different IP over time — and on a Mac, which randomizes its Wi-Fi MAC by default, the router may see a "new" device and do so often. Three ways to deal with it:
+
+| Option | Works from | Router work | Notes |
+| ------ | ---------- | ----------- | ----- |
+| [A. DHCP reservation](#option-a-dhcp-reservation) | Home Wi-Fi | Reservation on the C1111, MAC must be fixed | Needed if the workstation must reach the storage node (the C1111 ACL allows `192.168.1.100/32`) |
+| [B. Tailscale MagicDNS](#option-b-tailscale-magicdns) | Anywhere | None | Recommended for the Mac |
+| [C. Bonjour `.local` name](#option-c-bonjour-local-name) | Home Wi-Fi | None | Depends on the phone resolving `.local` names |
+
+The Linux workstation uses A. The Mac uses B and C and skips the reservation — it can keep its Private Wi-Fi address on, because nothing depends on its MAC or IP. The trade-off: the Mac can't SSH into the storage node, since the C1111 only allows `192.168.1.100` there.
+
+!!! note "Connect to a name, not to a MAC"
+    SSH always connects to an IP address; a MAC only matters on the local link, to the router. A reservation turns a fixed MAC into a fixed IP. B and C skip that: the phone looks up the current IP by name each time.
+
+### Option A: DHCP reservation
+
+Reserve `192.168.1.100` on the C1111 as described in [HowTo add DHCP reservations](./how_to_add_dhcp_reservations.md). Check the current binding:
 
 ```cisco
 muspell#show ip dhcp binding 192.168.1.100
@@ -295,6 +314,8 @@ A reservation only works if the MAC stays the same, so make sure the Wi-Fi MAC i
 
 === "macOS"
 
+    Only needed if you do want a reservation for the Mac (e.g. so it can reach the storage node); with options B/C, skip this.
+
     macOS uses a **Private Wi-Fi address** by default — a made-up MAC per network, which may rotate. Turn it off for the home network: System Settings → Wi-Fi → **Details…** next to the network → **Private Wi-Fi address** → *Off*. Then rejoin the network and read the MAC that's actually in use:
 
     ```bash
@@ -307,6 +328,60 @@ A reservation only works if the MAC stays the same, so make sure the Wi-Fi MAC i
 
 !!! warning
     The committed router configs (`docs/installation/.files/muspell_startup-config_stage{3,4}.txt`) don't contain this reservation. Rebuilding the router from them loses it — see the ToDo list.
+
+### Option B: Tailscale MagicDNS
+
+Both devices join the same tailnet, and the phone connects to the Mac's Tailscale name. The name never changes, whatever the Mac's LAN IP or MAC — and it works from mobile data too, without opening anything on the router.
+
+1. **Mac:** install the Tailscale app and log in (`/usr/local/bin/tailscale` is its CLI). Get the Mac's MagicDNS name:
+
+    ```bash
+    tailscale status --json | jq -r .Self.DNSName   # e.g. razorback.tail1234.ts.net.
+    ```
+
+    The machine name comes from the Mac's hostname; rename it in the Tailscale admin console if you like.
+
+2. **sshd:** connections over Tailscale come from the tailnet range, not from `192.168.1.0/24`, so allow it in `/etc/ssh/sshd_config.d/10-hardening.conf`:
+
+    ```
+    AllowUsers sergio@192.168.1.0/24 sergio@100.64.0.0/10
+    ```
+
+    Check with `sudo sshd -T | grep -i allowusers`. Only devices in your tailnet can reach `100.64.0.0/10` addresses, and they still need the key.
+
+3. **Phone:** install Tailscale (Play Store or F-Droid), log in to the same tailnet and keep *Use Tailscale DNS settings* on. Then connect:
+
+    ```bash
+    ssh sergio@razorback                        # short MagicDNS name
+    ssh sergio@razorback.tail1234.ts.net        # full name, if the short one doesn't resolve
+    ```
+
+!!! warning "This widens access beyond the LAN — by design"
+    Over Tailscale the Mac is reachable from wherever the phone is. That's the point, but it also means losing the phone matters more: the key passphrase from step 4 is what stands between whoever has the phone and the Mac. If your tailnet uses a custom access policy (ACLs), it must allow the phone to reach the Mac on `tcp:22`; the default policy allows everything between your own devices.
+
+After a reboot, check that the Mac is back on the tailnet before relying on it from afar — depending on the Tailscale app variant and FileVault, it may only reconnect once you've logged in at the Mac.
+
+### Option C: Bonjour `.local` name
+
+The Mac already advertises itself on the local network via Bonjour (mDNS). Its name:
+
+```bash
+scutil --get LocalHostName   # razorback → razorback.local
+```
+
+Change it in System Settings → General → Sharing → *Local hostname*. From the phone, on home Wi-Fi:
+
+```bash
+ssh sergio@razorback.local
+```
+
+Nothing to change in sshd: the connection comes from the phone's LAN address, which `AllowUsers sergio@192.168.1.0/24` already admits.
+
+Limits:
+
+- **Same network only.** mDNS is link-local multicast and doesn't cross VLANs, so the phone and the Mac must both be on the home Wi-Fi (VLAN 2).
+- **The phone has to resolve `.local`.** Support on Android depends on the Android version and the app. If Termux or Termius says `Could not resolve hostname razorback.local`, use option B.
+- **Name conflicts.** After sleep/wake the Mac occasionally renames itself to `razorback-2.local` when it thinks the name is taken. Check with `scutil --get LocalHostName` and set it back in Sharing.
 
 ## macOS-specific caveats
 
@@ -357,13 +432,27 @@ sv-enable ssh-agent  # enable ssh-agent
 
 termux-setup-storage # allow access to internal storage
 
-cat <<EOT >>"~/.ssh/config"
+cat <<EOT >>~/.ssh/config
+# Linux workstation, reserved IP (step 6, option A)
 Host 192.168.1.100 serenity
   HostName 192.168.1.100
   User sergio
   IdentityFile ~/.ssh/id_ed25519
+
+# Mac over Tailscale, works anywhere (step 6, option B)
+Host razorback
+  HostName razorback.tail1234.ts.net
+  User sergio
+  IdentityFile ~/.ssh/id_ed25519
+
+# Mac via Bonjour, home Wi-Fi only (step 6, option C)
+Host razorback.local
+  User sergio
+  IdentityFile ~/.ssh/id_ed25519
 EOT
 ```
+
+Then `ssh serenity`, `ssh razorback` or `ssh razorback.local`. Replace `tail1234.ts.net` with your tailnet's domain (see [option B](#option-b-tailscale-magicdns)).
 
 ### Configure extra keys
 
@@ -501,7 +590,9 @@ Start with tmux and the battery setting; add mosh only if disconnects are still 
 
 | Symptom | Likely cause |
 | ------- | ------------ |
-| Connection times out | Phone on mobile data instead of home Wi-Fi; workstation got a different IP (check the reservation, and on macOS the [Private Wi-Fi address](#6-keep-the-workstations-ip-fixed)); workstation asleep (on macOS, see [Sleep](#sleep)) |
+| Connection times out | Phone on mobile data instead of home Wi-Fi (or Tailscale off on either device); workstation got a different IP (check the [reservation](#option-a-dhcp-reservation), or connect by [name](#6-give-the-workstation-a-stable-address)); workstation asleep (on macOS, see [Sleep](#sleep)) |
+| `Could not resolve hostname razorback.local` | The phone's Android version or app doesn't resolve `.local` names, or the phone isn't on the home Wi-Fi — use [Tailscale](#option-b-tailscale-magicdns). Also check the Mac didn't rename itself (`scutil --get LocalHostName`) |
+| `Could not resolve hostname razorback` | Tailscale off on the phone, or *Use Tailscale DNS settings* disabled — or use the full `razorback.<tailnet>.ts.net` name |
 | `Connection refused` | `sshd` not running: `systemctl status ssh` (Linux); Remote Login off (macOS) |
 | `Permission denied (publickey)` | Wrong key on the phone, key not in `~/.ssh/authorized_keys`, wrong permissions on `~/.ssh` (`700`) or `authorized_keys` (`600`), or a user other than the one in `AllowUsers`. On macOS also: connecting from outside `192.168.1.0/24` (e.g. Tailscale without its range in `AllowUsers`), or the user not in Remote Login's *Allow access for* list |
 | Host key changed warning | Expected after an OS reinstall only; otherwise don't connect, investigate |
