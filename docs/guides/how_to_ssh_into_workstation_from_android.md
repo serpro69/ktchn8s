@@ -524,6 +524,8 @@ tmux new -A -s phone -t 0
 
 Create a phone-only window with ++ctrl+b++ ++c++. The workstation is only affected when both look at the same window.
 
+The linked session also has its own environment. Attaching the phone directly with `tmux attach -t 0` replaces session `0`'s `DISPLAY`, ssh-agent socket and `SSH_CONNECTION` with the phone's, which breaks the clipboard and ssh-agent in new workstation panes. See [Troubleshooting](#new-workstation-panes-act-like-ssh-sessions-after-the-phone-attaches).
+
 ### Keep the app alive in the background
 
 - **Battery:** Android Settings → Apps → Termux/Termius → Battery → **Unrestricted**. This matters most. Samsung, Xiaomi, etc. also have "sleeping apps" lists — remove the app there too.
@@ -600,3 +602,29 @@ Start with tmux and the battery setting; add mosh only if disconnects are still 
 | `gh`/`git`/Claude Code not logged in over SSH (macOS) | Keychain locked in SSH sessions, see [Keychain](#keychain) |
 | `command not found: tmux` with `ssh -t … tmux` (macOS) | Non-interactive PATH, see [PATH in one-shot commands](#path-in-one-shot-commands) |
 | Nodes stop PXE booting after enabling `ufw` | PXE port rules missing, see [step 1](#1-enable-the-firewall) and [Troubleshooting PXE Boot](./troubleshooting_pxe_boot.md) |
+| On the workstation, new tmux panes lose the clipboard and ssh-agent and show `user@host` | Phone attached directly to session `0`, see [below](#new-workstation-panes-act-like-ssh-sessions-after-the-phone-attaches) |
+
+### New workstation panes act like SSH sessions after the phone attaches
+
+After the phone runs `tmux attach -t 0`, panes opened on the **workstation** behave as if they were the phone's SSH login:
+
+- Copying in tmux no longer reaches the system clipboard.
+- The prompt and statusline show `user@host`.
+- `git push` and other SSH commands ask for the key passphrase instead of using the agent.
+
+**Cause:** tmux keeps one environment per *session*, not per screen. On every attach, it copies the variables listed in `update-environment` (`DISPLAY`, `XAUTHORITY`, `SSH_AUTH_SOCK`, `SSH_CONNECTION`, …) from the attaching client into the session, and removes the ones that client doesn't have. Attaching the phone to session `0` therefore replaces the desktop's values with the phone's SSH ones. Every new pane inherits them, whichever screen opens it, and so does the `xclip` process the copy bindings start (without `DISPLAY` it fails silently). Panes that already existed keep the environment they started with.
+
+Detaching the phone does **not** undo this: tmux never restores the environment on detach. It only looks fixed if something re-attaches from the desktop afterwards, e.g. a new terminal tab running `tmux attach -t 0`.
+
+**Check:**
+
+```bash
+tmux show-environment -t 0 | grep -E '^-?(DISPLAY|SSH_)'
+```
+
+`-DISPLAY` (removed) together with `SSH_CONNECTION=192.168.1.… 192.168.1.100 22` means session `0` has the phone's variables.
+
+**Fix:**
+
+- **Prevent it:** attach from the phone with a linked session, `tmux new -A -s phone -t 0` (see [above](#attach-to-the-session-already-open-on-the-workstation)). It shares session `0`'s windows but has its own environment, so session `0` keeps the desktop's values.
+- **Repair it without detaching:** on the workstation, press ++ctrl+b++ and run `:switch-client -t 0`. This applies `update-environment` from the desktop client again. Panes opened while the phone's values were active keep them; close those.
