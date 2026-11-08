@@ -1,6 +1,6 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./reviews/archive/design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
 > Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Implementation and live acceptance remain pending.
 
 ## Problem statement
@@ -438,7 +438,7 @@ areas may receive new files.
 | Claim | Verdict | Source |
 |---|---|---|
 | mergerfs non-path-preserving (`mfs`) supports pool-wide hardlinks; `EXDEV` is a path-preserving-policy issue | Confirmed | [mergerfs FAQ](https://trapexit.github.io/mergerfs/latest/faq/why_isnt_it_working/), [mergerfs(1)](https://manpages.debian.org/unstable/mergerfs/mergerfs.1.en.html) |
-| Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; design-review.md finding R2-P0 |
+| Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; [archived design review](./reviews/archive/design-review.md) finding R2-P0 |
 | *arrs hardlink-or-silently-copy; upgrades delete old files | Confirmed | *arr/trash-guides community documentation |
 | Immich external libs delete originals when RW; `:ro` is the enforcement; no XMP on `:ro` | Confirmed (corrected during review) | [Immich libraries docs](https://docs.immich.app/features/libraries/), [discussion #24064](https://github.com/immich-app/immich/discussions/24064), [#13771](https://github.com/immich-app/immich/discussions/13771) |
 | NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; live acceptance pending Task 11 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
