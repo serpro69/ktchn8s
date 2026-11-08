@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-10-04 — Tasks 2–4 and 12 complete; Tasks 1, 11 and 13 repository work verified; both Molecule scenarios pass; NAS apply/preparation/acceptance deferred while offline
+> Revised: 2026-11-08 — Tasks 2–4, 9 and 12 complete; Tasks 1, 11 and 13 repository work verified; both Molecule scenarios pass; NAS apply/preparation/acceptance deferred while offline
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -211,18 +211,18 @@ disabled to preserve existing YAML indentation.
 - [ ] 8.6 Write all size/safety-copy/job/retry/disposition records to the controller evidence workspace during the freeze; after release archive them to `00_meta`, keep the independent copy, and re-enable maintenance
 
 ## Task 9: Legend & docs
-- **Status:** pending
+- **Status:** done
 - **Depends on:** Task 1
 - **Size:** S
 - **Can run in parallel with:** Task 2, Task 3, Task 4, Task 5, Task 6, Task 7, Task 8, Task 11, Task 12, Task 13
 - **Docs:** [implementation.md#legend-docs](./implementation.md#legend-docs)
 
 ### Subtasks
-- [ ] 9.1 Write the vault legend note (manual, in Obsidian vault) mirroring `00_meta/README.md`
-- [ ] 9.2 Point `docs/info/todo.md` storage section at `docs/feat/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
-- [ ] 9.3 Run `python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check` and check revised local links; document any unrelated baseline warnings rather than weakening the check
+- [x] 9.1 Write the vault legend note (manual, in Obsidian vault) mirroring `00_meta/README.md`
+- [x] 9.2 Point `docs/info/todo.md` storage section at `docs/feat/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
+- [x] 9.3 Run `python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check` and check revised local links; document any unrelated baseline warnings rather than weakening the check
 
-**Docs baseline (2026-10-04):** Strict build already reports nine broken-link
+**Docs baseline (2026-10-04; resolved 2026-11-08 — see Execution context below):** Strict build already reports nine broken-link
 warnings after the review documents were moved into `reviews/archive/`. This is
 outside the Molecule planning change. Before completing 9.3, update the review
 links in `design.md` and `docs/reference/architecture/decision_records.md`, fix the
@@ -231,6 +231,54 @@ mode. Do not count an unchanged warning baseline as a passing strict build.
 The Molecule planning update adds no warnings: the before/after warning sets are
 identical. Local links/anchors in the revised implementation/tasks documents and
 their dependency graph/parallel markers pass validation.
+
+### Execution context
+
+- **2026-11-08 — accepted scope:** The owner requested Task 9 and supplied the
+  Obsidian vault at `~/obsidian/evergreen-dissemination-light`. Create
+  `000_Infra/001_Legend/cosmarchy_of_the_nas.md` there, update the storage TODO
+  references, and repair the archived-review links required by 9.3.
+- **2026-11-08 — observed baseline:** Repository work starts at `3f98bd8` on
+  `feat/nas_layout`; the vault worktree is clean and has no NAS legend note.
+  Task 1's completed `storage_dirs` and `storage-readme.j2` supply the offline
+  source. Mirror the generated legend without claiming NAS deployment or parity
+  acceptance. The NAS `00_meta/README.md` remains authoritative; media-guide
+  rollout instructions remain owned by Task 5.
+- **2026-11-08 — verified:** The baseline strict MkDocs build reproduced all nine
+  archived-review warnings. After the link repairs,
+  `nix develop -c python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check`
+  passed with zero MkDocs warnings. The final direct check of 71 local links/anchors across
+  seven feature/reference documents passed. The check initially omitted MkDocs'
+  `attr_list` extension and falsely rejected two existing custom anchors; using
+  that configured extension resolved the checker error without changing the docs.
+  Strict Jinja rendering of the role template matched the vault note's complete
+  40-directory tree and all three policy sections exactly. Vault frontmatter and
+  its internal WikiLink passed; Git whitespace checks passed with the user-level
+  `indent-with-non-tab` rule disabled. No NAS or cluster commands ran.
+- **2026-11-08 — environment limit:** The existing Nix shell hook still reports
+  the stale `.venv/bin/pip` interpreter path already recorded in
+  [environment repair](./implementation.md#deferred-follow-ups-explicit).
+  Existing documentation dependencies work; no installation or environment repair
+  was needed. The repair remains a separate task owned by the operator.
+- **2026-11-08 — review complete:** The isolated code reviewer (GPT-6.1 Sol)
+  approved the seven changed Markdown files and relevant source contracts, with no
+  findings. PAL selected CLI review because no API providers were configured:
+  Claude was the only eligible installed client (Anthropic assumed initially,
+  confirmed by the returned `claude-opus-5-5` model); agy/codex were unavailable
+  and gemini was retired. The external review also approved. Its optional clarity
+  suggestions were applied: link the remaining plain-text review reference, mark
+  the historical warning baseline resolved, and match vault timestamp formatting.
+  Its proposed tag mismatch was withdrawn after checking that `homelab` is an
+  alias, not an existing tag; `infrastructure/nas` remains unchanged.
+  The external initial read trace was truncated; the follow-up exposed successful
+  source reads but also a denied shell survey, recovered through read/search tools.
+  No independent corroboration is claimed from the incomplete initial receipt.
+  Both reviews were source-only; validation was run by the implementing session.
+  No findings needed indexing and no Task 9 actions remain deferred.
+- **2026-11-08 — final acceptance:** After the review edits, strict MkDocs, all
+  71 local links/anchors, exact rendered-legend equality and vault metadata checks
+  passed again (captured run `efc49f5a-426e-4a2d-b24f-1844028749a6`, exit 0).
+  Task 9 is complete. The overall feature and its live acceptance gates remain open.
 
 ## Task 11: NFS export lifecycle acceptance
 - **Status:** in-progress
