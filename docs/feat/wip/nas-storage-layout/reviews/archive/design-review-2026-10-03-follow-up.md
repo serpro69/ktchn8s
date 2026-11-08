@@ -2,8 +2,8 @@
 
 Reviewed: 2026-10-03 · Baseline: `7c15aae` · Method: kk:review-design, standard
 
-**Scope:** [design](./design.md), [implementation plan](./implementation.md),
-[tasks](./tasks.md), [AD-0003–AD-0007](../../../reference/architecture/decision_records.md),
+**Scope:** [design](../../design.md), [implementation plan](../../implementation.md),
+[tasks](../../tasks.md), [AD-0003–AD-0007](../../../../../reference/architecture/decision_records.md),
 and both existing review/resolution records as historical context.
 
 **Overall assessment before corrections:** CONCERNS_FOUND

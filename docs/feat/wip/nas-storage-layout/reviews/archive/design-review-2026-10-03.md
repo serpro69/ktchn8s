@@ -11,9 +11,9 @@ documents; infrastructure implementation and live acceptance remain pending.
 
 **Documents:**
 
-- [Design](./design.md)
-- [Implementation](./implementation.md)
-- [Tasks](./tasks.md)
+- [Design](../../design.md)
+- [Implementation](../../implementation.md)
+- [Tasks](../../tasks.md)
 
 **Summary:** 9 findings: 0 critical, 5 high, 3 medium, 1 low.
 

@@ -143,7 +143,7 @@ So the alternative was to disable the GRUB timeout altogether.
 ## AD-0003 - NAS directory layout grammar
 
 AD-0003 through AD-0007 were amended on 2026-10-03 following the
-[storage-layout follow-up corrections](../../feat/wip/nas-storage-layout/design-review-2026-10-03-follow-up.md#resolution).
+[storage-layout follow-up corrections](../../feat/wip/nas-storage-layout/reviews/archive/design-review-2026-10-03-follow-up.md#resolution).
 These are design decisions; the referenced implementation tasks remain pending.
 
 **Context**
@@ -187,7 +187,7 @@ The media stack (transmission + Radarr/Sonarr + Jellyfin) relies on hardlinks: t
 
 **Status**
 
-- Accepted (amended 2026-08-22, same day: the original wording claimed multiple `subPath` mounts of one PVC suffice for hardlinks — refuted empirically during design review; see `docs/feat/wip/nas-storage-layout/design-review.md`)
+- Accepted (amended 2026-08-22, same day: the original wording claimed multiple `subPath` mounts of one PVC suffice for hardlinks — refuted empirically during design review; see the [archived design review](../../feat/wip/nas-storage-layout/reviews/archive/design-review.md))
 
 **Consequences**
 
