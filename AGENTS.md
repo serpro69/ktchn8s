@@ -8,10 +8,12 @@ This is ktchn8s - a homelab Kubernetes cluster project that uses Infrastructure 
 
 ## Key Commands
 
+**NB! For reference only!**
+
 ### Development Environment
 
 ```bash
-# Enter Nix development shell (REQUIRED for all tooling - provides all necessary tools)
+# Enter Nix development shell (provides all specialized tools)
 nix develop
 
 # Main deployment command - provisions entire homelab cluster
@@ -234,15 +236,3 @@ The project uses PXE boot for automated OS installation:
 - Inventory managed in `metal/inventory/hosts.yml`
 - Support for Wake-on-LAN for power management
 - Remote disk wiping capability
-
-## Important Notes
-
-- **ALWAYS** use `nix develop` before running any commands - it provides all required tools
-- `KUBECONFIG` is automatically set to `metal/kubeconfig.yaml` in Makefiles
-- Ansible uses dynamic inventory from `metal/inventory.sh`
-- ArgoCD self-manages after initial bootstrap - all changes should go through Git
-- Cilium operates in kube-proxy replacement mode with L2 announcements
-- External access exclusively through Cloudflare tunnels for security
-- The project assumes specific network configuration (VLANs, IP ranges) - adjust as needed
-- PXE server containers must be stopped with `make clean` after provisioning
-- Test deployments thoroughly before production use

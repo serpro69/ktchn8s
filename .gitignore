@@ -2,8 +2,9 @@
 .ansible/
 galaxy/
 
-# python virtualenv
+# python
 .venv
+__pycache__
 
 # k8s stuff that shouldn't be exposed
 ca.crt
