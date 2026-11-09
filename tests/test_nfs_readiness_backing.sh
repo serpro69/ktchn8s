@@ -2,7 +2,7 @@
 # Local synthetic hardlinks only: no mounts, inventory, host or Kubernetes calls.
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-probe="$repo/metal/roles/storage/files/nfs-readiness-backing.sh"
+probe="$repo/metal/roles/nfs_validation/files/nfs-readiness-backing.sh"
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 branches=("$scratch/branch one" "$scratch/branch two")

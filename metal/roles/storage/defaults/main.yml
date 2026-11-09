@@ -84,5 +84,7 @@ disk_health_thresholds:
   max_pending_sectors: 0
   max_uncorrectable_errors: 0
 
-# Run nfs validations
+# Legacy opt-in: basic NAS + Kubernetes probes after convergence.
+# Requires an existing cluster; prefer the separate storage-validate target.
+# Never enables disruptive lifecycle acceptance or migration-tool checks.
 validate_nfs: false

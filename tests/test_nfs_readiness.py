@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 
 ROLE = Path(__file__).resolve().parents[1] / "metal/roles/storage"
+VALIDATION = ROLE.parent / "nfs_validation"
 SPEC = importlib.util.spec_from_file_location("nfs_vms", ROLE / "molecule/nfs-lifecycle/vms.py")
 vms = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(vms)
@@ -30,7 +31,7 @@ class ProbeTests(unittest.TestCase):
 
     def probe(self, action, *, check=False):
         return subprocess.run(
-            ["sh", str(ROLE / "files/nfs-readiness.sh"), action, str(self.root)],
+            ["sh", str(VALIDATION / "files/nfs-readiness.sh"), action, str(self.root)],
             check=check, capture_output=True, text=True, timeout=70,
         )
 
