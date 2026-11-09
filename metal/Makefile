@@ -136,9 +136,6 @@ else
   ifeq (, $(shell which jq))
     $(error "No jq in '$(PATH)', go to https://github.com/jqlang/jq?tab=readme-ov-file#installation and follow the instructions")
   endif
-  ifeq (, $(shell which yq))
-    $(error "No yq in '$(PATH)', go to https://github.com/mikefarah/yq/#install and follow the instructions")
-  endif
 endif
 
 ################################################################################################

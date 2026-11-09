@@ -1,0 +1,4 @@
+- name: List fixture NAS hosts without executing tasks
+  hosts: nas
+  gather_facts: false
+  tasks: []
