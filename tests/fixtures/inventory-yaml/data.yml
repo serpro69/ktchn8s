@@ -1,0 +1,15 @@
+all: null
+metal:
+  vars:
+    ansible_user: fixture-user
+  children:
+    nas: null
+nas:
+  hosts:
+    fixture-nas:
+      ansible_connection: local
+      data_drives:
+        - id: fixture-part1
+          brand: fixture
+      parity_drives: []
+      network_interface: fixture0

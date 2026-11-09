@@ -21,30 +21,51 @@
     deb: "{{ mergerfs_url_deb }}"
     state: present
 
-- name: Copy snapraid .deb
-  copy:
-    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
-    dest: /tmp/
-    owner: root
-    group: root
-    mode: "0755"
-  register: snapraid_deb
+# A storage rerun does not need the controller's .deb when the pinned binary
+# used by the parity jobs is already installed.
+- name: Inspect installed SnapRAID executable
+  stat:
+    path: /usr/local/bin/snapraid
+    follow: true
+    get_checksum: false
+  register: snapraid_binary
 
-- name: Ensure apt module dependencies
-  apt:
-    name:
-      # temp 'apt' module dependency for installing .deb
-      - xz-utils
-    state: present
-  when: snapraid_deb is changed
+- name: Read installed SnapRAID version
+  command: /usr/local/bin/snapraid --version
+  register: snapraid_installed_version
+  changed_when: false
+  check_mode: false
+  when: snapraid_binary.stat.exists
 
-- name: Install snapraid
-  apt:
-    deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
-    state: present
+- name: Install the pinned SnapRAID version when needed
+  when: >-
+    (snapraid_installed_version.stdout | default('')).split()[:2]
+    != ['snapraid', 'v' ~ snapraid_version]
+  block:
+    - name: Copy snapraid .deb
+      copy:
+        src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
+        dest: /tmp/
+        owner: root
+        group: root
+        mode: "0755"
+      register: snapraid_deb
 
-- name: Clean up temporary packages
-  apt:
-    name:
-      - xz-utils
-    state: absent
+    - name: Ensure apt module dependencies
+      apt:
+        name:
+          # temp 'apt' module dependency for installing .deb
+          - xz-utils
+        state: present
+      when: snapraid_deb is changed
+
+    - name: Install snapraid
+      apt:
+        deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
+        state: present
+
+    - name: Clean up temporary packages
+      apt:
+        name:
+          - xz-utils
+        state: absent

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "$1" = decrypt
+case "$#" in
+  2) fixture_input=$2 ;;
+  4)
+    test "$2" = --output-type
+    test "$3" = yaml
+    fixture_input=$4
+    ;;
+  *) exit 1 ;;
+esac
+# The test copies the real wrapper beside this synthetic input; no keys are used.
+test "$fixture_input" = "$PWD/inventory/metal.yml"
+cat "$fixture_input"

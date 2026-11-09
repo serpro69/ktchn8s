@@ -29,6 +29,8 @@
 - name: Display mergerfs mount details
   debug:
     msg: "{{ mergerfs_mount_info.stdout | from_json }}"
-  when: mergerfs_mount_info.rc == 0
+  when:
+    - mergerfs_mount_info is not skipped
+    - mergerfs_mount_info.rc == 0
 
 # Mutating write/link probes belong to explicit NFS validation, after convergence.
