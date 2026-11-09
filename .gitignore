@@ -1,6 +1,7 @@
 # ansible
 .ansible/
 galaxy/
+/.nas-audit-evidence/
 
 # python
 .venv
