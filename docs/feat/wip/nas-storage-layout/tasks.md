@@ -4,7 +4,7 @@
 > Implementation: [./implementation.md](./implementation.md)
 > Status: in-progress
 > Created: 2026-08-22
-> Revised: 2026-11-08 — Tasks 2–4, 9 and 12 complete; Tasks 1, 11 and 13 repository work verified; both Molecule scenarios pass; NAS apply/preparation/acceptance deferred while offline
+> Revised: 2026-11-09 — Tasks 1–4, 9 and 11–13 complete; migration, media rollout and final verification remain pending
 > Not Doing: SMB shares, documents-service selection (Nextcloud/Copyparty/OpenCloud), Plex/second media service, automated photo promotion, vault reorganization, ZFS migration planning, Gitea code-archive extraction, restic policy values, NFS health monitoring
 
 Tasks 11–13 add prerequisites while preserving existing task IDs. Parallel markers
@@ -23,9 +23,11 @@ reusing the NFS fixture for its identity-sensitive access test. Task 3 supplies 
 tooling. Follow [the scenario contract](./implementation.md#molecule-testing);
 passing a disposable scenario does not complete any deferred live acceptance.
 
+The [acceptance summary](./reviews/guided-execution-2026-11-08.md) records the completed live gates and verification limits. Raw execution records and audit reports remain private under the ignored `.nas-audit-evidence/` directory.
+
 ## Task 1: Tree skeleton via storage role
-- **Status:** in-progress
-- **Repository work:** done; live acceptance in 1.5 remains deferred
+- **Status:** done
+- **Repository work:** done; live acceptance completed 2026-11-09
 - **Depends on:** —
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 3, Task 12
@@ -36,31 +38,21 @@ passing a disposable scenario does not complete any deferred live acceptance.
 - [x] 1.2 Ensure the `storage_dirs` loop in `tasks/nfs.yml` sets owner/group `1000:1000`, mode `0775`
 - [x] 1.3 Add `templates/storage-readme.j2` (legend: grammar rules, working-set test, machine-vs-human convention) rendered to `00_meta/README.md` from the same variable; create `00_meta/RETIRED.md` with `force: false`
 - [x] 1.4 Grep the role for references to old dirs (`Temp`, `Videos` in validation tasks) and repoint to `99_tmp`
-- [ ] 1.5 Run the role against the NAS twice: second run reports zero changes for the layout/legend tasks (the pre-existing `sensors-detect` task always changes); manually remove only confirmed-empty legacy dirs and verify the new tree
+- [x] 1.5 Run the role against the NAS twice: second run reports zero changes for the layout/legend tasks (the pre-existing `sensors-detect` task always changes); manually remove only confirmed-empty legacy dirs and verify the new tree
 
-**Deferred operation (2026-10-04):** Subtask 1.5 is deferred at the owner's request
-because the NAS is offline. Do not run Ansible against the NAS for this task now.
-When the host is available, inspect the storage-play check/diff, apply twice, record
-layout/legend idempotence, and remove legacy directories only after confirming they
-are empty. Local validation does not satisfy this live acceptance gate.
+### Execution context
 
-**Local verification (2026-10-04):** YAML lint, offline Ansible lint and a
-localhost-only syntax check passed. A disposable localhost fixture ran the three
-actual layout/legend tasks against a temporary root: all 40 directories had
-`1000:1000` ownership and `0775` mode; the second application made zero changes.
-Existing retirement entries, legacy data and restrictive descendant permissions
-survived. Strict template rendering matched the full path list and included an
-extra path supplied only through the variable. No NAS commands were executed.
-Isolated code review found no correctness issues. Its optional `basename` filter
-suggestion was left unchanged because the standard Jinja expression works in both
-rendering checks. If that style change is adopted later, rerun the Ansible template
-check.
+**Accepted 2026-11-09:** The operator completed the constrained preview, coordinated
+normal mount transition and two storage-role applications. All 40 layout entries,
+the legend and retirement file were unchanged on the second application; only
+the existing sensors task changed. Confirmed-empty legacy entries were removed
+and absence was checked on the pool and every branch. Routine role execution
+still does not delete legacy data.
 
-**Molecule follow-up:** Task 1's completed repository checks remain valid. Task 11
-will include layout/legend and retirement-log preservation in its reusable NFS
-scenario; Tasks 3, 11–13 below now own the planned tooling and integration coverage.
-Task 11's NFS Molecule scenario now covers these regressions; Task 1.5 remains a
-separate live acceptance gate.
+Earlier local layout/legend checks and the disposable NFS scenario covered
+ownership, modes, idempotence and preservation of existing data and retirement
+entries. They were separate from the now-completed live gate. See the
+[Task 1 acceptance evidence](./reviews/guided-execution-2026-11-08.md#task-1-live-acceptance-complete-2026-11-09).
 
 ## Task 2: SnapRAID excludes and parity configuration
 - **Status:** done
@@ -74,22 +66,12 @@ separate live acceptance gate.
 - [x] 2.2 Correct additional parity directives/filenames to use `loop.index`: `parity`, `2-parity`, `3-parity`, with no repeated first level
 - [x] 2.3 Render and parse one-, two-, and three-parity configs offline in disposable SnapRAID 13.0 fixtures; assert exact paths, included backup `downloads`/`appdata` paths, and rejection of duplicate first parity; the live config check belongs to Task 8 because the role skips it with no parity drives
 
-**Local verification (2026-10-04):** All three tests in
-`tests/test_snapraid_config.py` passed with SnapRAID 13.0, Python 3.12.10 and Jinja
-3.1.6. The parity-count subtests parsed all three configurations and checked actual
-scan inclusion/exclusion on three temporary data roots. Duplicate first parity
-failed with the expected parser error. No parity/content files were created and no
-NAS commands ran. The test binary was built in `/tmp` from upstream tag `v13.0`
-(using its `.version` build metadata); no project dependency versions changed.
-See [the repeatable command and fixture limits](./implementation.md#snapraid-excludes).
-Live configuration acceptance remains in Task 8.
-
-**Regression and review:** Running the same suite against the original template
-produced five expected assertion failures and no execution errors. Isolated external
-code review (Gemini 3.1 Pro) found no required fixes; its optional explicit
-`check=False` suggestion was left unchanged because that is already the subprocess
-default. The code-reviewer sub-agent could not access the Nix daemon under its
-read-only permissions, so only the external reviewer completed independent review.
+**Verified 2026-10-04:** The three config tests passed against SnapRAID 13.0:
+root-only exclusions, preservation of same-named backup paths, correct additional
+parity levels and rejection of duplicate first parity. No live parity computation
+was performed. The role skips parity configuration while no parity drives are
+assigned; live configuration, sync and full-scrub evidence remain Task 8. See
+[the fixture commands and limits](./implementation.md#snapraid-excludes).
 
 ## Task 3: Storage test tooling in the dev shell
 - **Status:** done
@@ -104,22 +86,12 @@ read-only permissions, so only the external reviewer completed independent revie
 - [x] 3.3 Add a Molecule package compatible with the locked Ansible/Python environment to `devShells.default` in `flake.nix`; use the pinned Nix package set rather than a global pip install
 - [x] 3.4 Verify `nix develop -c molecule --version` and scenario CLI availability; record the resolved versions. VM backend setup and actual scenario passes belong to Tasks 11–12
 
-**Local verification (2026-10-04):** The locked packages provide `b3sum 1.8.2`
-and Molecule `25.11.1` with Python `3.13.11`, Ansible Core `2.19.4` and
-`molecule-plugins 23.5.3`. Version and scenario-help commands passed; executable
-paths and package metadata confirm the Nix runtimes satisfy Molecule's requirements.
-See [the commands and environment limits](./implementation.md#devshell-b3sum).
-No NAS commands or Molecule scenarios ran; backend provisioning and scenario
-acceptance remain in Tasks 11–12.
-
-**Validation and review:** `nix flake check --no-build --no-update-lock-file`
-passed for `x86_64-linux`; other platforms were not checked. Revised Markdown
-link targets passed. Git whitespace checks passed with only the user-level
-`indent-with-non-tab` rule disabled, preserving the existing Nix space indentation.
-The isolated code-reviewer found no issues in the supplied patch; its read-only
-environment could not access the Nix daemon, so runtime verification remained with
-the implementing session. The external reviewer returned no findings but reported
-zero embedded files; its response is not counted as independent source inspection.
+**Verified 2026-10-04:** The locked x86_64-linux toolchain provides b3sum 1.8.2,
+Molecule 25.11.1, Ansible Core 2.19.4, Python 3.13.11 and molecule-plugins 23.5.3.
+Version/help checks and flake evaluation passed; other platforms were not checked.
+CLI availability alone did not establish VM capabilities or live acceptance.
+The existing virtualenv-launcher issue remains an
+[environment follow-up](./implementation.md#deferred-follow-ups-explicit).
 
 ## Task 4: Prepare the NFS media PV offline
 - **Status:** done
@@ -134,25 +106,13 @@ zero embedded files; its response is not counted as independent source inspectio
 - [x] 4.1 In `system/csi-driver-nfs/values.yaml` replace the `videos` volume entry with `media` / share `30_media` / capacity 4Ti
 - [x] 4.2 Verify offline: `helm template` renders `pv-nfs-media` with volumeHandle `…/mnt/storage/30_media`, capacity 4Ti and Retain policy; leave cluster resources unchanged
 
-**Local verification (2026-10-04):** Helm `3.19.1` strict lint and offline rendering
-passed using the cached `csi-driver-nfs 4.13.0` dependency. Parsed all ten rendered
-resources and compared them with the pre-change values: only the PV name, capacity,
-CSI handle and share changed. Assertions verified `pv-nfs-media`, `4Ti`, `Retain`,
-`ReadWriteMany`, the class-less static binding and unchanged mount options.
-`kubeconform` was unavailable, so Kubernetes API schema validation was skipped;
-see [repeatable commands and coverage limits](./implementation.md#nfs-media-share).
-The changes remain on `feat/nas_layout`; the checked-in ArgoCD configuration targets
-`master`. No NAS, Ansible or cluster commands ran. Task 5 still owns joint release,
-old-resource cleanup and live acceptance after Task 8.
-
-**Review:** The isolated code reviewer found no actionable issues in the supplied
-patch and source snapshots. Its read-only environment could not access the Nix
-daemon, so filesystem inspection and test execution remained with the implementing
-session. The external reviewer returned no findings but reported zero embedded
-files; that response is not counted as independent source inspection. No findings
-needed indexing. All 29 local links/anchors in the implementation and task documents
-passed; whitespace checks passed with the user-level `indent-with-non-tab` rule
-disabled to preserve existing YAML indentation.
+**Verified 2026-10-04:** Helm 3.19.1 lint/render checks passed with the cached
+csi-driver-nfs 4.13.0 dependency. Only the PV name, capacity, CSI handle and share
+changed; Retain, ReadWriteMany, static class-less binding and mount options were
+preserved. Kubernetes schema validation was unavailable because kubeconform was
+absent. This was offline preparation on the feature branch: Task 5 still owns
+joint release, binding, old-resource cleanup and application acceptance after
+Task 8. See [the rendering contract](./implementation.md#nfs-media-share).
 
 ## Task 5: Jellyfin stack remount end-to-end
 - **Status:** pending
@@ -170,6 +130,8 @@ disabled to preserve existing YAML indentation.
 - [ ] 5.6 After Task 8, release both charts together, retire old consumer mounts/claim, and delete the unused old PV only after its state is safe; verify new binding and replacement-pod startup per the implementation plan
 - [ ] 5.7 Complete all live acceptance in `implementation.md#jellyfin-remount`: real app credentials/import/hardlinks/seeding, promotion/rescan, actual migrated-library playback, RO after recreation, and explicitly executed NFS tests. Network smoke testing remains separate
 
+
+
 ## Task 6: Migration — copy & cross-drive verification (manual ops)
 - **Status:** pending
 - **Depends on:** Task 1, Task 3, Task 11, Task 13
@@ -181,6 +143,15 @@ disabled to preserve existing YAML indentation.
 - [ ] 6.1 Establish `implementation.md#migration-evidence` workspace; freeze original source entries and use Task 13's tested helper to publish complete A/B/C JSONL inventories, recording NAS Python/b3sum versions
 - [ ] 6.2 Copy A locally to `99_tmp/driveA/` with metadata preservation, inventory/hash the copy on the NAS, and use path comparison to reconcile all entries; publish evidence to the independent workspace
 - [ ] 6.3 Use content comparison to discover B/C deltas, copy/read-verify them, and record all source/path identities and proposed dispositions in the ledger; stop on execution/incomplete-input errors
+
+### Execution context
+
+No real source has been mounted, inventoried or copied in this guided work.
+Tasks 1, 3, 11 and 13 now satisfy the tooling/storage prerequisites, but the owner
+stopped before migration. On resumption, the owner must reconcile the A/B/C labels,
+logical source relationships and independent recovery copies with the actual
+sources before mounting or copying anything. Preserve original data and RAID/LVM
+structures. The assistant prepares reviewed batches; the owner executes them.
 
 ## Task 7: Migration — sort into numbered homes (manual ops)
 - **Status:** pending
@@ -194,6 +165,8 @@ disabled to preserve existing YAML indentation.
 - [ ] 7.2 Apply `implementation.md#migrated-content-access`: record necessary permission/ACL transformations, preserve archive metadata, and prove actual migrated-media reads as UID/GID 1000 through a temporary RO NFS mount; remove that client afterward
 - [ ] 7.3 Run the helper's complete final reconciliation; require metadata/content/disposition checks and access acceptance against the same ledger generation, with no unresolved staging entries
 - [ ] 7.4 Check retained content against Task 2's finalized exclusions, archive the accepted evidence before the freeze, and follow `implementation.md#migration-evidence` through Task 8
+
+
 
 ## Task 8: Parity enablement & drive release (manual ops)
 - **Status:** pending
@@ -210,6 +183,8 @@ disabled to preserve existing YAML indentation.
 - [ ] 8.5 Release A last only after the two-level sync/scrub and a recovery check covering safety copies and excluded retained items; record its role. Leave a cold spare unformatted; parity/data expansion requires a further sync/full scrub before claiming protection
 - [ ] 8.6 Write all size/safety-copy/job/retry/disposition records to the controller evidence workspace during the freeze; after release archive them to `00_meta`, keep the independent copy, and re-enable maintenance
 
+
+
 ## Task 9: Legend & docs
 - **Status:** done
 - **Depends on:** Task 1
@@ -222,67 +197,16 @@ disabled to preserve existing YAML indentation.
 - [x] 9.2 Point `docs/info/todo.md` storage section at `docs/feat/wip/nas-storage-layout/` (supersedes "Future shares (Pictures, Documents, Music, Backups)" naming)
 - [x] 9.3 Run `python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check` and check revised local links; document any unrelated baseline warnings rather than weakening the check
 
-**Docs baseline (2026-10-04; resolved 2026-11-08 — see Execution context below):** Strict build already reports nine broken-link
-warnings after the review documents were moved into `reviews/archive/`. This is
-outside the Molecule planning change. Before completing 9.3, update the review
-links in `design.md` and `docs/reference/architecture/decision_records.md`, fix the
-relative feature/ADR links inside the two dated archived reviews, and rerun strict
-mode. Do not count an unchanged warning baseline as a passing strict build.
-The Molecule planning update adds no warnings: the before/after warning sets are
-identical. Local links/anchors in the revised implementation/tasks documents and
-their dependency graph/parallel markers pass validation.
-
-### Execution context
-
-- **2026-11-08 — accepted scope:** The owner requested Task 9 and supplied the
-  Obsidian vault at `~/obsidian/evergreen-dissemination-light`. Create
-  `000_Infra/001_Legend/cosmarchy_of_the_nas.md` there, update the storage TODO
-  references, and repair the archived-review links required by 9.3.
-- **2026-11-08 — observed baseline:** Repository work starts at `3f98bd8` on
-  `feat/nas_layout`; the vault worktree is clean and has no NAS legend note.
-  Task 1's completed `storage_dirs` and `storage-readme.j2` supply the offline
-  source. Mirror the generated legend without claiming NAS deployment or parity
-  acceptance. The NAS `00_meta/README.md` remains authoritative; media-guide
-  rollout instructions remain owned by Task 5.
-- **2026-11-08 — verified:** The baseline strict MkDocs build reproduced all nine
-  archived-review warnings. After the link repairs,
-  `nix develop -c python3 -m mkdocs build --strict --site-dir /tmp/ktchn8s-docs-check`
-  passed with zero MkDocs warnings. The final direct check of 71 local links/anchors across
-  seven feature/reference documents passed. The check initially omitted MkDocs'
-  `attr_list` extension and falsely rejected two existing custom anchors; using
-  that configured extension resolved the checker error without changing the docs.
-  Strict Jinja rendering of the role template matched the vault note's complete
-  40-directory tree and all three policy sections exactly. Vault frontmatter and
-  its internal WikiLink passed; Git whitespace checks passed with the user-level
-  `indent-with-non-tab` rule disabled. No NAS or cluster commands ran.
-- **2026-11-08 — environment limit:** The existing Nix shell hook still reports
-  the stale `.venv/bin/pip` interpreter path already recorded in
-  [environment repair](./implementation.md#deferred-follow-ups-explicit).
-  Existing documentation dependencies work; no installation or environment repair
-  was needed. The repair remains a separate task owned by the operator.
-- **2026-11-08 — review complete:** The isolated code reviewer (GPT-6.1 Sol)
-  approved the seven changed Markdown files and relevant source contracts, with no
-  findings. PAL selected CLI review because no API providers were configured:
-  Claude was the only eligible installed client (Anthropic assumed initially,
-  confirmed by the returned `claude-opus-5-5` model); agy/codex were unavailable
-  and gemini was retired. The external review also approved. Its optional clarity
-  suggestions were applied: link the remaining plain-text review reference, mark
-  the historical warning baseline resolved, and match vault timestamp formatting.
-  Its proposed tag mismatch was withdrawn after checking that `homelab` is an
-  alias, not an existing tag; `infrastructure/nas` remains unchanged.
-  The external initial read trace was truncated; the follow-up exposed successful
-  source reads but also a denied shell survey, recovered through read/search tools.
-  No independent corroboration is claimed from the incomplete initial receipt.
-  Both reviews were source-only; validation was run by the implementing session.
-  No findings needed indexing and no Task 9 actions remain deferred.
-- **2026-11-08 — final acceptance:** After the review edits, strict MkDocs, all
-  71 local links/anchors, exact rendered-legend equality and vault metadata checks
-  passed again (captured run `efc49f5a-426e-4a2d-b24f-1844028749a6`, exit 0).
-  Task 9 is complete. The overall feature and its live acceptance gates remain open.
+**Accepted 2026-11-08:** The vault legend was matched to the generated 40-directory
+tree and policy sections, repository references were updated, and archived-review
+links were repaired. Strict MkDocs, 71 local links/anchors, rendered-legend equality
+and vault metadata checks passed. Earlier documentation warnings are resolved.
+The NAS-generated legend remains authoritative; media rollout documentation still
+belongs to Task 5. No NAS deployment was inferred from these documentation checks.
 
 ## Task 11: NFS export lifecycle acceptance
-- **Status:** in-progress
-- **Repository work:** done; live NAS/Kubernetes acceptance in 11.6 remains deferred
+- **Status:** done
+- **Repository work:** done; live lifecycle, Kubernetes and teardown acceptance completed 2026-11-09
 - **Depends on:** Task 1, Task 3
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
@@ -296,31 +220,23 @@ their dependency graph/parallel markers pass validation.
 - [x] 11.3 Retain `root_squash`; prove the fixed-owner operations in the disposable guests and record results. Permission or stale-handle failures still block production rollout and require a design revision, not silent privilege relaxation
 - [x] 11.4 Simulate rename/promotion only inside `99_tmp/nfs-readiness`, proving reopened bytes and backing links without media applications; tear down VM clients/fixtures. Real seeding, production promotion and library rescans belong to Task 5
 - [x] 11.5 Create `metal/roles/storage/molecule/nfs-lifecycle/` with pinned disposable VM provisioning, isolated inventory, real-role convergence/idempotence, lifecycle and layout-preservation assertions; run the full scenario, intentional-failure cleanup and fresh recreation
-- [ ] 11.6 When the NAS returns, complete Task 1.5, quiesce clients and apply the mount changes; prove live active options, fixed-owner operations, two-client idle/reopen and controlled remount/recovery, RO rejection, backing links and NAS memory. Run the required live Kubernetes probes and verify clients/fixtures are removed. These live checks are deferred, not satisfied by the VM results
+- [x] 11.6 When the NAS returns, perform Task 1.5 and the mount changes in one maintenance window, quiescing/unmounting clients before the first full-role application; use the normal NFS/mergerfs shutdown/remount procedure in the implementation plan. Prove live active options, fixed-owner operations, two-client idle/reopen and controlled remount/recovery, RO rejection, backing links and NAS memory. Run the required live Kubernetes probes and verify clients/fixtures are removed. Live acceptance completed2026-11-09; VM results alone did not satisfy it
 
-**Local verification (2026-10-04):** The three-VM QEMU/KVM scenario passed with
-mergerfs 2.41.1 and a checksum-pinned Debian 12 image. The second real-role converge
-reported zero changes. Both clients passed UID/GID-1000 operations, a deliberate
-permission-denied test, 65-second idle/reopen, exact-byte reads, backing hardlink
-identity, RO rejection and normal unmount/remount recovery. All 40 directories,
-legend paths, operator retirement entries, legacy data and restrictive descendant
-metadata passed preservation checks. An injected failure after client mounts
-returned nonzero and completed cleanup/destroy; a subsequent fresh full run passed.
-Six local regression tests passed. See `metal/roles/storage/molecule/nfs-lifecycle/README.md`
-for repeatable commands, versions, resource requirements and log locations.
+### Execution context
 
-**Validation and review:** Offline Ansible lint passed with the existing short-module
-and unprefixed-role-variable conventions excluded; shell checks and Nix flake
-evaluation passed. Both Kubernetes manifests rendered and parsed locally, including
-a delegated-controller case proving the original inventory server address survives.
-No live Kubernetes test was run. Isolated review fixes strengthened cleanup ordering,
-exact-byte/error checks, delegated server addressing and process-exit cleanup. The
-external review's proposed undefined loop-register issue did not reproduce: the
-real Ansible 2.19.4 scenario executes that loop successfully. No NAS commands ran.
-The final full VM rerun also passed after the cleanup and log-retention fixes;
-its controller transcript is `/tmp/nas-nfs-final.log`. Strict MkDocs validation
-still fails on the same nine archived-review links already tracked in Task 9;
-none of its warnings concern the revised implementation/task documents.
+**Accepted 2026-11-09:** The operator completed the live two-client lifecycle,
+including fixed-owner denied/allowed operations, 65-second idle/reopen, RO rejection,
+backing hardlink identity, normal NFS/mergerfs recovery, post-recovery reads and
+memory observations. Both Kubernetes probes succeeded, and namespace, client
+mounts, workspaces and pool/all-branch fixture cleanup were verified.
+
+The earlier three-VM scenario passed configuration idempotence, layout/data
+preservation, lifecycle checks, intentional-failure cleanup and fresh recreation.
+The full live gate was satisfied by operator output, not by those VM results.
+The focused live entry point and its limits are documented in
+[the implementation plan](./implementation.md#guided-live-acceptance-entry-point);
+see the [acceptance summary](./reviews/guided-execution-2026-11-08.md#task-11-live-nfs-acceptance).
+No lifecycle or cleanup repeat is needed for this completed run.
 
 ## Task 12: Explicit parity bootstrap and expansion jobs
 - **Status:** done
@@ -335,44 +251,23 @@ none of its warnings concern the revised implementation/task documents.
 - [x] 12.3 Create `metal/roles/storage/molecule/parity-lifecycle/` using a disposable systemd VM and distinct data/parity filesystems; exercise actual role tasks/handlers and prove initial creation, adding second parity, interruption/retry and nonzero-exit propagation. Applying config must not start jobs, and role reruns must not reactivate disabled maintenance
 - [x] 12.4 Run `molecule test -s parity-lifecycle` from the role directory inside `nix develop`; require configuration idempotence, successful and failed unit evidence, recovery after injected failure, and cleanup/recreation. Keep this scenario independent of Task 11; real NAS sync/scrub remains Task 8
 
-**Local verification (2026-10-04):** The independent QEMU/KVM scenario passed with
-SnapRAID 13.0, systemd 252.39 and four distinct scratch filesystems on the pinned
-Debian 12 image. The second configuration converge reported zero changes. First
-sync, second-parity expansion, two full scrubs, real-process interruption/retry,
-and injected exit-42 failure/recovery passed with six distinct invocation IDs.
-Configuration preserved existing parity/content bytes and inodes, never started
-jobs, and stopped previously enabled maintenance; changed timer handlers kept
-disabled maintenance stopped. Original payload SHA-256 hashes matched before and
-after every invocation. An intentional failure after first sync returned nonzero
-and completed evidence collection/cleanup/destroy; fresh recreation then passed.
-No NAS commands ran. Live configuration, sync/scrub and drive release remain Task 8.
+**Verified 2026-10-04:** The independent QEMU/KVM scenario passed with SnapRAID
+13.0, systemd 252.39 and four distinct scratch filesystems. Configuration was
+idempotent and preserved existing parity/content bytes without starting jobs.
+First sync, expansion, two full scrubs, real-process interruption/retry and
+injected exit-42 failure/recovery passed with distinct invocation evidence and
+unchanged payload hashes. Failure cleanup and fresh recreation also passed.
 
-**Evidence and commands:** See
-`metal/roles/storage/molecule/parity-lifecycle/README.md`. Controller transcripts
-are `/tmp/nas-parity-injected.log` and `/tmp/nas-parity-final.log`; retained guest
-journals, JSON results, baseline hashes, versions and scrub output are under
-`/tmp/nas-parity-evidence/`. These are local artifacts, not committed evidence.
-All 13 local storage regression tests passed (three config, six NFS, four parity
-evidence tests). YAML/offline Ansible lint and whitespace checks passed; the existing
-short-module, role-variable and lowercase-handler conventions were retained.
-All 29 implementation/task document links and anchors passed. Strict MkDocs still
-fails on the same nine archived-review links tracked in Task 9, with no new warnings.
-
-**Implementation adjustment and review:** Successful inactive oneshot units lost
-their exit metadata immediately in the guest. `RemainAfterExit=yes` now retains
-`active (exited)` results; every explicit attempt uses `systemctl restart --no-block`
-and must have a new invocation ID/start timestamp. Plain `start` after completion
-does not run again. The independent reviewer approved after adding payload-baseline
-checks and preserving original errors when evidence capture fails. The final VM
-pass exercised payload checks and journal-error handling; the subsequent JSON-write
-error guard passed the local regression suite. External review reported zero
-embedded files, so its proposals were checked against source independently:
-the credential-bearing runner config is now `0600`, PID/teardown safeguards remain
-fail-loud, and runtime journals did not reproduce the proposed invocation-ID issue.
+The unit retains completion evidence with RemainAfterExit; each explicit attempt
+uses restart and must produce a new invocation ID. Disabled maintenance stays
+stopped, and credential-bearing runner configuration is mode 0600. These are
+disposable-environment results: real NAS sync, scrub and drive release remain
+Task 8. See [the job contract](./implementation.md#parity-job-readiness) and the
+scenario README under `metal/roles/storage/molecule/parity-lifecycle/`.
 
 ## Task 13: Migration inventory and audit tooling
-- **Status:** in-progress
-- **Repository work:** done; NAS preparation in 13.4 is deferred while offline
+- **Status:** done
+- **Repository work:** done; NAS differing-version unit/access and teardown acceptance completed2026-11-09
 - **Depends on:** Task 3, Task 11
 - **Size:** M
 - **Can run in parallel with:** Task 2, Task 4, Task 9, Task 12
@@ -383,45 +278,29 @@ fail-loud, and runtime journals did not reproduce the proposed invocation-ID iss
 - [x] 13.1 Create `scripts/nas-migration-audit.py` with the documented inventory/compare/verify/access contract, read-only dataset handling, versioned JSONL, explicit exit codes and atomic completed generations
 - [x] 13.2 Add `tests/test_nas_migration_audit.py` covering the specified data/metadata/error/retry cases; run standard-library unittest discovery from the dev shell
 - [x] 13.3 Extend Task 11's `molecule/nfs-lifecycle` verifier with the restrictive-permission audit fixture; require UID/GID 1000 reads over a read-only NFS mount to fail before the declared repair and pass afterward, then clean up clients. Record helper/tool revisions for Task 6; keep unit tests in 13.2 and actual migrated-content acceptance in Task 7
-- [ ] 13.4 When the NAS is available, prepare Python 3/b3sum outside the storage role and compare their versions with the fixture record; rerun unit/access checks for differing versions before Task 6. Defer this NAS preparation while offline
+- [x] 13.4 When the NAS is available, prepare Python 3/b3sum outside the storage role and compare their versions with the fixture record; rerun unit/access checks for differing versions before Task 6. Completed2026-11-09 on NAS Python3.13.5/b3sum1.8.1
 
-**Offline completion (2026-10-04):** Subtasks 13.1–13.3 are complete. Task 11's
-completed repository/scenario work supplied the offline prerequisite; its live
-acceptance remains deferred. No NAS commands ran. Subtask 13.4 remains unchecked,
-and Task 13 stays in progress until NAS preparation/version acceptance completes.
-Actual source inventories, migrated-content access and drive-release gates remain
-Tasks 6–8. See the [helper and ledger guide](../../../guides/nas_migration_audit.md).
+### Execution context
 
-**Verification:** All 44 local storage regression tests passed, including 31 new
-audit-helper tests, with Python 3.12.10 and b3sum 1.8.2. The final `nfs-lifecycle`
-Molecule run passed configuration idempotence, the existing lifecycle checks and
-the new audit fixture. All 31 helper tests also passed with guest Python 3.11.2
-and b3sum 1.2.0. The fixture's foreign-owned `0700` directory, restrictive ACL and
-two hardlinked files produced three access/reconciliation failures before the
-declared repair and zero afterward. Real UID/GID 1000 reads used no supplementary
-groups and an RO NFS mount; mergerfs backing identities, hashes, xattrs and matching
-ledger digests were checked. Clients and VM disks were removed after verification.
+**Accepted 2026-11-09:** All 31 audit unit tests passed without skips on the NAS's
+Python 3.13.5/b3sum 1.8.1 stack. Actual UID/GID 1000 reads with no supplementary
+groups over RO NFS produced the expected permission failures before repair,
+then read both files successfully afterward. Reconciliation, ledger digest,
+tool versions and helper hash matched. Evidence transfer, normal unmount,
+pool/all-branch fixture absence and workspace removal passed.
 
-**Failure/retry evidence:** `NFS_AUDIT_FAIL_AFTER_DENIAL=1` deliberately failed with
-the audit client mounted; cleanup and destroy succeeded. A fresh normal run then
-passed with the final helper. Transcripts are `/tmp/nas-audit-molecule-injected.log`
-and `/tmp/nas-audit-molecule-final.log`. Final JSONL evidence remains under
-`/tmp/ktchn8s-audit-nfs-final/audit-evidence/`, with the guest unit transcript under
-`vms/nfs-server/audit-unit.log`. These local artifacts were checked after teardown.
-The tested helper SHA-256 is
-`2ab80625954ce51e68551b224917cb7390d0e4fed39b44937c69b2189164243a`;
-Task 6 must preserve the relevant tool/helper revisions with its own evidence.
+The retained records were also inspected locally: all eight required files and
+six completed JSONL generation digests were valid. Raw reports remain private
+and Git-ignored. The core helper and completed Molecule fixture are unchanged;
+live-only ownership/cleanup protections are in the separate harness. See
+[the workflow](./implementation.md#guided-live-audit-acceptance) and
+[acceptance evidence](./reviews/guided-execution-2026-11-08.md#task-13-audit-tooling-acceptance).
 
-**Review and checks:** Independent code review approved after fixing intermediate
-symlink search semantics, empty-directory search checks and repeated ancestor
-enumeration. Resource-initialization cleanup and three-way collision regressions
-also pass. External review reported zero embedded files; its resource-cleanup
-suggestions were inspected independently, and its response is not counted as
-independent source inspection. No P0/P1 findings required indexing. YAML lint,
-offline Ansible lint and whitespace checks pass. Revised local documentation links
-pass; strict MkDocs still reports the same nine archived-review warnings tracked
-in Task 9, with none added by this task. Molecule evidence retention needed an
-explicit file glob; the final run confirmed its reports survive pruning.
+Earlier unit/scenario checks passed on Python 3.12.10/b3sum 1.8.2 and guest
+Python 3.11.2/b3sum 1.2.0, including denied-read, declared-repair and failure-cleanup
+cases. The different NAS stack required its own successful checks above. Actual
+source inventories, migrated-library access and drive release remain Tasks 6–8;
+none has started. Task 6 must record its own tool/helper revisions and evidence.
 
 ## Task 10: Final verification
 - **Status:** pending
@@ -430,10 +309,14 @@ explicit file glob; the final run confirmed its reports survive pruning.
 - **Can run in parallel with:** —
 
 ### Subtasks
-- [ ] 10.1 Run `/kk:test` — both Molecule scenarios (including Task 13's access fixture), layout idempotency, direct parity config/audit-helper tests, complete migration/access/release evidence, live NFS and real application acceptance, separate network smoke test, strict docs build. Scenario passes do not replace live gates
+- [ ] 10.1 Run `/kk:test` — both Molecule scenarios (including Task 13's access fixture), layout idempotency, direct parity config/audit-helper tests, `bash tests/test_inventory.sh`, complete migration/access/release evidence, live NFS and real application acceptance, separate network smoke test, strict docs build. Scenario passes do not replace live gates
 - [ ] 10.2 Run `/kk:document` — finalize docs, move feature out of wip when done
 - [ ] 10.3 Run `/kk:review-code` — review the ansible/helm/nix changes
 - [ ] 10.4 Run `/kk:review-spec` — verify implementation matches design/implementation docs
+
+Final feature verification remains pending until the migration, parity and
+application acceptance tasks are complete. The completed incremental reviews and
+synthetic/live storage checks do not replace this final gate.
 
 ## Dependency Graph
 
