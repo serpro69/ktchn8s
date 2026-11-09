@@ -94,8 +94,24 @@ Replace the flat `storage_dirs` list with the designed tree.
    manually on the NAS after confirming they are empty.
    → verify: `find /mnt/storage -maxdepth 1` shows only the new tree + lost+found.
 
-Note: do not remove `Temp` blindly — `tasks/k8s_validation.yml` and NFS validation tasks
-may reference it; grep the role first and repoint those to `99_tmp` if so.
+Mount validation excludes skipped command results from JSON parsing in check mode.
+Skipped probes remain unverified; a successful preview does not replace actual
+disk and mount checks. Debian setup reads `/usr/local/bin/snapraid`'s version even
+in check mode: an exact pinned version skips archive installation and dependency
+cleanup, a missing/different version still requires the archive, and a failed
+probe aborts. This establishes version presence, not provenance or byte integrity.
+
+The inventory wrapper requests YAML directly from SOPS and removes temporary
+plaintext on normal exits and handled HUP/INT/TERM, with no guarantee after SIGKILL.
+Run `bash tests/test_inventory.sh` in the existing dev shell for real Ansible
+parsing/selection checks with synthetic SOPS output; no production keys are used.
+Real decryption and host operations remain operator-executed checks.
+
+Validation fixtures use `99_tmp`; routine role execution never deletes legacy
+content. Task 1's two live applications and confirmed-empty cleanup passed on
+2026-11-09, including pool/all-branch absence checks. See the
+[acceptance evidence](./reviews/guided-execution-2026-11-08.md#task-1-live-acceptance-complete-2026-11-09)
+and [remaining provisioning follow-ups](#deferred-follow-ups-explicit).
 
 ## snapraid-excludes
 
@@ -178,8 +194,9 @@ not establish Kubernetes integration. Record offline and live results separately
    lifecycle checks on `99_tmp`, report failures, and clean up fixtures. Correct the
    test pod's existing trailing `&&` before relying on its shell script. Require an
    available kubeconfig and an actually successful pod, not the optional-test skip.
-   From the repository root, run `make -C metal storage ANSIBLE_TARGETS=yggdrasil
+   For the basic role probes, run `make -C metal storage ANSIBLE_TARGETS=yggdrasil
    ANSIBLE_ARGS='-e validate_nfs=true'` when the cluster and NAS are available.
+   Full Task 11.6 acceptance uses the focused entry point below.
    → verify: NFS and Kubernetes validation both execute and pass; a deliberately
    unwritable fixture is reported as failed, not skipped.
 4. Simulate promotion inside the fixture: link a downloads file into its library,
@@ -215,7 +232,52 @@ NFS can temporarily cache a link count of one after `ln`; the probe requires two
 within 65 seconds and independently proves backing inode identity. It does not
 disable caching or relax `root_squash` to make tests pass. A permission-denied
 fixture is an expected negative test; unexpected permission or stale-handle errors
-remain acceptance failures. NAS and live Kubernetes execution remain Task 11.6.
+remain acceptance failures. Task 11.6 supplied the separate live NAS/Kubernetes
+acceptance recorded below.
+
+### Guided live acceptance entry point
+
+Task 11.6 passed on 2026-11-09; see the
+[acceptance summary](./reviews/guided-execution-2026-11-08.md#task-11-live-nfs-acceptance).
+The existing `validate_nfs=true` role path covers basic NAS self-client and Pod
+probes. Full two-client remount/recovery acceptance uses the focused entry points:
+
+| Playbook | Purpose |
+| --- | --- |
+| `metal/storage-client-setup.yml` | Prepare the two selected Fedora clients with nfs-utils and required dependencies, then report helper/package versions. |
+| `metal/storage-acceptance.yml` | Run the complete synthetic client/server lifecycle and required Kubernetes probes without storage-role convergence. |
+
+Both require one NAS selected through `--limit` and two distinct inventory names
+in `nfs_lifecycle_clients`. Full acceptance also requires an absolute controller
+`KUBECONFIG` and `nfs_lifecycle_maintenance=true`: the operator declares that
+unrelated clients and local writers stay stopped throughout recovery. An empty
+consumer snapshot does not prove that condition. Use the existing dev shell and
+review each applicable operator batch before execution.
+
+The helper gate runs before fixture creation or Kubernetes queries. Client boot
+IDs must match the selected Kubernetes nodes. The lifecycle then exercises denied
+and allowed UID1000 operations, idle/reopen, RO rejection and backing links;
+unmounts clients normally; cycles NFS and the pool through its accepted fstab;
+and verifies options, links and both clients again. Successful node-pinned Pods
+and their final log markers are mandatory. The mutable BusyBox tag remains a
+reproducibility limit even though the resolved image ID is recorded. Default
+scheduling is preserved for the basic role path when no explicit node list is set.
+
+Teardown observes independent-client and kubelet fixture-mount absence before
+removing the owned fixture, with mounted-root guards and final pool/all-branch
+absence checks. A failed server transition stops for assessment: there is no
+force/lazy fallback or automatic rollback. Unreachable hosts or an interrupted
+controller can prevent cleanup; retain the reported paths and resolve that state
+before a retry or deletion.
+
+Client preparation is a separate targeted package transaction. It disables weak
+and implicit module dependencies, downgrades and solver erasing; it does not
+change repositories or disable signature checks. Required dependencies and package
+scriptlets may still change the client. Dnf5 can label an upgrade as Installed,
+so its summary is not proof of zero dependency updates. Ordinary failures retain
+available per-client results; unreachable/interrupted execution may not. Missing
+libdnf5 or unavailable repositories fail for assessment, without an automatic
+fallback to broad provisioning or an OS upgrade.
 
 ## parity-job-readiness
 
@@ -393,6 +455,47 @@ SQLite for bounded-memory joins and successful directory-listing records, while
 still opening and reading every declared served file. It checks directory search
 permission separately from listing and preserves kernel traversal semantics when
 resolving served symlinks; lexical `..` simplification alone is insufficient.
+
+### Guided live audit acceptance
+
+Task 13.4 passed on 2026-11-09 on the differing NAS Python/b3sum stack; see the
+[acceptance summary](./reviews/guided-execution-2026-11-08.md#task-13-audit-tooling-acceptance).
+`metal/storage-audit-acceptance.yml` is the standalone, operator-run entry point.
+It ensures the ACL fixture utility and runs the unchanged audit unit suite on the
+NAS, rejecting zero tests, skips and failures. A temporary self-NFS RO mount then
+uses the same NAS tool stack as UID/GID1000 with no supplementary groups.
+
+A foreign-owned0700 synthetic subtree with an ACL and two hardlinked files must
+fail reads before its declared repair, then pass reconciliation and both file
+reads afterward. Unit, access and verification records must agree on tool/helper
+identities and ledger digest. The core helper enforces RO mount and reader identity;
+these synthetic checks do not accept actual migrated-library content.
+
+`scripts/nas-audit-fixture.py` is the live-only harness; the completed Molecule
+fixture is unchanged. Source data and ledger state remain protected inside a unique
+`/var/tmp/nas-audit-*` workspace. Data is exposed only under a root-owned guard at
+`99_tmp/<workspace-name>/dataset`. Native descriptors and recorded device/inode
+identities constrain privileged changes to this run's objects. Cleanup seals and
+revalidates the namespace before nonrecursive removal; final empty-guard removal
+uses UID1000's existing scratch-parent rights. Replacements or unexpected content
+are preserved and fail the run. The accepted one-second mergerfs caches are given
+two seconds to expire before checking native metadata repairs.
+
+Reader outputs are separate from root-owned evidence. Capture seals and validates
+them, and transfers preserve relative paths so reader filenames cannot overwrite
+protected reports. Reports persist under private, Git-ignored
+`.nas-audit-evidence/run-*` on the controller; `nas_audit_evidence_root` can select
+another private controller directory outside the NAS. Retain the printed location.
+Successful teardown requires all eight protected records, normal client unmount,
+and fixture absence on the pool and every branch. A failed claim, transfer,
+permission check, interruption or unreachable host can leave protected state for
+assessment; do not blindly delete or rerun it.
+
+Local tests and syntax checks do not establish NAS acceptance. The successful
+operator run supplied that evidence; no fresh VM run was claimed in the agent
+environment without KVM, and no VM source change remains. Tasks 5–8 and 10 are
+still pending. No real migration has started, and source-label/recovery-copy
+reconciliation remains a prerequisite to resuming Task 6.
 
 ## nfs-media-share
 
@@ -678,6 +781,41 @@ If unrelated baseline warnings exist, record them and prove no new warnings; do 
 silently weaken strict mode. Also check local links in the revised Markdown directly.
 
 ## Deferred / follow-ups (explicit)
+
+- **Probe failures and formatting authorization:** The inherited disk task can
+  reach formatting after any nonzero blkid result; force=false does not make
+  that an unconditional data-preservation guarantee. Owner: assistant, before
+  any later apply to unmounted or undetected volumes. Distinguish probe errors,
+  absent signatures and existing filesystems, require explicit per-device
+  formatting intent, and test all three paths while preserving fresh provisioning.
+  The completed layout applications used verified mounted ext4 branches and
+  skipped formatting; they do not accept this broader path.
+- **Temporary package ownership:** The inherited SnapRAID installation cleanup
+  can remove a pre-existing xz-utils package. Owner: assistant, before approving
+  a run that needs installation. Track dependency ownership and test pre-existing
+  versus newly installed dependencies. The exact-version gate skipped this path
+  in the completed live applications.
+- **Inventory failure regression coverage:** Owner: assistant, before Task 10.1.
+  Add persistent invalid-option and decryption-failure cases to
+  `tests/test_inventory.sh`, requiring nonzero status and no temporary plaintext.
+  Earlier transient failure/signal checks passed; the committed fixture currently
+  covers parsing, host selection and successful cleanup.
+- **Export assertion scope:** Runtime checks match policy substrings across the
+  export output and were accepted for the known single root export. Owner:
+  assistant, before broader/custom-export reuse. Parse and validate each intended
+  export independently, with tests rejecting policy fields from another export.
+- **General mount maintenance:** The focused acceptance play does not orchestrate
+  unrelated clients. A general opt-in maintenance workflow was discussed but not
+  accepted as scope. Owner: operator to request it if needed; assistant to design
+  its client quiescence, failure handling and runtime validation before use.
+
+- **Wake-only entry point:** `make wake` currently calls `metal/Makefile`'s
+  bootstrap play with pxe_state=absent; `metal/bootstrap.yml` still includes the
+  PXE role and imports storage.yml. This can do more than wake cluster nodes.
+  Owner: assistant, before recommending this target for wake-only use, split or route
+  it to a dedicated wake-only play using the existing boot role and explicit
+  cluster scope; verify no PXE/storage/provisioning tasks are reached. Deferred
+  because that entry-point repair is outside the current NAS acceptance step.
 
 - **restic policy values** per tier — design names the tiers; concrete
   frequencies/retention are future work (`scripts/backup.py` / backup docs).
