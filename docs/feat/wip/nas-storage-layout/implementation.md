@@ -190,12 +190,14 @@ not establish Kubernetes integration. Record offline and live results separately
    creation, link, rename, read and deletion; errors block rollout and require a
    design decision, not an automatic switch to `no_root_squash` or privileged clients.
    → verify: successful operations as the real writer identity, plus RO rejection.
-3. Extend `tasks/nfs_validation.yml` and `tasks/k8s_validation.yml` to perform the
+3. Extend the validation role's `tasks/nfs_validation.yml` and `tasks/k8s_validation.yml` to perform the
    lifecycle checks on `99_tmp`, report failures, and clean up fixtures. Correct the
    test pod's existing trailing `&&` before relying on its shell script. Require an
    available kubeconfig and an actually successful pod, not the optional-test skip.
-   For the basic role probes, run `make -C metal storage ANSIBLE_TARGETS=yggdrasil
-   ANSIBLE_ARGS='-e validate_nfs=true'` when the cluster and NAS are available.
+   For the basic post-install probes, run `make -C metal storage-validate
+   ANSIBLE_TARGETS=nas-host KUBECONFIG=/absolute/path/cluster.yaml` when the cluster
+   and NAS are available. The legacy `validate_nfs=true` route still runs the same
+   probes after storage convergence.
    Full Task 11.6 acceptance uses the focused entry point below.
    → verify: NFS and Kubernetes validation both execute and pass; a deliberately
    unwritable fixture is reported as failed, not skipped.
@@ -211,7 +213,7 @@ References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/rem
 and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
 
 Task 11's offline implementation uses the actual mergerfs/NFS role tasks and a
-shared `files/nfs-readiness.sh` probe in both VM and live validation. Configuration
+shared `metal/roles/nfs_validation/files/nfs-readiness.sh` probe in both VM and live validation. Configuration
 convergence no longer hides scratch writes inside `mount_validation.yml`; writes
 belong to explicit verification. Both rpcbind units are stopped, disabled and
 masked: stopping only the service allowed socket activation to break idempotence.
@@ -239,8 +241,8 @@ acceptance recorded below.
 
 Task 11.6 passed on 2026-11-09; see the
 [acceptance summary](./reviews/guided-execution-2026-11-08.md#task-11-live-nfs-acceptance).
-The existing `validate_nfs=true` role path covers basic NAS self-client and Pod
-probes. Full two-client remount/recovery acceptance uses the focused entry points:
+The `storage-validate` target covers basic NAS self-client and Pod probes
+without storage convergence; `validate_nfs=true` remains a compatibility route. Full two-client remount/recovery acceptance uses the focused entry points:
 
 | Playbook | Purpose |
 | --- | --- |
@@ -261,7 +263,7 @@ unmounts clients normally; cycles NFS and the pool through its accepted fstab;
 and verifies options, links and both clients again. Successful node-pinned Pods
 and their final log markers are mandatory. The mutable BusyBox tag remains a
 reproducibility limit even though the resolved image ID is recorded. Default
-scheduling is preserved for the basic role path when no explicit node list is set.
+scheduling is preserved for basic validation when no explicit node list is set.
 
 Teardown observes independent-client and kubelet fixture-mount absence before
 removing the owned fixture, with mounted-root guards and final pool/all-branch
@@ -278,6 +280,52 @@ so its summary is not proof of zero dependency updates. Ordinary failures retain
 available per-client results; unreachable/interrupted execution may not. Missing
 libdnf5 or unavailable repositories fail for assessment, without an automatic
 fallback to broad provisioning or an OS upgrade.
+
+### Workflow cleanup after completed acceptance
+
+Reconciled on 2026-11-09 against handoff HEAD
+`b3e25da50ce81db785c655cf2593f0278bf7f376` on `feat/nas_layout`, with a clean
+starting worktree. Tasks 1–4, 9 and 11–13 retain their recorded completion;
+Tasks 5–8 and 10 remain pending. No homelab commands or migration were executed
+for this cleanup. The user-owned kubeconfig-access restriction is preserved.
+
+The [public NFS guide](../../../guides/how_to_use_nfs_for_persistent_storage.md)
+now describes the from-scratch order and separate public Make targets. Storage
+convergence still precedes cluster creation, with `validate_nfs: false` by
+default. Optional `storage-validate` runs the same self-client and Pod probes in
+`metal/roles/nfs_validation/` after installation. It requires mounted pool/branches
+before fixture creation and cleanup, and checks controller prerequisites before
+scratch writes. Its default scheduling supports one cluster
+node; it does not claim the full two-independent-client lifecycle.
+
+`storage-acceptance` uses that role's explicit maintenance entry point. Its
+client-kernel binding, fixed-owner operations, idle/reopen, backing checks,
+normal recovery and observed teardown are preserved. Shared helpers remain
+separate because they are reused at multiple lifecycle stages. The disposable
+Molecule scenario continues to exercise the same relocated probe and runtime
+checks, and explicitly loads the layout variables from their storage-role owner.
+
+Existing-client repair and executable checks now live under the prerequisites
+role, invoked through focused task entry points. Fresh node provisioning still
+owns normal `nfs-utils` installation. The targeted repair's stricter transaction
+policy remains separate from the broad provisioning role's package upgrades;
+sharing those policies would change behavior unnecessarily.
+
+Migration-tool verification retains its standalone play, confined harness,
+report paths and cleanup protections. Its Make target does not introduce it into
+provisioning or basic validation. A new empty NAS can omit migration-tool checks.
+The existing media PV/PVC mismatch is documented, not released by this cleanup.
+
+Local routing/admission checks, relocated probe tests, offline syntax/template
+checks and independent review verify this refactor's repository scope. They are
+not new live acceptance evidence. Owner: operator for any later live validation
+after relevant configuration changes; next action is to choose the appropriate
+public entry point after its prerequisites, and acceptance requires that complete
+run and cleanup. No repeat of the already accepted run is required merely to
+re-establish context. Migration remains stopped pending owner authorization and
+source/recovery-copy reconciliation. Existing deferred follow-ups below remain open.
+The [cleanup verification and review record](./reviews/nfs-workflow-cleanup-2026-11-09.md)
+details local coverage and the code-only review verdicts.
 
 ## parity-job-readiness
 
@@ -392,7 +440,8 @@ fixture and record both versions with the results. When the NAS is available, ve
 Python 3 and install `b3sum` once there (`apt install b3sum` on Debian, or a verified
 upstream binary) before Task 6. If its versions differ from the fixture's, rerun the
 unit/access checks with those versions and record the results before migration.
-This NAS preparation is deferred while it is offline. The helper reads datasets and writes
+The recorded NAS preparation and Task 13.4 checks are complete; a later tool
+change needs its own comparison and applicable revalidation. The helper reads datasets and writes
 evidence only. Copying, moving, permission changes, discards and disk operations remain
 explicit operator actions.
 
@@ -443,8 +492,8 @@ Python 3.12.10/b3sum 1.8.2 and guest Python 3.11.2/b3sum 1.2.0, all 44 local sto
 tests, and the extended NFS Molecule scenario including failure cleanup/recreation.
 The [task record](./tasks.md#task-13-migration-inventory-and-audit-tooling) contains
 the tested helper digest and evidence locations. Python 3.11 is the tested minimum.
-NAS setup/version comparison in 13.4 remains deferred; these results do not accept
-actual migrated content. Reproduce the scenario with an explicit evidence location:
+NAS setup/version comparison in 13.4 subsequently passed on 2026-11-09;
+neither result accepts actual migrated content. Reproduce the scenario with an explicit evidence location:
 
 ```bash
 nix develop -c bash -c 'cd metal/roles/storage && MOLECULE_EPHEMERAL_DIRECTORY=/tmp/ktchn8s-audit-nfs-final molecule test -s nfs-lifecycle'

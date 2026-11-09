@@ -8,5 +8,5 @@
   tasks:
     - name: Install and verify only the NFS client prerequisite
       ansible.builtin.include_role:
-        name: storage
+        name: prerequisites
         tasks_from: nfs_client_setup.yml

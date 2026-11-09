@@ -1,0 +1,78 @@
+---
+# Optional post-install probes. No storage convergence or server remount.
+- name: Require one NAS and real execution for synthetic validation
+  ansible.builtin.assert:
+    that:
+      - not ansible_check_mode
+      - ansible_play_hosts_all | length == 1
+      - data_drives | default([]) | length > 0
+      - nfs_readiness_client_nodes is not defined or nfs_readiness_client_nodes | length == 2
+    fail_msg: >-
+      Select one NAS after cluster creation. Validation creates temporary NFS
+      mounts and Kubernetes Pods; check mode cannot establish readiness.
+      Optional nfs_readiness_client_nodes must contain two Pod placements;
+      both may name the same node for basic single-node validation.
+
+- name: Check controller prerequisites before any NAS scratch writes
+  ansible.builtin.include_tasks:
+    file: k8s_prerequisites.yml
+    apply:
+      become: false
+      delegate_to: localhost
+
+- name: Derive the provisioned branch paths without converging storage
+  ansible.builtin.set_fact:
+    disk_directories: "{{ range(1, data_drives | length + 1) | map('regex_replace', '^', '/mnt/data') | list }}"
+
+- name: Require the existing pool and every branch before scratch writes
+  ansible.builtin.command:
+    argv: [mountpoint, --quiet, "{{ item }}"]
+  loop: "{{ ['/mnt/storage'] + disk_directories }}"
+  changed_when: false
+
+- name: Validate scoped NFS operations and required Kubernetes integration
+  block:
+    - name: Initialize ownership and client teardown state for this validation run
+      set_fact:
+        nfs_readiness_created: {changed: false}
+        nfs_readiness_local_clean: true
+        nfs_readiness_k8s_clean: true
+
+    - name: Prepare the shared readiness fixture
+      include_tasks: nfs_readiness_server.yml
+
+    - name: Validate NFS exports
+      include_tasks: nfs_validation.yml
+
+    - name: Validate NFS-K8S integration
+      include_tasks:
+        file: k8s_validation.yml
+        apply:
+          become: false
+          delegate_to: localhost
+  always:
+    - name: Require mounted storage before removing an owned fixture
+      ansible.builtin.command:
+        argv: [mountpoint, --quiet, "{{ item }}"]
+      loop: "{{ ['/mnt/storage'] + disk_directories }}"
+      changed_when: false
+      when:
+        - nfs_readiness_created is defined and nfs_readiness_created is changed
+        - nfs_readiness_local_clean | default(false)
+        - nfs_readiness_k8s_clean | default(false)
+
+    - name: Remove this run's synthetic fixture after clients are removed
+      file:
+        path: /mnt/storage/99_tmp/nfs-readiness
+        state: absent
+      when:
+        - nfs_readiness_created is defined and nfs_readiness_created is changed
+        - nfs_readiness_local_clean | default(false)
+        - nfs_readiness_k8s_clean | default(false)
+
+    - name: Preserve the fixture when client teardown did not complete
+      debug:
+        msg: "Client teardown failed; preserve /mnt/storage/99_tmp/nfs-readiness until clients are removed."
+      when:
+        - nfs_readiness_created is defined and nfs_readiness_created is changed
+        - not (nfs_readiness_local_clean | default(false)) or not (nfs_readiness_k8s_clean | default(false))

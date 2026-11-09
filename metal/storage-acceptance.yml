@@ -8,5 +8,5 @@
   tasks:
     - name: Run the explicit live acceptance entry point
       ansible.builtin.include_role:
-        name: storage
+        name: nfs_validation
         tasks_from: live_acceptance.yml

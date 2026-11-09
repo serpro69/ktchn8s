@@ -18,7 +18,7 @@
           packages: "{{ guest_versions.stdout_lines }}"
     - name: Run the same readiness setup used by live validation
       ansible.builtin.include_role:
-        name: storage
+        name: nfs_validation
         tasks_from: nfs_readiness_server.yml
         public: true
     - name: Read retirement log and legacy data
@@ -37,6 +37,8 @@
           - private_directory.stat.uid == 1234
           - private_directory.stat.gid == 1234
           - private_directory.stat.mode == '0700'
+    - name: Load the provisioned layout contract from its owning role
+      ansible.builtin.include_vars: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/vars/main.yml"
     - name: Inspect every layout directory
       ansible.builtin.stat:
         path: "/mnt/storage/{{ item }}"
@@ -78,7 +80,7 @@
   tasks:
     - name: Copy the shared probe
       ansible.builtin.copy:
-        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/files/nfs-readiness.sh"
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/../nfs_validation/files/nfs-readiness.sh"
         dest: /tmp/nfs-readiness.sh
         mode: '0755'
 

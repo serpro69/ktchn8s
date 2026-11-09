@@ -1,7 +1,7 @@
 # NAS Storage Directory Layout — Design
 
 > Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./reviews/archive/design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
-> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Implementation and live acceptance remain pending.
+> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Storage/tooling acceptance is complete; migration and application release remain pending. See the task record for current evidence.
 
 ## Problem statement
 
@@ -387,9 +387,9 @@ areas may receive new files.
    containers — strongly indicated by the existing `data` PVC usage; verified when
    templating Task 5. (Linking containers use exactly ONE such mount each — see mount
    topology principle.)
-4. The NFS PV stack has **never run** (todo.md, NFS branch review). Task 11 must prove
-   export lifecycle and fixed-owner operations with `root_squash`; Task 5 validates
-   the actual application import path. A failing prerequisite blocks media rollout.
+4. The NFS PV stack had **never run** at design time (todo.md, NFS branch review).
+   Task 11 subsequently proved export lifecycle and fixed-owner operations with
+   `root_squash`; Task 5 still owns the actual application import path. A failing prerequisite blocks media rollout.
 5. With `PUID=1000`/`PGID=1000` set, the lscr.io containers write as `1000:1000` and the
    s6 init chown is a no-op on already-`1000:1000` dirs — verified by the write/hardlink
    proofs as the application user in Task 5. (fsGroup is known-inert on NFS; do not
@@ -441,9 +441,9 @@ areas may receive new files.
 | Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; [archived design review](./reviews/archive/design-review.md) finding R2-P0 |
 | *arrs hardlink-or-silently-copy; upgrades delete old files | Confirmed | *arr/trash-guides community documentation |
 | Immich external libs delete originals when RW; `:ro` is the enforcement; no XMP on `:ro` | Confirmed (corrected during review) | [Immich libraries docs](https://docs.immich.app/features/libraries/), [discussion #24064](https://github.com/immich-app/immich/discussions/24064), [#13771](https://github.com/immich-app/immich/discussions/13771) |
-| NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; live acceptance pending Task 11 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
+| NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; Task 11 live acceptance completed 2026-11-09 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
 | `parity` and `1-parity` select the same level; additional protection starts with `2-parity`; a repeated level is rejected | Confirmed against the pinned version | [SnapRAID 13.0 parser](https://github.com/amadvance/snapraid/blob/v13.0/cmdline/state.c) |
-| Explicit full sync supports parity expansion; a full scrub is distinct from the maintenance percentage/age policy | Confirmed; job changes pending Task 12 | [SnapRAID 13.0 manual](https://github.com/amadvance/snapraid/blob/v13.0/snapraid.1) |
+| Explicit full sync supports parity expansion; a full scrub is distinct from the maintenance percentage/age policy | Confirmed; Task 12 disposable job lifecycle completed, real parity release remains Task 8 | [SnapRAID 13.0 manual](https://github.com/amadvance/snapraid/blob/v13.0/snapraid.1) |
 | snapraid records hardlinks; excluded/included shared inodes protected via the included path; `name/` excludes match anywhere, `/name/` at disk root | Confirmed | [SnapRAID manual](https://www.snapraid.it/manual), [exclude-syntax thread](https://sourceforge.net/p/snapraid/discussion/1677233/thread/387da6b3/) |
 
 ## Migration mapping

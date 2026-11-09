@@ -28,20 +28,16 @@
     nfs_lifecycle_workspaces: {results: []}
 
 - name: Check client mount helpers before fixture creation or Kubernetes queries
-  ansible.builtin.include_tasks: nfs_client_helpers.yml
+  ansible.builtin.include_role:
+    name: prerequisites
+    tasks_from: nfs_client_helpers.yml
 
-- name: Require the explicit controller kubeconfig before creating fixtures
-  ansible.builtin.stat:
-    path: "{{ lookup('env', 'KUBECONFIG') }}"
-  delegate_to: localhost
-  become: false
-  register: nfs_lifecycle_kubeconfig
-
-- name: Require an absolute existing kubeconfig path
-  ansible.builtin.assert:
-    that:
-      - lookup('env', 'KUBECONFIG') is match('^/')
-      - nfs_lifecycle_kubeconfig.stat.isreg | default(false)
+- name: Check controller prerequisites before creating any lifecycle fixture
+  ansible.builtin.include_tasks:
+    file: k8s_prerequisites.yml
+    apply:
+      become: false
+      delegate_to: localhost
 
 - name: Observe distinct client kernels before using them as independent clients
   ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
@@ -331,5 +327,5 @@
   ansible.builtin.debug:
     msg: >-
       Task11.6 live lifecycle and Kubernetes probes passed with observed
-      independent-client and fixture teardown. Task13.4 differing-version
-      audit checks remain a separate gate before migration.
+      independent-client and fixture teardown. Migration-tool checks and actual migrated-data acceptance
+      have separate evidence; this run does not authorize migration.

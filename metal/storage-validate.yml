@@ -1,0 +1,9 @@
+---
+# Optional post-install checks; never called by the bootstrap path.
+- name: Validate NFS and Kubernetes integration without provisioning storage
+  hosts: nas
+  gather_facts: true
+  become: true
+  any_errors_fatal: true
+  roles:
+    - role: nfs_validation
