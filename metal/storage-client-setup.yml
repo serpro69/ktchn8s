@@ -1,0 +1,12 @@
+---
+# Explicit Fedora client package preparation, separate from NAS provisioning.
+- name: Prepare the selected NFS clients without running storage acceptance
+  hosts: nas
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Install and verify only the NFS client prerequisite
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: nfs_client_setup.yml

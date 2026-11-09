@@ -1,0 +1,335 @@
+---
+# This entry point intentionally does not include main.yml, disks.yml or nfs.yml.
+# The operator keeps every unrelated NFS consumer/local writer stopped throughout.
+- name: Require an explicit maintenance run and exactly two distinct inventory clients
+  ansible.builtin.assert:
+    that:
+      - not ansible_check_mode
+      - nfs_lifecycle_maintenance | default(false) | bool
+      - ansible_play_hosts_all | length == 1
+      - nfs_lifecycle_clients | default([]) | length == 2
+      - nfs_lifecycle_clients | unique | length == 2
+      - inventory_hostname not in nfs_lifecycle_clients
+      - nfs_lifecycle_clients | difference(groups['all']) | length == 0
+      - data_drives | default([]) | length > 0
+    fail_msg: >-
+      Run only for one NAS, with two distinct inventory clients and
+      nfs_lifecycle_maintenance=true after keeping unrelated clients/jobs stopped.
+      This play normally unmounts/remounts the pool; check mode is not acceptance.
+
+- name: Capture server address and branch paths before delegated operations
+  ansible.builtin.set_fact:
+    nfs_lifecycle_server: "{{ ansible_host }}"
+    nfs_readiness_client_nodes: "{{ nfs_lifecycle_clients }}"
+    disk_directories: "{{ range(1, data_drives | length + 1) | map('regex_replace', '^', '/mnt/data') | list }}"
+    nfs_readiness_created: {changed: false}
+    nfs_readiness_k8s_clean: true
+    nfs_lifecycle_clients_clean: false
+    nfs_lifecycle_workspaces: {results: []}
+
+- name: Check client mount helpers before fixture creation or Kubernetes queries
+  ansible.builtin.include_tasks: nfs_client_helpers.yml
+
+- name: Require the explicit controller kubeconfig before creating fixtures
+  ansible.builtin.stat:
+    path: "{{ lookup('env', 'KUBECONFIG') }}"
+  delegate_to: localhost
+  become: false
+  register: nfs_lifecycle_kubeconfig
+
+- name: Require an absolute existing kubeconfig path
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'KUBECONFIG') is match('^/')
+      - nfs_lifecycle_kubeconfig.stat.isreg | default(false)
+
+- name: Observe distinct client kernels before using them as independent clients
+  ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+  delegate_to: "{{ item }}"
+  loop: "{{ nfs_lifecycle_clients }}"
+  register: nfs_lifecycle_boot_ids
+  changed_when: false
+
+- name: Reject two inventory aliases pointing to the same client kernel
+  ansible.builtin.assert:
+    that:
+      - nfs_lifecycle_boot_ids.results | map(attribute='stdout') | unique | length == 2
+      - nfs_lifecycle_boot_ids.results | map(attribute='stdout') | reject('equalto', '') | list | length == 2
+
+- name: Bind Kubernetes node names to the same two client kernels
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - node
+      - "{{ item.item }}"
+      - --request-timeout=15s
+      - '-o=jsonpath={.status.nodeInfo.bootID}'
+  delegate_to: localhost
+  become: false
+  loop: "{{ nfs_lifecycle_boot_ids.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: nfs_lifecycle_node_identity
+  changed_when: false
+  failed_when: nfs_lifecycle_node_identity.rc != 0 or nfs_lifecycle_node_identity.stdout != item.stdout
+
+- name: Require the pool and every configured branch to remain mounted
+  ansible.builtin.command:
+    argv: [mountpoint, --quiet, "{{ item }}"]
+  loop: "{{ ['/mnt/storage'] + disk_directories }}"
+  changed_when: false
+
+- name: Run the owned lifecycle fixture and always attempt normal client teardown
+  block:
+    - name: Prepare the existing runtime-checked fixed-owner fixture
+      ansible.builtin.include_tasks: nfs_readiness_server.yml
+
+    - name: Allocate a unique workspace on each client
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: nfs-readiness-
+      delegate_to: "{{ item }}"
+      loop: "{{ nfs_lifecycle_clients }}"
+      register: nfs_lifecycle_workspaces
+
+    - name: Make only the owned workspaces traversable
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: '0755'
+      delegate_to: "{{ item.item }}"
+      loop: "{{ nfs_lifecycle_workspaces.results }}"
+
+    - name: Copy the existing shared UID-1000 probe to each client
+      ansible.builtin.copy:
+        src: nfs-readiness.sh
+        dest: "{{ item.path }}/probe.sh"
+        mode: '0644'
+      delegate_to: "{{ item.item }}"
+      loop: "{{ nfs_lifecycle_workspaces.results }}"
+
+    - name: Mount the two independent clients
+      ansible.builtin.include_tasks: nfs_lifecycle_mount.yml
+
+    - name: Prove permission errors are detected without relaxing the export
+      block:
+        - name: Create a separate unwritable child for the negative case
+          ansible.builtin.file:
+            path: /mnt/storage/99_tmp/nfs-readiness/denied
+            state: directory
+            owner: '1234'
+            group: '1234'
+            mode: '0555'
+
+        - name: Require a real UID1000 permission denial
+          ansible.builtin.command:
+            argv:
+              - setpriv
+              - --reuid=1000
+              - --regid=1000
+              - --clear-groups
+              - /bin/sh
+              - "{{ nfs_lifecycle_workspaces.results[0].path }}/probe.sh"
+              - create
+              - "{{ nfs_lifecycle_workspaces.results[0].path }}/rw/denied"
+          delegate_to: "{{ nfs_lifecycle_clients[0] }}"
+          register: nfs_lifecycle_denied
+          changed_when: false
+          failed_when: nfs_lifecycle_denied.rc == 0 or 'Permission denied' not in nfs_lifecycle_denied.stderr
+      always:
+        - name: Remove the denied child without changing the shared root's permissions
+          ansible.builtin.file:
+            path: /mnt/storage/99_tmp/nfs-readiness/denied
+            state: absent
+
+    - name: Create and promote through the first client as UID1000 with no extra groups
+      ansible.builtin.command:
+        argv:
+          - setpriv
+          - --reuid=1000
+          - --regid=1000
+          - --clear-groups
+          - /bin/sh
+          - "{{ nfs_lifecycle_workspaces.results[0].path }}/probe.sh"
+          - "{{ item }}"
+          - "{{ nfs_lifecycle_workspaces.results[0].path }}/rw"
+      delegate_to: "{{ nfs_lifecycle_clients[0] }}"
+      loop: [create, promote]
+      changed_when: true
+
+    - name: Leave both mounted clients idle through ordinary attribute cache expiry
+      ansible.builtin.pause:
+        seconds: 65
+
+    - name: Verify both clients after idle
+      ansible.builtin.include_tasks: nfs_lifecycle_read.yml
+
+    - name: Verify unique backing hardlinks before recovery
+      ansible.builtin.command:
+        argv: "{{ ['/bin/sh', '-c', lookup('file', role_path ~ '/files/nfs-readiness-backing.sh'), 'backing-check'] + disk_directories }}"
+      register: nfs_lifecycle_backing_before
+      changed_when: false
+
+    - name: Record memory with the lifecycle fixture populated
+      ansible.builtin.command: ps -C mergerfs -o pid=,rss=,vsz=,args=
+      register: nfs_lifecycle_memory
+      changed_when: false
+
+    - name: Report lifecycle backing identity and memory observation
+      ansible.builtin.debug:
+        msg:
+          backing: "{{ nfs_lifecycle_backing_before.stdout }}"
+          memory: "{{ nfs_lifecycle_memory.stdout_lines }}"
+
+    - name: Quiesce and observe both client mounts absent before server recovery
+      ansible.builtin.include_tasks: nfs_lifecycle_unmount.yml
+
+    - name: Perform the controlled server recovery and stop clearly on failure
+      block:
+        - name: Stop NFS for the controlled recovery
+          ansible.builtin.systemd_service:
+            name: nfs-kernel-server
+            state: stopped
+
+        - name: Release kernel exports before normal pool unmount
+          ansible.builtin.command: exportfs -ua
+          changed_when: true
+
+        - name: Normally unmount the pool without force or lazy flags
+          ansible.builtin.command: umount /mnt/storage
+          changed_when: true
+
+        - name: Restore the pool using its already-accepted fstab entry
+          ansible.builtin.command: mount /mnt/storage
+          changed_when: true
+
+        - name: Require the recovered pool and unchanged data mounts
+          ansible.builtin.command:
+            argv: [mountpoint, --quiet, "{{ item }}"]
+          loop: "{{ ['/mnt/storage'] + disk_directories }}"
+          changed_when: false
+
+        - name: Restore NFS after the pool has recovered
+          ansible.builtin.systemd_service:
+            name: nfs-kernel-server
+            state: started
+      rescue:
+        - name: Report the failed transition without forcing or blindly retrying recovery
+          ansible.builtin.fail:
+            msg: >-
+              Controlled recovery failed at {{ ansible_failed_task.name }}.
+              NFS may be stopped and the pool may be unmounted. Keep unrelated
+              clients/jobs stopped and return the full output for assessment.
+              Do not start NFS over an unmounted pool or use force/lazy unmount.
+              This run is failed; it does not accept Task11.6.
+
+    - name: Verify active runtime settings after recovery
+      ansible.builtin.include_tasks: nfs_readiness_runtime.yml
+
+    - name: Require the same backing hardlinks after recovery
+      ansible.builtin.command:
+        argv: "{{ ['/bin/sh', '-c', lookup('file', role_path ~ '/files/nfs-readiness-backing.sh'), 'backing-check'] + disk_directories }}"
+      register: nfs_lifecycle_backing_after
+      changed_when: false
+      failed_when: >-
+        nfs_lifecycle_backing_after.rc != 0 or
+        nfs_lifecycle_backing_after.stdout != nfs_lifecycle_backing_before.stdout
+
+    - name: Reconnect both clients after recovery
+      ansible.builtin.include_tasks: nfs_lifecycle_mount.yml
+
+    - name: Verify exact bytes and RO enforcement after recovery
+      ansible.builtin.include_tasks: nfs_lifecycle_read.yml
+
+    - name: Repeat the writer lifecycle through the second client
+      ansible.builtin.command:
+        argv:
+          - setpriv
+          - --reuid=1000
+          - --regid=1000
+          - --clear-groups
+          - /bin/sh
+          - "{{ nfs_lifecycle_workspaces.results[1].path }}/probe.sh"
+          - "{{ item }}"
+          - "{{ nfs_lifecycle_workspaces.results[1].path }}/rw"
+      delegate_to: "{{ nfs_lifecycle_clients[1] }}"
+      loop: [delete, create, promote, read, delete]
+      changed_when: true
+
+    - name: Unmount independent clients before the separate Kubernetes probes
+      ansible.builtin.include_tasks: nfs_lifecycle_unmount.yml
+
+    - name: Require actual Kubernetes writer and reader completion
+      ansible.builtin.include_tasks:
+        file: k8s_validation.yml
+        apply:
+          become: false
+          delegate_to: localhost
+  always:
+    - name: Attempt normal teardown of every allocated independent client
+      ansible.builtin.include_tasks: nfs_lifecycle_unmount.yml
+
+    - name: Record observed independent-client teardown
+      ansible.builtin.set_fact:
+        nfs_lifecycle_clients_clean: true
+
+    - name: Wait for kubelet fixture mounts to disappear on both selected nodes
+      ansible.builtin.command:
+        argv: [findmnt, --json, --types, 'nfs,nfs4', --output, 'SOURCE,TARGET']
+      delegate_to: "{{ item }}"
+      loop: "{{ nfs_lifecycle_clients }}"
+      register: nfs_lifecycle_node_mounts
+      changed_when: false
+      failed_when: nfs_lifecycle_node_mounts.rc not in [0, 1] or nfs_lifecycle_node_mounts.stderr | length > 0
+      until: >-
+        nfs_lifecycle_node_mounts.rc in [0, 1] and
+        nfs_lifecycle_node_mounts.stderr | length == 0 and
+        '/mnt/storage/99_tmp/nfs-readiness' not in nfs_lifecycle_node_mounts.stdout
+      retries: 24
+      delay: 5
+      when: nfs_readiness_k8s_clean | default(false)
+
+    - name: Remove only unmounted owned client workspaces
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      delegate_to: "{{ item.item }}"
+      loop: "{{ nfs_lifecycle_workspaces.results | default([]) | selectattr('path', 'defined') | list }}"
+
+    - name: Clean the owned server fixture only after all clients are removed
+      when:
+        - nfs_readiness_created is changed
+        - nfs_lifecycle_clients_clean
+        - nfs_readiness_k8s_clean | default(false)
+      block:
+        - name: Require mounted pool and branches before fixture cleanup
+          ansible.builtin.command:
+            argv: [mountpoint, --quiet, "{{ item }}"]
+          loop: "{{ ['/mnt/storage'] + disk_directories }}"
+          changed_when: false
+
+        - name: Remove only this run's synthetic fixture
+          ansible.builtin.file:
+            path: /mnt/storage/99_tmp/nfs-readiness
+            state: absent
+
+        - name: Observe fixture absence in the pool and every backing branch
+          ansible.builtin.stat:
+            path: "{{ item }}/99_tmp/nfs-readiness"
+            follow: false
+          loop: "{{ ['/mnt/storage'] + disk_directories }}"
+          register: nfs_lifecycle_remaining
+
+        - name: Reject partial mergerfs removal even when deletion reported success
+          ansible.builtin.assert:
+            that: not item.stat.exists
+          loop: "{{ nfs_lifecycle_remaining.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+
+- name: Report the completed live lifecycle acceptance
+  ansible.builtin.debug:
+    msg: >-
+      Task11.6 live lifecycle and Kubernetes probes passed with observed
+      independent-client and fixture teardown. Task13.4 differing-version
+      audit checks remain a separate gate before migration.

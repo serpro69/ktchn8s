@@ -42,3 +42,19 @@
       - nfs_readiness_pod_logs.rc == 0
       - "'NFS pod acceptance passed' in nfs_readiness_pod_logs.stdout"
     fail_msg: Kubernetes NFS validation failed; inspect the reported pod output.
+
+- name: Record the node and resolved image used by the successful probe
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - "pod/{{ nfs_readiness_pod.name }}"
+      - -n
+      - "{{ nfs_readiness_namespace }}"
+      - '-o=jsonpath={.spec.nodeName}{" "}{.status.containerStatuses[0].imageID}{"\n"}'
+  register: nfs_readiness_pod_identity
+  changed_when: false
+
+- name: Report probe execution identity
+  ansible.builtin.debug:
+    var: nfs_readiness_pod_identity.stdout
