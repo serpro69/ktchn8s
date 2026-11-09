@@ -1,0 +1,396 @@
+---
+# Task13.4: only synthetic data; no role convergence, real migration or server remount.
+- name: Validate the migration audit on the NAS tool versions
+  hosts: nas
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require one NAS and real execution
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - ansible_play_hosts_all | length == 1
+          - data_drives | default([]) | length > 0
+
+    - name: Initialize fixture ownership and client state
+      ansible.builtin.set_fact:
+        nas_audit_branches: "{{ range(1, data_drives | length + 1) | map('regex_replace', '^', '/mnt/data') | list }}"
+        nas_audit_fixture_created: {changed: false}
+        nas_audit_mount_attempted: false
+        nas_audit_client_clean: true
+
+    - name: Create a private persistent controller evidence directory
+      ansible.builtin.file:
+        path: "{{ nas_audit_evidence_root | default(playbook_dir ~ '/../.nas-audit-evidence') }}"
+        state: directory
+        mode: '0700'
+      delegate_to: localhost
+      become: false
+
+    - name: Allocate retained controller evidence outside the NAS
+      ansible.builtin.tempfile:
+        state: directory
+        path: "{{ nas_audit_evidence_root | default(playbook_dir ~ '/../.nas-audit-evidence') }}"
+        prefix: run-
+      delegate_to: localhost
+      become: false
+      register: nas_audit_controller
+
+    - name: Report the evidence destination before running tests
+      ansible.builtin.debug:
+        msg: "Retain this run's reports at {{ nas_audit_controller.path }} on the controller."
+
+    - name: Allocate a unique NAS workspace outside the pool
+      ansible.builtin.tempfile:
+        state: directory
+        path: /var/tmp
+        prefix: nas-audit-
+      register: nas_audit_workspace
+
+    - name: Derive this run's synthetic pool path
+      ansible.builtin.set_fact:
+        nas_audit_fixture_name: "{{ nas_audit_workspace.path | basename }}"
+        nas_audit_fixture_root: "/mnt/storage/99_tmp/{{ nas_audit_workspace.path | basename }}"
+        nas_audit_dataset_root: "/mnt/storage/99_tmp/{{ nas_audit_workspace.path | basename }}/dataset"
+
+    - name: Verify the helper's unit and actual RO-NFS access contract
+      block:
+        - name: Require pool and configured branches mounted before scratch writes
+          ansible.builtin.command:
+            argv: [mountpoint, --quiet, "{{ item }}"]
+          loop: "{{ ['/mnt/storage'] + nas_audit_branches }}"
+          changed_when: false
+
+        - name: Inspect the established scratch parent without following links
+          ansible.builtin.stat:
+            path: /mnt/storage/99_tmp
+            follow: false
+          register: nas_audit_parent
+
+        - name: Require the scratch parent to be a real directory
+          ansible.builtin.assert:
+            that:
+              - nas_audit_parent.stat.isdir | default(false)
+              - not nas_audit_parent.stat.islnk | default(false)
+
+        - name: Ensure the synthetic ACL fixture tool is present
+          ansible.builtin.apt:
+            name: acl
+            state: present
+            auto_install_module_deps: false
+
+        - name: Make the owned workspace traversable by the audit reader
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}"
+            mode: '0755'
+
+        - name: Create the owned helper and test directories
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}/{{ item }}"
+            state: directory
+            mode: '0755'
+          loop: [scripts, tests]
+
+        - name: Copy the exact repository helper unit suite and live fixture harness
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/{{ item.source }}"
+            dest: "{{ nas_audit_workspace.path }}/{{ item.destination }}"
+            mode: '0644'
+          loop:
+            - {source: ../scripts/nas-migration-audit.py, destination: scripts/nas-migration-audit.py}
+            - {source: ../tests/test_nas_migration_audit.py, destination: tests/test_nas_migration_audit.py}
+            - {source: ../scripts/nas-audit-fixture.py, destination: audit-fixture.py}
+
+        - name: Run every audit unit test on the actual NAS Python and b3sum stack
+          ansible.builtin.command:
+            argv:
+              - python3
+              - -I
+              - -B
+              - -c
+              - |
+                import importlib.util, json, pathlib, sys, unittest
+                root = pathlib.Path(sys.argv[1])
+                spec = importlib.util.spec_from_file_location('audit', root / 'scripts/nas-migration-audit.py')
+                audit = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(audit)
+                tools = audit.versions('b3sum')
+                suite = unittest.defaultTestLoader.discover(str(root / 'tests'), pattern='test_nas_migration_audit.py')
+                result = unittest.TextTestRunner(verbosity=2).run(suite)
+                print(json.dumps({'tools': tools, 'tests_run': result.testsRun,
+                                  'skipped': len(result.skipped), 'successful': result.wasSuccessful()}))
+                sys.exit(0 if result.wasSuccessful() and result.testsRun > 0 and not result.skipped else 1)
+              - "{{ nas_audit_workspace.path }}"
+          environment:
+            PYTHONOPTIMIZE: '0'
+          args:
+            chdir: "{{ nas_audit_workspace.path }}"
+          register: nas_audit_units
+          changed_when: false
+          failed_when: false
+
+        - name: Retain the complete unit transcript including failure output
+          ansible.builtin.copy:
+            dest: "{{ nas_audit_workspace.path }}/unit.log"
+            content: "{{ nas_audit_units.stdout }}\n{{ nas_audit_units.stderr }}\n"
+            mode: '0600'
+
+        - name: Require successful nonempty unit execution without skipped tests
+          ansible.builtin.assert:
+            that: nas_audit_units.rc == 0
+
+        - name: Claim a new fixture root atomically without reusing previous content
+          ansible.builtin.command:
+            argv: [mkdir, '--mode=0755', --, "{{ nas_audit_fixture_root }}"]
+          register: nas_audit_fixture_created
+          changed_when: nas_audit_fixture_created.rc == 0
+
+        - name: Keep the source workspace private while root seeds the fixture
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}"
+            mode: '0700'
+
+        - name: Seed only this run's synthetic data and declared repair ledger
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", seed, --workspace, "{{ nas_audit_workspace.path }}"]
+          changed_when: true
+
+        - name: Permit reader traversal only after root seeding is complete
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}"
+            mode: '0755'
+
+        - name: Create reader output space without granting writes to the ledger directory
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}/reader"
+            state: directory
+            owner: '1000'
+            group: '1000'
+            mode: '0755'
+
+        - name: Make the exact ledger readable without allowing reader edits
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}/evidence/ledger.jsonl"
+            mode: '0444'
+
+        - name: Require observed teardown once the audit mount is attempted
+          ansible.builtin.set_fact:
+            nas_audit_mount_attempted: true
+            nas_audit_client_clean: false
+
+        - name: Mount only synthetic media read-only through the NAS NFS export
+          ansible.posix.mount:
+            path: "{{ nas_audit_workspace.path }}/ro"
+            src: "{{ ansible_host }}:{{ nas_audit_dataset_root }}/30_media"
+            fstype: nfs4
+            opts: ro,vers=4.2,soft,timeo=50,retrans=2
+            state: ephemeral
+
+        - name: Require actual UID1000 access denial with no supplementary groups
+          ansible.builtin.command:
+            argv:
+              - setpriv
+              - --reuid=1000
+              - --regid=1000
+              - --clear-groups
+              - python3
+              - -I
+              - -B
+              - "{{ nas_audit_workspace.path }}/scripts/nas-migration-audit.py"
+              - access
+              - --root
+              - "{{ nas_audit_workspace.path }}/ro"
+              - --ledger
+              - "{{ nas_audit_workspace.path }}/evidence/ledger.jsonl"
+              - --run-id
+              - "{{ nas_audit_fixture_name }}"
+              - --output
+              - "{{ nas_audit_workspace.path }}/reader/reader-before.jsonl"
+          register: nas_audit_denied
+          changed_when: false
+          failed_when: nas_audit_denied.rc != 1
+
+        - name: Preserve the completed denial report in the root-owned evidence directory
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", capture-before, --workspace, "{{ nas_audit_workspace.path }}"]
+          changed_when: true
+
+        - name: Normally unmount the audit client before local metadata repair
+          ansible.posix.mount:
+            path: "{{ nas_audit_workspace.path }}/ro"
+            state: unmounted
+
+        - name: Observe audit mount absence before repair
+          ansible.builtin.command:
+            argv: [findmnt, --mountpoint, "{{ nas_audit_workspace.path }}/ro", --noheadings]
+          register: nas_audit_before_repair
+          changed_when: false
+          failed_when: nas_audit_before_repair.rc != 1 or nas_audit_before_repair.stdout | length > 0 or nas_audit_before_repair.stderr | length > 0
+
+        - name: Apply only the synthetic ledger's repair and verify bytes metadata ACLs and links
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", repair, --workspace, "{{ nas_audit_workspace.path }}"]
+          changed_when: true
+
+        - name: Remount the repaired synthetic media read-only
+          ansible.posix.mount:
+            path: "{{ nas_audit_workspace.path }}/ro"
+            src: "{{ ansible_host }}:{{ nas_audit_dataset_root }}/30_media"
+            fstype: nfs4
+            opts: ro,vers=4.2,soft,timeo=50,retrans=2
+            state: ephemeral
+
+        - name: Require complete real UID1000 reads after the declared repair
+          ansible.builtin.command:
+            argv:
+              - setpriv
+              - --reuid=1000
+              - --regid=1000
+              - --clear-groups
+              - python3
+              - -I
+              - -B
+              - "{{ nas_audit_workspace.path }}/scripts/nas-migration-audit.py"
+              - access
+              - --root
+              - "{{ nas_audit_workspace.path }}/ro"
+              - --ledger
+              - "{{ nas_audit_workspace.path }}/evidence/ledger.jsonl"
+              - --run-id
+              - "{{ nas_audit_fixture_name }}"
+              - --output
+              - "{{ nas_audit_workspace.path }}/reader/reader-after.jsonl"
+          changed_when: false
+
+        - name: Preserve the successful read report in the root-owned evidence directory
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", capture-after, --workspace, "{{ nas_audit_workspace.path }}"]
+          changed_when: true
+
+        - name: Cross-check actual access identity ledger digest hashes and tool versions
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", check, --workspace, "{{ nas_audit_workspace.path }}"]
+          register: nas_audit_acceptance
+          changed_when: false
+
+        - name: Require unit and NFS checks to use the same helper and tool versions
+          ansible.builtin.assert:
+            that: (nas_audit_units.stdout | from_json).tools == (nas_audit_acceptance.stdout | from_json).tools
+
+        - name: Report actual unit and access acceptance evidence
+          ansible.builtin.debug:
+            msg:
+              units: "{{ nas_audit_units.stdout | from_json }}"
+              access: "{{ nas_audit_acceptance.stdout | from_json }}"
+      always:
+        - name: Normally unmount the audit client including on failure
+          ansible.posix.mount:
+            path: "{{ nas_audit_workspace.path }}/ro"
+            state: unmounted
+          when: nas_audit_mount_attempted
+
+        - name: Observe audit mount absence before any workspace removal
+          ansible.builtin.command:
+            argv: [findmnt, --mountpoint, "{{ nas_audit_workspace.path }}/ro", --noheadings]
+          register: nas_audit_unmounted
+          changed_when: false
+          failed_when: nas_audit_unmounted.rc != 1 or nas_audit_unmounted.stdout | length > 0 or nas_audit_unmounted.stderr | length > 0
+
+        - name: Record client teardown and restrict evidence access after reader exit
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}"
+            mode: '0700'
+
+        - name: Mark the client clean only after observed mount absence
+          ansible.builtin.set_fact:
+            nas_audit_client_clean: true
+
+        - name: Inspect reader workspace before privileged evidence collection
+          ansible.builtin.stat:
+            path: "{{ nas_audit_workspace.path }}/reader"
+            follow: false
+          register: nas_audit_reader
+
+        - name: Seal and validate all reader artifacts before any recursive workspace operation
+          ansible.builtin.command:
+            argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", seal-reader, --workspace, "{{ nas_audit_workspace.path }}"]
+          changed_when: true
+          when: nas_audit_reader.stat.exists
+
+        - name: Find completed and partial reports within the owned workspace
+          ansible.builtin.find:
+            paths: "{{ nas_audit_workspace.path }}"
+            patterns: ['*.jsonl', '*.partial', unit.log]
+            recurse: true
+            follow: false
+            file_type: file
+          register: nas_audit_reports
+
+        - name: Refuse to discard a workspace whose reports could not be enumerated
+          ansible.builtin.assert:
+            that: nas_audit_reports.skipped_paths | default({}) | length == 0
+
+        - name: Require every accepted report before removing scratch evidence
+          ansible.builtin.assert:
+            that: >-
+              ['unit.log', 'evidence/source.jsonl', 'evidence/ledger.jsonl', 'evidence/fixture-claim.jsonl',
+               'evidence/verify-before.jsonl', 'evidence/verify-after.jsonl',
+               'evidence/access-before.jsonl', 'evidence/access-after.jsonl']
+              | map('regex_replace', '^', nas_audit_workspace.path ~ '/') | list
+              | difference(nas_audit_reports.files | map(attribute='path') | list) | length == 0
+          when:
+            - nas_audit_acceptance is defined
+            - nas_audit_acceptance is succeeded
+
+        - name: Retain available reports on the controller before removing scratch data
+          ansible.builtin.fetch:
+            src: "{{ item.path }}"
+            dest: "{{ nas_audit_controller.path }}/{{ item.path | relpath(nas_audit_workspace.path) }}"
+            flat: true
+          loop: "{{ nas_audit_reports.files }}"
+          loop_control:
+            label: "{{ item.path | basename }}"
+
+        - name: Clean only this run's claimed fixture with the client removed
+          when:
+            - nas_audit_fixture_created is changed
+            - nas_audit_client_clean
+          block:
+            - name: Require pool and all branches mounted before fixture removal
+              ansible.builtin.command:
+                argv: [mountpoint, --quiet, "{{ item }}"]
+              loop: "{{ ['/mnt/storage'] + nas_audit_branches }}"
+              changed_when: false
+
+            - name: Remove the owned synthetic fixture
+              ansible.builtin.command:
+                argv: [python3, -I, -B, "{{ nas_audit_workspace.path }}/audit-fixture.py", cleanup, --workspace, "{{ nas_audit_workspace.path }}"]
+              changed_when: true
+
+            - name: Inspect fixture absence on the pool and every branch
+              ansible.builtin.stat:
+                path: "{{ item }}/99_tmp/{{ nas_audit_fixture_name }}"
+                follow: false
+              loop: "{{ ['/mnt/storage'] + nas_audit_branches }}"
+              register: nas_audit_remaining
+              until: not nas_audit_remaining.stat.exists
+              retries: 5
+              delay: 1
+
+            - name: Reject partial mergerfs fixture removal
+              ansible.builtin.assert:
+                that: not item.stat.exists
+              loop: "{{ nas_audit_remaining.results }}"
+              loop_control:
+                label: "{{ item.item }}"
+
+        - name: Remove only the unmounted owned NAS workspace after evidence transfer
+          ansible.builtin.file:
+            path: "{{ nas_audit_workspace.path }}"
+            state: absent
+          when: nas_audit_client_clean
+
+    - name: Report completed synthetic audit acceptance and retained reports
+      ansible.builtin.debug:
+        msg: "Task13.4 checks passed with observed teardown. Reports: {{ nas_audit_controller.path }} on the controller. Real migration has not started."
