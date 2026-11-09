@@ -99,5 +99,9 @@
       "mcp__pal__codereview",
       "mcp__pal__listmodels"
     ]
-  }
+  },
+  "deny": [
+    "Read(./**/kubeconfig.yml)",
+    "Read(./**/kubeconfig.yaml)"
+  ]
 }
