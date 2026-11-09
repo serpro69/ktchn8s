@@ -1,0 +1,12 @@
+---
+- name: Mount each independent client's scoped RW and RO views without fstab changes
+  ansible.posix.mount:
+    path: "{{ item.0.path }}/{{ item.1 }}"
+    src: "{{ nfs_lifecycle_server }}:/mnt/storage/99_tmp/nfs-readiness"
+    fstype: nfs4
+    opts: "{{ item.1 }},vers=4.2,soft,timeo=50,retrans=2"
+    state: ephemeral
+  delegate_to: "{{ item.0.item }}"
+  loop: "{{ nfs_lifecycle_workspaces.results | product(['rw', 'ro']) | list }}"
+  loop_control:
+    label: "{{ item.0.item }} {{ item.1 }}"

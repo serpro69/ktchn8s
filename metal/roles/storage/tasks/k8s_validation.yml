@@ -39,8 +39,12 @@
     - name: Execute and require successful writer and reader pods
       ansible.builtin.include_tasks: k8s_readiness_pod.yml
       loop:
-        - {name: writer, actions: [create, promote, read, readonly]}
-        - {name: reader, actions: [read, readonly, delete]}
+        - name: writer
+          actions: [create, promote, read, readonly]
+          node: "{{ (nfs_readiness_client_nodes | default(['', '']))[0] }}"
+        - name: reader
+          actions: [read, readonly, delete]
+          node: "{{ (nfs_readiness_client_nodes | default(['', '']))[1] }}"
       loop_control:
         loop_var: nfs_readiness_pod
   always:

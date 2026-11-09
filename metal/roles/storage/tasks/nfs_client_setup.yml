@@ -1,0 +1,58 @@
+---
+- name: Require one NAS selector and exactly two distinct inventory clients
+  ansible.builtin.assert:
+    that:
+      - not ansible_check_mode
+      - ansible_play_hosts_all | length == 1
+      - nfs_lifecycle_clients | default([]) | length == 2
+      - nfs_lifecycle_clients | unique | length == 2
+      - inventory_hostname not in nfs_lifecycle_clients
+      - nfs_lifecycle_clients | difference(groups['all']) | length == 0
+
+- name: Install the prerequisite and retain transaction details on ordinary failure
+  block:
+    - name: Ensure the declared NFS prerequisite is installed on the selected Fedora clients
+      ansible.builtin.dnf5:
+        name: nfs-utils
+        state: present
+        install_weak_deps: false
+        auto_install_module_deps: false
+        allowerasing: false
+        allow_downgrade: false
+        disable_gpg_check: false
+      delegate_to: "{{ item }}"
+      loop: "{{ nfs_lifecycle_clients }}"
+      register: nfs_client_package_setup
+  always:
+    - name: Report available package transaction results including failed clients
+      ansible.builtin.debug:
+        msg:
+          client: "{{ item.item }}"
+          changed: "{{ item.changed | default(false) }}"
+          failed: "{{ item.failed | default(false) }}"
+          transactions: "{{ item.results | default([]) }}"
+          failures: "{{ item.failures | default([]) }}"
+          message: "{{ item.msg | default('') }}"
+      loop: "{{ nfs_client_package_setup.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+- name: Verify both installed NFS mount helpers
+  ansible.builtin.include_tasks: nfs_client_helpers.yml
+
+- name: Read the installed client package versions
+  ansible.builtin.command:
+    argv: [rpm, -q, nfs-utils, util-linux-core, python3-libdnf5]
+  delegate_to: "{{ item }}"
+  loop: "{{ nfs_lifecycle_clients }}"
+  register: nfs_client_package_versions
+  changed_when: false
+
+- name: Report the installed package versions
+  ansible.builtin.debug:
+    msg:
+      client: "{{ item.item }}"
+      packages: "{{ item.stdout_lines }}"
+  loop: "{{ nfs_client_package_versions.results }}"
+  loop_control:
+    label: "{{ item.item }}"

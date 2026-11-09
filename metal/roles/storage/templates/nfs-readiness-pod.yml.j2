@@ -4,6 +4,10 @@ metadata:
   name: {{ nfs_readiness_pod.name }}
   namespace: {{ nfs_readiness_namespace }}
 spec:
+{% if nfs_readiness_pod.node | default('') %}
+  nodeName: {{ nfs_readiness_pod.node | to_json }}
+{% endif %}
+  automountServiceAccountToken: false
   securityContext:
     runAsUser: 1000
     runAsGroup: 1000

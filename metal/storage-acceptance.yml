@@ -1,0 +1,12 @@
+---
+# Operator-only, disruptive Task 11.6 acceptance; not routine provisioning.
+- name: Validate the live NFS lifecycle without provisioning storage
+  hosts: nas
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Run the explicit live acceptance entry point
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: live_acceptance.yml

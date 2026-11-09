@@ -1,0 +1,17 @@
+---
+- name: Reopen exact bytes and verify RO rejection on both independent clients
+  ansible.builtin.command:
+    argv:
+      - setpriv
+      - --reuid=1000
+      - --regid=1000
+      - --clear-groups
+      - /bin/sh
+      - "{{ item.0.path }}/probe.sh"
+      - "{{ item.1 }}"
+      - "{{ item.0.path }}/{{ 'ro' if item.1 == 'readonly' else 'rw' }}"
+  delegate_to: "{{ item.0.item }}"
+  loop: "{{ nfs_lifecycle_workspaces.results | product(['read', 'readonly']) | list }}"
+  loop_control:
+    label: "{{ item.0.item }} {{ item.1 }}"
+  changed_when: false
