@@ -1,0 +1,20 @@
+---
+- name: Normally unmount every owned client view without changing fstab
+  ansible.posix.mount:
+    path: "{{ item.0.path }}/{{ item.1 }}"
+    state: unmounted
+  delegate_to: "{{ item.0.item }}"
+  loop: "{{ nfs_lifecycle_workspaces.results | default([]) | selectattr('path', 'defined') | product(['ro', 'rw']) | list }}"
+  loop_control:
+    label: "{{ item.0.item }} {{ item.1 }}"
+
+- name: Observe that every owned client mount is absent
+  ansible.builtin.command:
+    argv: [findmnt, --mountpoint, "{{ item.0.path }}/{{ item.1 }}", --noheadings]
+  delegate_to: "{{ item.0.item }}"
+  loop: "{{ nfs_lifecycle_workspaces.results | default([]) | selectattr('path', 'defined') | product(['ro', 'rw']) | list }}"
+  loop_control:
+    label: "{{ item.0.item }} {{ item.1 }}"
+  register: nfs_lifecycle_unmounted
+  changed_when: false
+  failed_when: nfs_lifecycle_unmounted.rc != 1 or nfs_lifecycle_unmounted.stdout | length > 0 or nfs_lifecycle_unmounted.stderr | length > 0
