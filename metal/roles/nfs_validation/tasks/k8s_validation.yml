@@ -1,21 +1,5 @@
 ---
-# validate_nfs=true requests acceptance: missing prerequisites are failures.
-- name: Require kubectl on the controller
-  ansible.builtin.command: kubectl version --client
-  changed_when: false
-
-- name: Inspect the explicitly selected kubeconfig
-  ansible.builtin.stat:
-    path: "{{ lookup('env', 'KUBECONFIG') }}"
-  register: nfs_readiness_kubeconfig
-
-- name: Require a real kubeconfig before running acceptance
-  ansible.builtin.assert:
-    that:
-      - lookup('env', 'KUBECONFIG') | length > 0
-      - nfs_readiness_kubeconfig.stat.isreg | default(false)
-    fail_msg: Set KUBECONFIG to the intended cluster config; NFS acceptance cannot skip Kubernetes.
-
+# Callers run k8s_prerequisites.yml before creating the shared NAS fixture.
 - name: Create a controller workspace for this probe
   ansible.builtin.tempfile:
     state: directory

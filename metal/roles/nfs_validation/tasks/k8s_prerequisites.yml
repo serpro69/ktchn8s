@@ -1,0 +1,18 @@
+---
+# Both basic validation and full lifecycle acceptance require successful Pods.
+- name: Require kubectl on the controller
+  ansible.builtin.command: kubectl version --client
+  changed_when: false
+
+- name: Inspect the explicitly selected kubeconfig
+  ansible.builtin.stat:
+    path: "{{ lookup('env', 'KUBECONFIG') }}"
+    get_checksum: false
+  register: nfs_readiness_kubeconfig
+
+- name: Require a real kubeconfig before running acceptance
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'KUBECONFIG') is match('^/')
+      - nfs_readiness_kubeconfig.stat.isreg | default(false)
+    fail_msg: Set KUBECONFIG to the intended cluster config; NFS acceptance cannot skip Kubernetes.

@@ -31,11 +31,11 @@
 .ONESHELL:
 .SHELL 			:= $(shell which bash)
 .SHELLFLAGS := -ec
-.PHONY: _requirements bootstrap cluster console help inventory main storage wake wipe
+.PHONY: _requirements bootstrap cluster console help inventory main storage storage-validate storage-acceptance storage-audit-acceptance storage-client-setup wake wipe
 # https://stackoverflow.com/a/63771055
 __MAKE_DIR=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-export KUBECONFIG = $(shell pwd)/kubeconfig.yaml
+export KUBECONFIG = $(CURDIR)/kubeconfig.yaml
 
 ################################################################################################
 #                                             VARIABLES
@@ -219,8 +219,34 @@ bootstrap: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the 
 	@$(call play,bootstrap.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 storage: SHELL:=$(shell which bash)
-storage: ~/.ssh/homelab_id_ed25519 _requirements ## Wake up and provision the servers
+storage: ~/.ssh/homelab_id_ed25519 _requirements ## Provision NAS storage (OS must already be installed)
 	@$(call play,storage.yml,$(ANSIBLE_TAGS),$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
+
+# Explicit operations use the installed collections; they do not install tooling,
+# fetch kubeconfig, generate SSH keys, or enter the normal provisioning path.
+storage-validate: SHELL:=$(shell which bash)
+storage-validate: ## Optional post-install NAS self-client and Kubernetes probes; no server remount
+	@$(call check_defined, ANSIBLE_TARGETS, select exactly one NAS)
+	@$(if $(strip $(ANSIBLE_TAGS)),$(error ANSIBLE_TAGS is unsupported for a complete check))
+	@$(call play,storage-validate.yml,,$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
+
+storage-acceptance: SHELL:=$(shell which bash)
+storage-acceptance: ## Disruptive two-client NFS lifecycle; requires explicit maintenance opt-in
+	@$(call check_defined, ANSIBLE_TARGETS, select exactly one NAS)
+	@$(if $(strip $(ANSIBLE_TAGS)),$(error ANSIBLE_TAGS is unsupported for a complete check))
+	@$(call play,storage-acceptance.yml,,$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
+
+storage-audit-acceptance: SHELL:=$(shell which bash)
+storage-audit-acceptance: ## Verify migration tools on synthetic NAS data; does not migrate data
+	@$(call check_defined, ANSIBLE_TARGETS, select exactly one NAS)
+	@$(if $(strip $(ANSIBLE_TAGS)),$(error ANSIBLE_TAGS is unsupported for a complete check))
+	@$(call play,storage-audit-acceptance.yml,,$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
+
+storage-client-setup: SHELL:=$(shell which bash)
+storage-client-setup: ## Repair NFS helpers on two selected Fedora clients; NAS is only the selector
+	@$(call check_defined, ANSIBLE_TARGETS, select exactly one NAS)
+	@$(if $(strip $(ANSIBLE_TAGS)),$(error ANSIBLE_TAGS is unsupported for a complete check))
+	@$(call play,storage-client-setup.yml,,$(ANSIBLE_TARGETS),$(ANSIBLE_ARGS))
 
 cluster: SHELL:=$(shell which bash)
 cluster: ~/.ssh/homelab_id_ed25519 _requirements ## Create kubernetes cluster on provisioned servers
