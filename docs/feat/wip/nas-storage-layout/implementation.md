@@ -436,19 +436,24 @@ use backing identities rather than the configured path-hash inode numbers.
 Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
 the Task 3 `b3sum` executable. Provide Python 3 and `b3sum` in the disposable NFS
-fixture and record both versions with the results. When the NAS is available, verify
-Python 3 and install `b3sum` once there (`apt install b3sum` on Debian, or a verified
-upstream binary) before Task 6. If its versions differ from the fixture's, rerun the
-unit/access checks with those versions and record the results before migration.
+fixture and record both versions with the results. The NAS storage role declares
+`rsync` and `b3sum` in its base package list with `state: present` (owner policy,
+2026-11-11): manual host package setup must also have an Ansible declaration.
+Existing installations are not explicitly upgraded by this task. Python 3 remains
+an Ansible-host prerequisite. Before migration, compare actual Python/b3sum versions
+with the accepted fixture; differing versions require applicable unit/access checks.
 The recorded NAS preparation and Task 13.4 checks are complete; a later tool
-change needs its own comparison and applicable revalidation. The helper reads datasets and writes
-evidence only. Copying, moving, permission changes, discards and disk operations remain
-explicit operator actions.
+change needs its own comparison and applicable revalidation. On the live migration
+host, use a targeted package operation to fill a missing dependency rather than
+rerunning storage convergence just to install it. The helper's deployment and
+execution remain operator-owned outside the storage role: it reads datasets and
+writes evidence only. Copying, moving, permission changes, discards and disk
+operations remain explicit operator actions.
 
 | Subcommand | Inputs and result |
 |---|---|
 | `inventory` | Root, source/disk ID and output path → versioned JSONL inventory of all entry types; BLAKE3 for regular files, literal symlink targets, numeric UID/GID/mode, mtime and ACL/xattr evidence. Do not compare non-restorable ctime or read-sensitive atime. Record source hardlink groups where the filesystem exposes reliable identities. |
-| `compare` | Source and copy inventories; select path comparison for A's copy or content comparison for B/C discovery → missing/mismatched entries and candidate equal-content matches, preserving every source identity. It never decides that a duplicate may be discarded. |
+| `compare` | Two completed inventories; content comparison supports source-to-source delta planning. Path comparison remains available for troubleshooting an independently inventoried copy, but is not a routine staging gate. Candidate matches preserve source identities and never authorize discard or establish NAS presence. |
 | `verify` | A/B/C inventories, disposition ledger and final NAS root → complete source-to-destination/content/expected-metadata reconciliation. |
 | `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
 
@@ -706,27 +711,71 @@ Manual/operational, after Task 13's tooling passes and before production consume
 start. Set up the [evidence workspace](#migration-evidence), freeze original source
 entries, and stop on any enumeration, read, hash, copy, or reconciliation failure.
 
-1. **Inventory A/B/C before copying.** Use the helper's `inventory` command on each
+**Owner-approved timing change, 2026-11-11:** Task 6 prepares source comparisons,
+copies and provisional disposition mappings; Task 7 accepts the sorted destination
+with the full content/metadata audit. Do not create a full `nas-copy.jsonl` staging
+inventory or separately hash each staged delta as routine migration steps. Copy
+success and a metadata-only check do not certify stored content. Original entries
+stay unchanged and available for repair until final acceptance and the existing
+per-drive release gates. The owner separately approved copying A while C stays
+disconnected on 2026-11-11. C's inventory/comparison still gates completion of
+Task 6 and final reconciliation/release, but no longer blocks A's copy.
+
+1. **Inventory each source before using it in copy planning.** Use the helper's `inventory` command on each
    attached source, recording disk ID, root and tool versions in the run evidence.
    Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
    scans; each records hashes, entry types and metadata per the tooling contract.
    Check the NAS tool versions against the Task 13 fixture record; NAS tool setup
    and any retesting for different versions must finish before these scans.
    This remains migration tooling outside the storage role.
-   → verify: all scans complete with zero errors and entry counts reconcile; special
-   files need an explicit archive/restore or discard decision before release.
-2. **Copy A and reconcile.** Run on the NAS with permission to preserve source metadata:
-   use `rsync -aHAX --info=progress2 /mnt/driveA/
-   /mnt/storage/99_tmp/driveA/`, checking success; never use `--delete`. Inventory that
-   copy locally on the NAS into `nas-copy.jsonl` outside the staging tree. Run the
-   helper's path comparison against A's inventory.
-   → verify: no missing/mismatched entries, including symlinks and empty directories.
-3. **Discover B/C deltas.** Use the helper's content comparison to find content missing
-   from the NAS; copy it into `99_tmp/driveB_delta/` and `driveC_delta/`, preserving relative
-   paths, and hash every new copy. Keep source identities even for equal content:
+   → verify: the source's scan completed with zero errors and entry counts reconcile
+   before copying from it. A's accepted inventory and preflight permit step 2 while
+   C remains disconnected; all A/B/C inventories are still required before Task 6
+   completes. Special files need an explicit archive/restore or discard decision
+   before release.
+2. **Copy A provisionally.** Run on the NAS with permission to preserve source metadata:
+   use project-root `nas-migration-16-copy-a.txt` from the controller for the
+   recorded run. It starts rsync locally on the NAS from
+   `/mnt/nas-migration-20261110/betelgeuse/` to `/mnt/storage/99_tmp/driveA/data/`
+   with `-aHAX --numeric-ids --modify-window=-1`, progress/stats and a per-file log.
+   Check its retained unit's completion; never use `--delete`. The
+   outer `driveA` directory is a fresh root-owned mode-0700 guard; the `data` child
+   receives A's original root metadata (observed mode 0777). Keep other clients
+   and local writers out of staging throughout copy/sorting. Retain the
+   exact source/destination mapping and launch receipt in the independent workspace.
+   Active progress/error/per-file logs are on the NAS spool. After successful
+   completion, capture the invocation/exit status and publish completed logs and
+   receipts to the independent workspace with transfer-hash checks before any
+   reboot or unit cleanup. A missing retained unit leaves the outcome unverified;
+   log endings alone cannot establish successful completion. Follow with an rsync
+   dry-run using `-aAX`, numeric IDs, nanosecond timestamp comparison and itemized
+   changes, without `--checksum`, `--delete` or `-H`. The copy still uses `-H`;
+   omit it only from this metadata check because mergerfs `inodecalc=path-hash`
+   presents different inode numbers for hardlinked names. Task 7's backing-aware
+   helper checks retained hardlink groups. Require successful exit and no unexplained proposed
+   updates; exit 0 alone does not mean a dry-run found no differences. This checks
+   rsync's size/time/metadata criteria without rereading all regular-file contents.
+   → verify: copy succeeded, metadata-only check has no unresolved updates, and
+   staging remains explicitly content-unverified. Do not run a full staging hash.
+3. **Plan and copy B/C deltas from source inventories.** Compare accepted B content
+   with A, and accepted C content with the planned A/B coverage, using BLAKE3 plus
+   size. These are comparisons of source evidence, not of the actual NAS copy.
+   Use grouped content sets for duplicate-heavy inventories; enumerating every
+   pair of equal-content paths can produce excessive output. Keep each original
+   inventory/source identity rather than inventing a physical combined source.
+   Copy planned missing content into `99_tmp/driveB_delta/` and `driveC_delta/`,
+   preserving relative paths and metadata; retain successful copy and metadata-only
+   dry-run evidence as in step 2. No separate staged-delta hashing is required.
+   Keep source identities even for equal content:
    a file needed at a second final path must be copied/linked there or explicitly
    deduplicated by the operator. Equality of hashes alone is not a discard decision.
-   → verify: every B/C entry has staged content or a recorded proposed disposition.
+   If a planned retained copy is later discarded or its destination changes, update
+   the mapping and copy any newly required content before final acceptance. Account
+   for directories, symlinks and special entries as well as regular-file bytes.
+   → verify: every B/C entry has an explicit planned retained destination/copy
+   receipt or proposed disposition; no copy failures or unresolved metadata-check
+   updates remain. Task 6 can finish on these criteria without claiming the NAS
+   content is verified. Task 7's dependency on Task 6 therefore remains acyclic.
 4. **Sort with collision checks.** Maintain the tooling contract's JSONL ledger,
    recording each source entry's destination/disposition and expected metadata.
    Record moves as they occur; directory-level logs may aid reconstruction but cannot
@@ -738,14 +787,23 @@ entries, and stop on any enumeration, read, hash, copy, or reconciliation failur
    run its temporary RO access probe. Task 13 already tests the collision/error cases.
    → verify: all media access failures are resolved, transformations are explicit,
    and the audit mount is removed before further local changes or the freeze.
-5. **Reconcile everything after sorting.** Run the helper's `verify` command against
-   all three source inventories, the ledger and the final tree. It re-hashes all kept
-   files and checks expected metadata/links and complete accounting. Remove
-   empty staging directories only after their entries are reconciled.
+5. **Perform the full content reconciliation after sorting.** First account for
+   staging directory entries in the ledger and remove only confirmed-empty staging
+   children; require `99_tmp` to have no remaining entries before starting the
+   expensive content pass. Then run the helper's `verify` command against all
+   three source inventories, the ledger and the final tree. It re-hashes all kept
+   files and checks expected metadata/links and complete accounting.
    → verify: `99_tmp` has no unresolved entries of any type, all source entries have
    checked dispositions, and the complete final audit has zero unexplained differences.
    Sampling is optional additional inspection, never the release gate. Store the
    helper revision, invocations, final access results and completed reports as evidence.
+   This is the planned full destination-content acceptance pass. A mismatch blocks
+   acceptance: use the ledger to identify the unchanged original, repair the final
+   destination and produce fresh successful reports. Do not silently discard a
+   failed entry. The served-media `access` check remains a separate identity/RO
+   gate and reads that subset in full; parity checks and required retries also
+   perform I/O. One planned full reconciliation does not mean one physical read
+   across the entire migration.
 6. **Freeze the accepted dataset.** Stop promotions and all writers to included paths
    until Task 8's final full scrub. Cross-check retained destinations against the
    final exclusions rendered in Task 2 (an explicit Task 7 prerequisite). An excluded

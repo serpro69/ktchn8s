@@ -1,6 +1,6 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./reviews/archive/design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./reviews/archive/design-review-2026-10-03-follow-up.md#resolution); migration verification timing revised 2026-11-11 by owner decision) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
 > Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Storage/tooling acceptance is complete; migration and application release remain pending. See the task record for current evidence.
 
 ## Problem statement
@@ -322,21 +322,41 @@ unmounts that audit client before the freeze; real application playback follows 
 Task 5. Original source entries stay unchanged, while separately tracked safety-copy
 areas may receive new files.
 
+**Verification timing — accepted 2026-11-11:** Copy and sort provisionally, then
+perform the comprehensive source-to-final checksum reconciliation. Omit the full
+intermediate staging inventory/hash and separate delta readback; rsync completion
+and metadata-only checks establish copy progress, not accepted destination bytes.
+Keep all originals intact until final reconciliation and the later release gates.
+This saves a staging-sized NAS read at the cost of finding content problems later;
+the ledger must make repair from the unchanged originals possible. Source inventories
+still establish the expected bytes. The separate served-media access audit reads
+media, and parity sync/scrubs and failure retries still require their own I/O.
+The owner also approved starting A's copy with C disconnected on 2026-11-11;
+C still needs its complete inventory and reconciliation before final acceptance
+or source release.
+
 1. **Skeleton via IaC** — the tree is created by the storage role (replacing the current
    `storage_dirs` list); `00_meta/README.md` is templated from the same variable, so code
    and legend cannot drift. → verify: layout tasks alone are idempotent, dirs present.
 2. **Source inventory and copy** — freeze the original A/B/C entries; use Task 13's
    helper to inventory all entries and hash regular files on each source, including A.
-   Copy A into `99_tmp/driveA/`, hash the NAS copy locally, and compare. Every command
-   must complete successfully; partial manifests do not authorize release.
-3. **Cross-drive comparison** — use hash-sets to discover content missing from the NAS
-   regardless of backup-generation paths. Preserve source/path identity separately:
-   equal hashes do not authorize dropping a distinct required pathname. Copy unique
-   B/C content into source-specific delta directories and checksum those copies.
+   Copy A into `99_tmp/driveA/data/` under a private outer staging directory,
+   with metadata preservation and retained successful
+   copy/metadata-check evidence. Do not hash staging as a routine step; its content
+   remains unverified until the final audit. Every command must complete successfully;
+   partial manifests or failed copies do not authorize progress or release.
+3. **Cross-drive comparison** — compare accepted source hash-sets to plan B/C deltas
+   regardless of backup-generation paths. Compare B with A, then C with the planned
+   coverage from A/B; this is expected coverage, not proof of NAS presence. Preserve
+   source/path identity separately: equal hashes do not authorize dropping a distinct
+   required pathname. Copy planned deltas into source-specific staging directories
+   and retain copy/metadata-check evidence. Reconcile changed retention choices with
+   the copy plan so every keeper has a planned final destination.
    Maintain the authoritative evidence workspace on an independent controller disk
    that survives all planned wipes. Archive it to `00_meta/migration/` before the
-   freeze and after release, with no parity-time writes to that archive. A full final
-   read is an intentional additional pass, not a claim that every dataset is read only once.
+   freeze and after release, with no parity-time writes to that archive. The full final
+   content read replaces the intermediate staging rehash; it does not replace the
+   source scans, served-media access checks or parity verification.
 4. **Sort** `99_tmp` → numbered homes per the [mapping table](#migration-mapping); each
    move recorded by source identity and final path. Stop on a destination collision;
    retain both versions at distinct leaf paths or record an explicit dedup/discard
