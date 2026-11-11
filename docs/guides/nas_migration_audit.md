@@ -11,8 +11,11 @@ Successful audits do not establish independent recovery copies or parity protect
 Run controller tooling inside `nix develop`. The helper needs Linux, Python 3.11+
 and `b3sum`; it uses no third-party Python packages. Inventory and reconciliation
 run locally on the host holding the data, with permission to read every entry and
-its xattrs/ACLs. NAS Python/b3sum installation and version comparison remain
-Task 13.4 while the host is offline. Do not deploy it through the storage role.
+its xattrs/ACLs. The NAS storage role ensures the `rsync` and `b3sum` packages are
+present; Python 3 is an Ansible-host prerequisite. Manual package setup must be
+reflected in those playbooks. Task 13.4 owns actual NAS tool-version comparison
+and any required revalidation. Deploying/running this audit helper remains a
+separate operator action, not storage-role convergence.
 
 Choose a run ID and follow the runbook's
 [independent evidence workspace rules](../feat/wip/nas-storage-layout/implementation.md#migration-evidence).
@@ -46,26 +49,25 @@ is exit 1; an I/O failure is exit 2. Check both process exit and report footer.
 
 ## Commands
 
-These are future operational examples, not instructions to contact the offline NAS.
+These are CLI examples, not instructions to contact the NAS or start a migration.
 Use absolute paths on the host actually running each command, and a fresh output
 name on each retry. `--b3sum /path/to/b3sum` selects a verified executable if needed.
+
+The migration workflow revised on 2026-11-11 compares **source inventories** to
+plan copies, keeps staging content unverified, and runs `verify` after sorting.
+There is no routine full staging inventory/hash. The `compare` argument named
+`--copy` can hold another source inventory; its name does not establish a NAS
+copy. For C, compare against the planned A/B content coverage while retaining
+each source's identities. On large duplicate-heavy inventories, use grouped
+content-set analysis rather than emitting every equal-content candidate pair.
 
 ```bash
 python3 scripts/nas-migration-audit.py inventory \
   --root /mnt/driveA --source-id A --disk-id disk-by-id-recorded-for-A \
   --run-id migration-01 --output /var/log/snapraid/migration/run-01/driveA.jsonl
 
-python3 scripts/nas-migration-audit.py inventory \
-  --root /mnt/storage/99_tmp/driveA --source-id nas-copy --disk-id nas-pool \
-  --identity mergerfs --run-id migration-01 \
-  --output /var/log/snapraid/migration/run-01/nas-copy.jsonl
-
-python3 scripts/nas-migration-audit.py compare --mode path \
-  --source /evidence/driveA.jsonl --copy /evidence/nas-copy.jsonl \
-  --run-id migration-01 --output /evidence/compare-A.jsonl
-
 python3 scripts/nas-migration-audit.py compare --mode content \
-  --source /evidence/driveB.jsonl --copy /evidence/nas-copy.jsonl \
+  --source /evidence/driveB.jsonl --copy /evidence/driveA.jsonl \
   --run-id migration-01 --output /evidence/discover-B.jsonl
 
 python3 scripts/nas-migration-audit.py verify \
@@ -74,6 +76,13 @@ python3 scripts/nas-migration-audit.py verify \
   --root /mnt/storage --identity mergerfs \
   --run-id migration-01 --output /evidence/verify-01.jsonl
 ```
+
+Rsync completion/logs and a metadata-only dry-run establish provisional copy
+progress; they do not replace the final checksum audit. Keep originals unchanged
+for repair. `inventory` of a NAS copy and `compare --mode path` remain available
+for targeted troubleshooting when needed, but that inventory performs a full
+content read and is not part of the normal staging sequence. The helper itself
+is unchanged by this workflow revision.
 
 `inventory` includes the root as `.` and every descendant, including empty
 directories, symlinks and special files. Names round-trip via escaped JSON,

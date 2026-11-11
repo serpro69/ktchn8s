@@ -11,6 +11,10 @@
     name:
       # hardware monitoring
       - smartmontools
+      # data migration and content verification
+      - rsync
+      - b3sum
+    state: present
 
 - name: Persist drivetemp across reboots
   copy:

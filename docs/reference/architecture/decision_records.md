@@ -253,9 +253,9 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 
 **Decision**
 
-- We will inventory A/B/C, including all entry types, and hash regular files on each source and the NAS. Hash-set comparison discovers content deltas across renamed backup generations; a per-source/path ledger separately records destinations and explicit dedup/discard decisions.
+- We will inventory A/B/C, including all entry types, and hash regular files on each source. Source hash-set comparison plans content deltas across renamed backup generations; a per-source/path ledger separately records destinations and explicit dedup/discard decisions. The NAS content is verified after sorting, not through an additional full staging hash.
 - We will implement and test a read-only inventory/reconciliation helper before operational migration (Task 13). Versioned JSONL and explicit completion/error states make the evidence reproducible; the operator still owns moves and curation.
-- We will stop on destination collisions and verify every retained final file after sorting, including a full checksum pass. Sampling and an empty staging directory alone cannot authorize source release. The additional read is an accepted integrity cost.
+- We will stop on destination collisions and verify every retained final file after sorting, including a full checksum pass. Sampling and an empty staging directory alone cannot authorize source release. This final read is an accepted integrity cost; provisional rsync copies and metadata-only checks do not establish content acceptance.
 - We will keep authoritative evidence on a controller disk outside the NAS pool and A/B/C. `00_meta/migration/` is an archive populated before the parity freeze and after release. All parity-time records stay in the controller workspace/NAS spool until the freeze ends, so recording evidence cannot mutate the snapshot under verification.
 - Before **each** source wipe, every retained entry from that device must have a verified independent surviving copy in addition to the NAS, or coverage in an unchanged, fully verified parity snapshot. Before first parity exists, copy unique B content to A/C or temporary independent storage and verify capacity and checksums. A surviving source drive alone is not a per-file recovery guarantee.
 - We will release B, complete its sync and full scrub, then re-check C's coverage before its release. Adding C requires explicit full parity expansion and another complete scrub. Release A last only after both parity levels pass; retain separate copies of excluded content and audit evidence. Partial files, service startup, and the routine percentage scrub never substitute for these gates.
@@ -267,6 +267,7 @@ The initial data load (~16TB) comes from backup drives that will themselves beco
 **Consequences**
 
 - "Safe to wipe" requires complete source-to-final reconciliation and recoverability for every retained entry after that specific wipe.
+- Owner-approved revisions, 2026-11-11: omit the intermediate staging rehash and staged-delta readbacks to reduce I/O. Content failures may surface later; unchanged originals and complete source-to-final mappings remain available for repair. Served-media access checks and parity verification retain their separate reads. The owner subsequently approved starting A's copy while C stays disconnected; C's complete inventory and reconciliation remain prerequisites to final acceptance and drive release.
 - Any file's integrity can be re-verified by hash forever, even after sorting scattered it across the tree.
 - The migration window is longer than a copy-and-wipe approach — hashing 16TB per dataset is disk-bound (~a day per drive) — accepted as the price of the proof.
 - `b3sum` becomes a dev-shell dependency (`flake.nix`).
