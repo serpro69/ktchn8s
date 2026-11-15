@@ -110,7 +110,7 @@ Real decryption and host operations remain operator-executed checks.
 Validation fixtures use `99_tmp`; routine role execution never deletes legacy
 content. Task 1's two live applications and confirmed-empty cleanup passed on
 2026-11-09, including pool/all-branch absence checks. See the
-[acceptance evidence](./reviews/guided-execution-2026-11-08.md#task-1-live-acceptance-complete-2026-11-09)
+private acceptance evidence under `.nas-audit-evidence/reviews/`
 and [remaining provisioning follow-ups](#deferred-follow-ups-explicit).
 
 ## snapraid-excludes
@@ -239,8 +239,7 @@ acceptance recorded below.
 
 ### Guided live acceptance entry point
 
-Task 11.6 passed on 2026-11-09; see the
-[acceptance summary](./reviews/guided-execution-2026-11-08.md#task-11-live-nfs-acceptance).
+Task 11.6 acceptance is recorded privately under `.nas-audit-evidence/reviews/`.
 The `storage-validate` target covers basic NAS self-client and Pod probes
 without storage convergence; `validate_nfs=true` remains a compatibility route. Full two-client remount/recovery acceptance uses the focused entry points:
 
@@ -324,8 +323,8 @@ public entry point after its prerequisites, and acceptance requires that complet
 run and cleanup. No repeat of the already accepted run is required merely to
 re-establish context. Migration remains stopped pending owner authorization and
 source/recovery-copy reconciliation. Existing deferred follow-ups below remain open.
-The [cleanup verification and review record](./reviews/nfs-workflow-cleanup-2026-11-09.md)
-details local coverage and the code-only review verdicts.
+The private cleanup verification/review record under `.nas-audit-evidence/reviews/`
+details local coverage and code-review verdicts.
 
 ## parity-job-readiness
 
@@ -454,7 +453,7 @@ operations remain explicit operator actions.
 |---|---|
 | `inventory` | Root, source/disk ID and output path → versioned JSONL inventory of all entry types; BLAKE3 for regular files, literal symlink targets, numeric UID/GID/mode, mtime and ACL/xattr evidence. Do not compare non-restorable ctime or read-sensitive atime. Record source hardlink groups where the filesystem exposes reliable identities. |
 | `compare` | Two completed inventories; content comparison supports source-to-source delta planning. Path comparison remains available for troubleshooting an independently inventoried copy, but is not a routine staging gate. Candidate matches preserve source identities and never authorize discard or establish NAS presence. |
-| `verify` | A/B/C inventories, disposition ledger and final NAS root → complete source-to-destination/content/expected-metadata reconciliation. |
+| `verify` | Explicit active copy-source inventories, matching disposition ledger and final NAS root → complete accounting/content/expected-metadata checks within those inputs. A is the current source; B is excluded. Prepare C-keeper inputs in the later C phase. |
 | `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
 
 The inventory and ledger use escaped JSON strings that round-trip filesystem names,
@@ -512,8 +511,8 @@ resolving served symlinks; lexical `..` simplification alone is insufficient.
 
 ### Guided live audit acceptance
 
-Task 13.4 passed on 2026-11-09 on the differing NAS Python/b3sum stack; see the
-[acceptance summary](./reviews/guided-execution-2026-11-08.md#task-13-audit-tooling-acceptance).
+Task 13.4 acceptance on the NAS tool stack is recorded privately under
+`.nas-audit-evidence/reviews/`.
 `metal/storage-audit-acceptance.yml` is the standalone, operator-run entry point.
 It ensures the ACL fixture utility and runs the unchanged audit unit suite on the
 NAS, rejecting zero tests, skips and failures. A temporary self-NFS RO mount then
@@ -721,22 +720,82 @@ per-drive release gates. The owner separately approved copying A while C stays
 disconnected on 2026-11-11. C's inventory/comparison still gates completion of
 Task 6 and final reconciliation/release, but no longer blocks A's copy.
 
-1. **Inventory each source before using it in copy planning.** Use the helper's `inventory` command on each
-   attached source, recording disk ID, root and tool versions in the run evidence.
-   Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
-   scans; each records hashes, entry types and metadata per the tooling contract.
+**Owner-approved C sequencing, 2026-11-13:** After A's provisional copy is accepted
+and the complete A map is reviewed, sort A with C still disconnected.
+Retain the original inventories and record source-to-final mappings as content
+moves. Then prepare C's inspection, inventory it once, and perform step 3's C
+comparison against retained A coverage. Additional keepers from C may be copied
+directly to their chosen final homes. Thus step 4's A sorting precedes step 3's
+C work; all source accounting and C contributions must finish before final access
+and content acceptance in steps 4–5. Task 6 remains open during early sorting.
+Before preparing each new operator batch, explain its purpose and place in this
+sequence to the owner. No attachment or sorting command is implied by this plan.
+
+**Sorting scope, clarified 2026-11-13:** Preserve content and choose destinations;
+do not combine organization with optional cleanup. Apply only exact omissions
+explicitly approved in the private record, including subsequent owner decisions;
+keep all other hidden, temporary and older-backup content. Active-source omissions
+remain explicit discard rows in the ledger, with a reason and null destination.
+The unchanged auditor supports this disposition; its accounting result does not
+prove physical deletion. The operator must record removal/absence separately,
+preserve original source entries and account for affected parent metadata.
+Historical B-only omissions do not become active A ledger entries.
+Use the existing inventories to propose
+collection-level mappings, resolve ambiguous homes with the owner, and expand
+the agreed mappings into the per-entry ledger before execution. Complete and
+review the map for all of A's staged content before preparing the first move
+batch, including required subfolder splits and remaining wrapper/housekeeping
+entries. An individual destination approval records a planning decision; it
+does not start an early move. Once the whole map is settled, execute it in
+manageable batches directly to the intended final homes.
+The owner approved keeping complete residence, job-application and travel packs
+intact under their purpose while sorting loose documents by subject. Unidentified
+documents have an explicit retained holding destination in the approved
+`10_documents/10.99_unsorted`; their later identification does not block completing
+the migration map. This is a deliberate destination choice, not an instruction
+to park other mixed collections for an unplanned second sorting pass.
+For the new education-records category, distinguish credentials from learning
+material: diplomas/certificates and comparable records go to Documents; courses,
+textbooks, study notes and practice work stay in the Library. Keep a learning
+bundle's supporting material together rather than splitting it solely by format.
+
+**Directory accounting — owner decision, 2026-11-13:** Merge obsolete organizing
+directory entries into the relevant final containers; retain their original
+metadata and identities in the saved inventories and per-entry ledger. Do not
+create empty archival shells. These directory-only mappings never route child
+payloads implicitly. Declare compatible expected metadata for shared parents and
+all differences from each source; preserve current layout ownership/modes and
+intact backup metadata. Settle exact final container times after sorting, before
+acceptance, without another blanket timestamp-repair pass. This policy does not
+discard file content or change the intact-backup decisions. Exact decisions and
+evidence are in the private `.nas-audit-evidence/reviews/destination-map-review.md`.
+
+**Active audit scope — owner correction, 2026-11-13:** B comparison is finished,
+no B additions were retained, and A is the staged copy. Exclude B from the active
+destination ledger and `verify` inventory list. Preserve its originals and
+completed evidence for history and physical-drive release; B alias accounting
+and metadata transformations are retired requirements. The unchanged helper
+already accepts an explicit inventory list and requires the ledger to bind exactly
+that list. Use A now; do not weaken metadata checks on A to accommodate B.
+
+1. **Preserve completed inventories; inventory C later.** A/B inventories are
+   accepted and must not be restarted. After A sorting and prepared inspection,
+   use the helper's `inventory` command for C, recording disk ID, root and tool
+   versions. Publish `driveC.jsonl` only after a complete successful scan;
+   it records hashes, entry types and metadata per the tooling contract.
    Check the NAS tool versions against the Task 13 fixture record; NAS tool setup
    and any retesting for different versions must finish before these scans.
    This remains migration tooling outside the storage role.
    → verify: the source's scan completed with zero errors and entry counts reconcile
    before copying from it. A's accepted inventory and preflight permit step 2 while
-   C remains disconnected; all A/B/C inventories are still required before Task 6
-   completes. Special files need an explicit archive/restore or discard decision
+   C remains disconnected. Task 6 still requires C's complete evidence; B's
+   comparison is already closed. Special files need an explicit archive/restore or discard decision
    before release.
-2. **Copy A provisionally.** Run on the NAS with permission to preserve source metadata:
-   use project-root `nas-migration-16-copy-a.txt` from the controller for the
-   recorded run. It starts rsync locally on the NAS from
-   `/mnt/nas-migration-20261110/betelgeuse/` to `/mnt/storage/99_tmp/driveA/data/`
+2. **A provisional copy — completed, retain this execution contract.** Do not rerun
+   the copy or mtime repair. The original NAS operation preserved source metadata
+   using a private operator batch whose actual source binding and invocation are
+   retained with the receipts. The reusable copy contract is rsync from the
+   validated read-only source mount to `/mnt/storage/99_tmp/driveA/data/`
    with `-aHAX --numeric-ids --modify-window=-1`, progress/stats and a per-file log.
    Check its retained unit's completion; never use `--delete`. The
    outer `driveA` directory is a fresh root-owned mode-0700 guard; the `data` child
@@ -757,32 +816,53 @@ Task 6 and final reconciliation/release, but no longer blocks A's copy.
    rsync's size/time/metadata criteria without rereading all regular-file contents.
    → verify: copy succeeded, metadata-only check has no unresolved updates, and
    staging remains explicitly content-unverified. Do not run a full staging hash.
-3. **Plan and copy B/C deltas from source inventories.** Compare accepted B content
-   with A, and accepted C content with the planned A/B coverage, using BLAKE3 plus
-   size. These are comparisons of source evidence, not of the actual NAS copy.
+3. **Plan and copy C additions after A sorting.** B's comparison and no-delta-copy
+   decision are complete. Compare accepted C content with retained A coverage
+   and current destination mappings, using BLAKE3 plus size. A content match only
+   to omitted historical content needs C's own retention decision; it cannot be skipped
+   as already retained. These are comparisons of source evidence, not of the
+   actual NAS copy.
    Use grouped content sets for duplicate-heavy inventories; enumerating every
    pair of equal-content paths can produce excessive output. Keep each original
    inventory/source identity rather than inventing a physical combined source.
-   Copy planned missing content into `99_tmp/driveB_delta/` and `driveC_delta/`,
-   preserving relative paths and metadata; retain successful copy and metadata-only
-   dry-run evidence as in step 2. No separate staged-delta hashing is required.
+   Copy additional C keepers
+   directly to selected final destinations, recording each original path and
+   expected metadata. Check each destination before copying: differing content
+   must receive a distinct leaf path or an explicit disposition, never a silent
+   overwrite. Existing directory merges also need explicit metadata expectations;
+   do not reset a shared parent's metadata as a copy side effect. Retain successful
+   copy and metadata-only dry-run evidence as in step 2, scoped to the selected
+   entries and recorded metadata transformations. No separate staged-delta hashing
+   is required.
    Keep source identities even for equal content:
    a file needed at a second final path must be copied/linked there or explicitly
    deduplicated by the operator. Equality of hashes alone is not a discard decision.
    If a planned retained copy is later discarded or its destination changes, update
    the mapping and copy any newly required content before final acceptance. Account
    for directories, symlinks and special entries as well as regular-file bytes.
-   → verify: every B/C entry has an explicit planned retained destination/copy
-   receipt or proposed disposition; no copy failures or unresolved metadata-check
+   Prepare the destination-audit inputs for selected C keepers at this stage.
+   The current helper requires every entry of each supplied inventory and has no
+   selected-entry option. Assistant must define and verify a selection mechanism
+   tied to the unchanged full C inventory before C integration/final acceptance;
+   do not silently drop ledger rows or rewrite the original report. This work is
+   deferred until C's retained additions are known; it does not reopen B or require
+   a new payload scan merely to construct audit inputs.
+   → verify: every C entry has a recorded retained-coverage decision, additional
+   keeper mapping/copy receipt or explicit disposition; no copy failures or unresolved metadata-check
    updates remain. Task 6 can finish on these criteria without claiming the NAS
-   content is verified. Task 7's dependency on Task 6 therefore remains acyclic.
-4. **Sort with collision checks.** Maintain the tooling contract's JSONL ledger,
-   recording each source entry's destination/disposition and expected metadata.
+   content is verified. Task 7's A sorting can already be underway; its final
+   access/content acceptance still waits for complete Task 6 source accounting.
+4. **Sort A with collision checks, then integrate C.** Begin A sorting
+   after step 2 and complete A map review, while C stays disconnected. Complete
+   step 3's C work after that sorting and before final access/content acceptance.
+   Maintain the tooling contract's JSONL ledger,
+   recording each active migration entry's destination/disposition and expected metadata.
    Record moves as they occur; directory-level logs may aid reconstruction but cannot
    replace each entry's final mapping. Before each move, check the destination. If
    differing content collides, stop and choose distinct unnumbered leaf paths or an
    explicit discard; never overwrite. Equal-content deduplication records the retained
-   destination for every source entry. Log cruft deletion deliberately.
+   destination for every active source entry. Preserve content; the five B-only
+   housekeeping omissions remain in historical comparison evidence, not active ledger rows.
    Apply the [migrated access policy](#migrated-content-access), record repairs, and
    run its temporary RO access probe. Task 13 already tests the collision/error cases.
    → verify: all media access failures are resolved, transformations are explicit,
@@ -790,10 +870,12 @@ Task 6 and final reconciliation/release, but no longer blocks A's copy.
 5. **Perform the full content reconciliation after sorting.** First account for
    staging directory entries in the ledger and remove only confirmed-empty staging
    children; require `99_tmp` to have no remaining entries before starting the
-   expensive content pass. Then run the helper's `verify` command against all
-   three source inventories, the ledger and the final tree. It re-hashes all kept
+   expensive content pass. Then run the helper's `verify` command against the
+   active copy-source inputs and matching ledger: A and the C-keeper inputs
+   prepared in step 3, never B. If C contributes no additional keepers, the active
+   input remains A alone. It re-hashes all kept
    files and checks expected metadata/links and complete accounting.
-   → verify: `99_tmp` has no unresolved entries of any type, all source entries have
+   → verify: `99_tmp` has no unresolved entries of any type, all active input entries have
    checked dispositions, and the complete final audit has zero unexplained differences.
    Sampling is optional additional inspection, never the release gate. Store the
    helper revision, invocations, final access results and completed reports as evidence.
@@ -826,11 +908,12 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
    the candidate parity drive vs every `/mnt/data*` device and record the numbers in
    the controller evidence workspace. Abort the wipe if the candidate is smaller.
-1. **Per-file redundancy gate before B:** use the ledger to identify retained content
-   on B without a verified copy on A/C or another independent surviving device, apart
-   from the NAS. Reserve sufficient free space there, copy those deltas into a separate
-   safety-copy directory, and read/hash them back. Record disk IDs, paths, hashes and
-   free space. No spare capacity or any failed verification means **do not wipe B**.
+1. **Per-file redundancy gate before B:** use the completed A/B comparison and
+   exact five omission decisions together with surviving A evidence/final mappings
+   to establish independent recovery for B's retained content, apart from the NAS.
+   No retained B-only delta remains; do not reopen B copying or require a B
+   destination ledger. Record device identities and recovery coverage. A missing
+   independent copy or failed recovery check still means **do not wipe B**.
    → verify: every retained B entry can be recovered if its NAS data disk fails during
    first parity construction; another path/branch on the same physical disk does not count.
 2. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
