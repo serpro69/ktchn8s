@@ -44,6 +44,12 @@ ktchn8s repository.
 `10_documents/inbox` is a machine-consumed drop directory, excluded from parity.
 `99_tmp` is disposable staging and validation scratch.
 
+`10_documents/10.06_education` holds diplomas, certificates and similar records;
+learning material belongs in `40_library`. The `10_documents/10.99_unsorted`
+and `40_library/40.99_unsorted` categories retain items awaiting identification;
+they are not scratch space or automatic deletion queues. `20_photos/20.04_images`
+holds general images separately from the photo archive.
+
 The media machine tier is entirely under `30_media/rotation`: Transmission
 feeds `downloads/{complete,incomplete}`, and the media managers hardlink into
 `movies` or `shows`. Each linking container needs both paths under one mount.

@@ -23,10 +23,13 @@ storage_dirs:
   - 10_documents/10.03_finance
   - 10_documents/10.04_work
   - 10_documents/10.05_health
+  - 10_documents/10.06_education
+  - 10_documents/10.99_unsorted
   - 20_photos
   - 20_photos/20.01_library
   - 20_photos/20.02_camera
   - 20_photos/20.03_home_video
+  - 20_photos/20.04_images
   - 30_media
   - 30_media/30.01_movies
   - 30_media/30.02_tv
@@ -42,6 +45,7 @@ storage_dirs:
   - 40_library/40.01_books
   - 40_library/40.02_courses
   - 40_library/40.03_reference
+  - 40_library/40.99_unsorted
   - 50_topics
   - 50_topics/50.01_dnd
   - 50_topics/50.02_airsoft

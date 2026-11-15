@@ -57,22 +57,36 @@ The migration workflow revised on 2026-11-11 compares **source inventories** to
 plan copies, keeps staging content unverified, and runs `verify` after sorting.
 There is no routine full staging inventory/hash. The `compare` argument named
 `--copy` can hold another source inventory; its name does not establish a NAS
-copy. For C, compare against the planned A/B content coverage while retaining
-each source's identities. On large duplicate-heavy inventories, use grouped
+copy. For C, compare against the retained A content and its final mappings after
+A sorting. Preserve B's completed comparison as historical evidence; it is not
+an active copy source. On large duplicate-heavy inventories, use grouped
 content-set analysis rather than emitting every equal-content candidate pair.
+
+**Active inputs — owner correction, 2026-11-13:** A/B comparison and A's copy are
+complete, and no B additions were retained. Supply **A only** to the current
+destination ledger and `verify`; do not include B merely because its inventory
+exists. B needs no alias rows, metadata transformations or renewed comparison.
+Keep its original inventory, comparison, five omission decisions and receipts
+for history and the later physical-drive release gate. The helper already scopes
+verification to the explicitly supplied inventory list and requires the ledger's
+input digests to match it exactly; no code/schema change is needed.
+
+The A-only example below illustrates that input contract, not permission to run
+an interim staging audit or to accept the migration before C is handled. After
+A sorting and preparation of C inspection, account for C's retained additions
+and prepare their audit inputs. The current helper requires a disposition for
+every entry in each supplied inventory; it has no selected-entry option. Define
+and verify the C-keeper input selection at that stage without altering the full
+original C inventory or pretending an incomplete ledger is complete. This future
+C work does not bring B back into destination verification.
 
 ```bash
 python3 scripts/nas-migration-audit.py inventory \
   --root /mnt/driveA --source-id A --disk-id disk-by-id-recorded-for-A \
   --run-id migration-01 --output /var/log/snapraid/migration/run-01/driveA.jsonl
 
-python3 scripts/nas-migration-audit.py compare --mode content \
-  --source /evidence/driveB.jsonl --copy /evidence/driveA.jsonl \
-  --run-id migration-01 --output /evidence/discover-B.jsonl
-
 python3 scripts/nas-migration-audit.py verify \
-  --inventory /evidence/driveA.jsonl --inventory /evidence/driveB.jsonl \
-  --inventory /evidence/driveC.jsonl --ledger /evidence/ledger-01.jsonl \
+  --inventory /evidence/driveA.jsonl --ledger /evidence/ledger-01.jsonl \
   --root /mnt/storage --identity mergerfs \
   --run-id migration-01 --output /evidence/verify-01.jsonl
 ```
@@ -119,7 +133,8 @@ and the SHA-256 of every preceding byte (including newlines). Inputs must be
 accepted, complete, internally consistent generations; duplicate JSON keys and
 source/path rows fail input validation.
 
-Prepare one `record: "disposition"` row per source entry in an operator-reviewed
+Prepare one `record: "disposition"` row per entry of the selected active source
+inventories in an operator-reviewed
 `decisions.jsonl` body. Each row has these fields:
 
 | Field | Meaning |
@@ -160,8 +175,7 @@ spec = importlib.util.spec_from_file_location("audit", "scripts/nas-migration-au
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
 inventories = {}
-for path in [Path("/evidence/driveA.jsonl"), Path("/evidence/driveB.jsonl"),
-             Path("/evidence/driveC.jsonl")]:
+for path in [Path("/evidence/driveA.jsonl")]:
     header, digest = audit.read_generation(path, "inventory", lambda header, row: None)
     if header["source_id"] in inventories:
         raise ValueError("duplicate source ID")
@@ -175,7 +189,7 @@ with audit.Generation("/evidence/ledger-01.jsonl", "ledger", "migration-01",
 ```
 
 Sealing only establishes a complete generation, not valid dispositions or acceptance.
-`verify` validates the source inventory digests, complete source accounting, source
+`verify` validates the selected inventory digests, complete accounting within those inputs, source
 content, declared metadata, destination collisions and retained hardlinks. It
 rehashes every retained file and requires `99_tmp` to have no entries, including
 empty leftover directories. Missing destinations/dispositions are reported
