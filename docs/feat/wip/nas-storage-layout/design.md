@@ -338,6 +338,34 @@ that the replacement starts with the retained config PVC and new media mounts.
 
 ## Migration plan
 
+**Permission-check correction, 2026-11-17:** Task 7.2 lists/traverses declared
+served directories and opens each served file with at most a one-byte read as
+UID/GID 1000 over read-only NFS. It does not hash or read complete media files.
+Task 7.3 performs the complete content verification. The original full-read
+access job was stopped and is not accepted. The helper's bounded-read change
+passed the operator-run workstation and NAS suites. The live access run is
+accepted with one specific owner-approved thumbnail-entry access exception;
+that retained entry remains in full content/metadata verification.
+
+**Current scope — owner decision, 2026-11-17:** C is deferred in its entirety.
+Proceed through Task 7.2's actual-media access audit, Task 7.3's complete A
+destination reconciliation and Task 7.4's parity-inclusion, evidence and freeze
+work using A alone. Assume no C contribution for this acceptance scope; this
+does not establish that C has no unique retained content. This supersedes the
+earlier requirement below to wait for C before Task 7 acceptance.
+
+When C is explicitly resumed, inventory it fully and compare with retained A
+coverage and final mappings. Copy additional keepers to approved destinations,
+then verify every addition's full content and expected metadata/links. Include
+existing entries affected by directory merges, hardlinks or access repairs;
+unchanged A payloads do not require another full hash pass. Preserve the accepted
+A baseline and record the exact affected scope. This is complete checking of a
+selected scope, not sampling. The assistant must prepare and verify scoped
+audit-input selection before later C acceptance; the current helper has no
+incremental mode. Later additions change the accepted dataset and must be
+reconciled before parity work proceeds on that changed state. Source originals
+and per-drive release gates remain required; C's own accounting remains deferred.
+
 Ordering rule: **before each wipe, prove recoverability for every retained file on that
 device.** Before verified parity exists this requires a checksummed copy on another
 independent device in addition to the NAS copy. A second path on the same disk is not
@@ -359,8 +387,8 @@ the ledger must make repair from the unchanged originals possible. Source invent
 still establish the expected bytes. The separate served-media access audit reads
 media, and parity sync/scrubs and failure retries still require their own I/O.
 The owner also approved starting A's copy with C disconnected on 2026-11-11;
-C still needs its complete inventory and reconciliation before final acceptance
-or source release.
+C still needs its complete inventory and reconciliation before its source release.
+The 2026-11-17 scope decision permits A-only Task 7 acceptance first.
 
 **C after A sorting — accepted 2026-11-13:** Sort A's staged content first,
 recording its source identities and destinations/dispositions. The saved inventories
@@ -370,9 +398,10 @@ only to historical content omitted from the migrated collection is not retained 
 settle C's own disposition. Copy additional C keepers directly to their chosen
 final homes, with collision checks and copy/metadata receipts. Account for C's
 paths, directories, symlinks and special entries as well as unique regular-file
-bytes. Full final content/access acceptance waits for all C decisions and copies;
-no intermediate staging rehash is introduced. This permits Task 7's A sorting
-portion before Task 6 completes, without advancing any drive-release gate.
+bytes. The original requirement to wait for C before Task 7 acceptance is
+superseded by the 2026-11-17 A-only decision above. No intermediate staging rehash
+is introduced; C's later accounting and scoped verification still precede its
+own release gate.
 
 **B excluded from active migration — owner correction, 2026-11-13:** A/B
 comparison is finished, A was copied, and no B additions were retained. B is
@@ -415,7 +444,7 @@ source-specific paths, coverage evidence and execution prerequisites.
    remains unverified until the final audit. Every command must complete successfully;
    partial manifests or failed copies do not authorize progress or release.
 3. **Cross-drive comparison** — B's comparison and omission decisions are complete.
-   After A sorting, inspect/inventory C and compare it with retained A coverage
+   When deferred C work is explicitly resumed, inspect/inventory C and compare it with retained A coverage
    and destination mappings regardless of backup-generation paths; this is
    expected coverage, not proof of NAS presence. Preserve
    source/path identity separately: equal hashes do not authorize dropping a distinct

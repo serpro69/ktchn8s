@@ -15,8 +15,9 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/nas-migration-audit.py"
@@ -414,6 +415,121 @@ class AuditTests(unittest.TestCase):
              patch.object(audit.os, "getresgid", return_value=(1000,) * 3), \
              patch.object(audit.os, "getgroups", return_value=[]):
             self.run_audit("access", "--root", self.final, "--ledger", ledger, code=2)
+
+    def media_fixture(self):
+        media = self.source / "30_media/30.01_movies"
+        media.mkdir(parents=True)
+        (media / "film").write_bytes(b"same prefix: original")
+        inventory = self.inventory()
+        shutil.copytree(self.source, self.final, dirs_exist_ok=True)
+        return inventory, self.ledger([inventory])
+
+    def access_media(self, ledger, code=0):
+        # Only identity and mount flags are simulated here; the existing live
+        # NFS fixture separately exercises the actual UID and mount boundary.
+        with patch.object(audit.os, "getresuid", return_value=(1000,) * 3), \
+             patch.object(audit.os, "getresgid", return_value=(1000,) * 3), \
+             patch.object(audit.os, "getgroups", return_value=[]), \
+             patch.object(audit.os, "fstatvfs", return_value=SimpleNamespace(f_flag=os.ST_RDONLY)):
+            return self.run_audit("access", "--root", self.final / "30_media", "--ledger", ledger, code=code)
+
+    def only_media_read(self, effect):
+        target = (self.final / "30_media/30.01_movies/film").stat()
+        real_read = os.read
+
+        def read(fd, size):
+            actual = os.fstat(fd)
+            if (actual.st_dev, actual.st_ino) == (target.st_dev, target.st_ino):
+                return effect(fd, size)
+            # subprocess uses os.read for its exec-error pipe too. Version
+            # discovery must remain real and unaffected by media-read faults.
+            return real_read(fd, size)
+
+        return read
+
+    def test_access_reads_at_most_one_byte_without_hashing(self):
+        with (self.final / "large").open("wb") as stream:
+            stream.truncate(64 * 1024 * 1024)
+        (self.final / "empty").touch()
+        (self.final / "link").symlink_to("large")
+        real_read = os.read
+        with audit.Index(self.evidence) as index, audit.Tree(self.final) as tree, \
+             patch.object(audit.os, "fstatvfs", return_value=SimpleNamespace(f_flag=os.ST_RDONLY)), \
+             patch.object(audit, "hash_fd", side_effect=AssertionError("access must not hash content")), \
+             patch.object(audit.os, "read", wraps=real_read) as read:
+            for path, expected_bytes in (("large", 1), ("empty", 0), ("link", 1)):
+                with self.subTest(path=path):
+                    read.reset_mock()
+                    result = tree.read_access(path, index)
+                    read.assert_called_once()
+                    self.assertEqual(read.call_args.args[1], 1)
+                    self.assertEqual(result["bytes_read"], expected_bytes)
+                    self.assertNotIn("blake3", result)
+            read.reset_mock()
+            self.assertEqual(tree.read_access(".", index)["type"], "directory")
+            read.assert_not_called()
+
+    def test_access_accepts_readable_bytes_but_verify_detects_changed_content(self):
+        source, ledger = self.media_fixture()
+        original = self.source / "30_media/30.01_movies/film"
+        destination = self.final / "30_media/30.01_movies/film"
+        # Same size, first byte, and restoration metadata; only full content
+        # verification can distinguish these files, and it must still do so.
+        destination.write_bytes(b"same prefix: modified")
+        shutil.copystat(original, destination)
+        with patch.object(audit, "hash_fd", side_effect=AssertionError("access must not hash content")):
+            report = self.access_media(ledger)
+        rows = self.rows(report)
+        self.assertEqual(rows[0]["max_file_read_bytes"], 1)
+        self.assertIs(rows[0]["content_verified"], False)
+        file_rows = [r for r in rows if r.get("type") == "file"]
+        self.assertEqual(len(file_rows), 1)
+        self.assertEqual(file_rows[0]["bytes_read"], 1)
+        self.assertNotIn("blake3", file_rows[0])
+        verified = self.verify([source], ledger, code=1)
+        path = "30_media/30.01_movies/film"
+        result = next(r for r in self.rows(verified) if r.get("source_path") == path)
+        expected = next(r["expected"] for r in self.ledger_rows(ledger) if r["source_path"] == path)
+        self.assertEqual(result["status"], "mismatch")
+        self.assertEqual(result["actual"]["size"], expected["size"])
+        self.assertNotEqual(result["actual"]["blake3"], expected["blake3"])
+
+    def test_access_still_reports_file_size_mismatch(self):
+        _, ledger = self.media_fixture()
+        (self.final / "30_media/30.01_movies/film").write_bytes(b"short")
+        report = self.access_media(ledger, code=1)
+        self.assertIn("mismatch", [r.get("status") for r in self.rows(report)])
+
+    def test_access_minimal_read_failures_are_not_accepted(self):
+        _, ledger = self.media_fixture()
+        for error, code in ((OSError(errno.EACCES, "denied"), 1),
+                            (OSError(errno.EIO, "read failed"), 2)):
+            with self.subTest(errno=error.errno):
+                failure = Mock(side_effect=error)
+                with patch.object(audit.os, "read", side_effect=self.only_media_read(failure)):
+                    report = self.access_media(ledger, code=code)
+                failure.assert_called_once()
+                if code == 1:
+                    denied = next(r for r in self.rows(report) if r.get("status") == "denied_or_unresolved")
+                    self.assertEqual(denied["errno"], errno.EACCES)
+        eof = Mock(return_value=b"")
+        with patch.object(audit.os, "read", side_effect=self.only_media_read(eof)):
+            self.access_media(ledger, code=2)
+        eof.assert_called_once()
+
+    def test_access_rejects_file_change_during_minimal_read(self):
+        _, ledger = self.media_fixture()
+        real_read = os.read
+
+        def mutate(fd, size):
+            sample = real_read(fd, size)
+            (self.final / "30_media/30.01_movies/film").write_bytes(b"changed")
+            return sample
+
+        mutation = Mock(side_effect=mutate)
+        with patch.object(audit.os, "read", side_effect=self.only_media_read(mutation)):
+            self.access_media(ledger, code=2)
+        mutation.assert_called_once()
 
     def test_served_link_resolution_rejects_escape_and_loop(self):
         (self.final / "dir").mkdir()

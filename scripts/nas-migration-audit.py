@@ -305,7 +305,13 @@ class Tree:
                     index.list_directory(fd, path)
                     return {"resolved": path, "type": "directory"}
                 require(stat.S_ISREG(info.st_mode), "served target is not a file or directory")
-                return {"resolved": path, "type": "file", "blake3": hash_fd(fd, self.b3sum), "size": info.st_size}
+                # Access proves readability, not content integrity. Full hashes
+                # belong to inventory/verify, including for large media files.
+                sample = os.read(fd, 1)
+                unchanged(info, os.fstat(fd), path)
+                require(len(sample) == min(info.st_size, 1), "unexpected EOF during access probe")
+                return {"resolved": path, "type": "file", "size": info.st_size,
+                        "bytes_read": len(sample)}
 
 
 def signature(row):
@@ -675,7 +681,8 @@ def access(args):
         failures, selected = 0, 0
         with Tree(args.root, args.b3sum) as tree, Generation(
                 args.output, "access", args.run_id, ledger_sha256=ledger_digest,
-                root=str(tree.root.resolve()), uid=1000, gid=1000, groups=[], tools=versions(args.b3sum)) as out:
+                root=str(tree.root.resolve()), uid=1000, gid=1000, groups=[], tools=versions(args.b3sum),
+                max_file_read_bytes=1, content_verified=False) as out:
             require(os.fstatvfs(tree.fd).f_flag & os.ST_RDONLY, "access requires a read-only mount")
             for (data,) in index.db.execute("SELECT data FROM ledger WHERE destination IS NOT NULL"):
                 row = json.loads(data)
@@ -689,7 +696,7 @@ def access(args):
                     actual = tree.read_access(destination.removeprefix("30_media/"), index)
                     expected = row["expected"]
                     matches = expected["type"] == "symlink" or (actual["type"] == expected["type"] and
-                              (actual["type"] != "file" or (actual["blake3"], actual["size"]) == (expected["blake3"], expected["size"])))
+                              (actual["type"] != "file" or actual["size"] == expected["size"]))
                     failures += not matches
                     out.add({**result, "status": "read" if matches else "mismatch", **actual})
                 except OSError as exc:
