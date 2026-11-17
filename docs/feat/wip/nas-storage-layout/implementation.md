@@ -454,7 +454,7 @@ operations remain explicit operator actions.
 | `inventory` | Root, source/disk ID and output path → versioned JSONL inventory of all entry types; BLAKE3 for regular files, literal symlink targets, numeric UID/GID/mode, mtime and ACL/xattr evidence. Do not compare non-restorable ctime or read-sensitive atime. Record source hardlink groups where the filesystem exposes reliable identities. |
 | `compare` | Two completed inventories; content comparison supports source-to-source delta planning. Path comparison remains available for troubleshooting an independently inventoried copy, but is not a routine staging gate. Candidate matches preserve source identities and never authorize discard or establish NAS presence. |
 | `verify` | Explicit active copy-source inventories, matching disposition ledger and final NAS root → complete accounting/content/expected-metadata checks within those inputs. A is the current source; B is excluded. Prepare C-keeper inputs in the later C phase. |
-| `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
+| `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Each file probe requests at most one byte and checks type/size; it performs no content hashing. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
 
 The inventory and ledger use escaped JSON strings that round-trip filesystem names,
 including spaces, newlines and Cyrillic. Never follow symlinks during inventory or
@@ -478,6 +478,17 @@ Retries create a fresh generation; partial inventories cannot be resumed or acce
 Verification/access reports record the same ledger digest; any ledger or destination
 change invalidates previous acceptance and requires the relevant checks again.
 Stream inventories/reports and hash locally to avoid reading NAS data over the network.
+
+**Acceptance scope, owner decision 2026-11-17:** the current Task 7 audit uses A
+alone; C is entirely deferred and B remains excluded. Later C acceptance uses
+its complete inventory and a scoped check of every copied addition plus affected
+existing entries, with the accepted A baseline preserved. The helper has no
+incremental/reuse switch. Before that later work, the assistant must prepare and
+verify source-bound audit-input selection and affected-entry accounting, including
+shared directory metadata, destination collisions, hardlinks and served-media
+access. Do not silently omit ledger rows or claim that C's source hashes prove
+its destination copies. Unchanged A payloads need no new full hash pass under
+this accepted workflow; affected entries require fresh successful evidence.
 
 → verify: `python3 -m unittest discover -s tests -p 'test_nas_migration_audit.py'`
 covers the command exit/output contract, partial scans/retries, failed hashes, unusual
@@ -505,7 +516,9 @@ nix develop -c bash -c 'cd metal/roles/storage && MOLECULE_EPHEMERAL_DIRECTORY=/
 
 Copy existing evidence elsewhere before reusing that directory. The helper uses
 SQLite for bounded-memory joins and successful directory-listing records, while
-still opening and reading every declared served file. It checks directory search
+opening every declared served file and requesting at most one byte per probe.
+Access reports explicitly state `content_verified: false`; full content checking
+remains `verify`. It checks directory search
 permission separately from listing and preserves kernel traversal semantics when
 resolving served symlinks; lexical `..` simplification alone is insufficient.
 
@@ -664,8 +677,26 @@ Verify in this order, rendering before sync and running runtime checks afterward
 
 ## migrated-content-access
 
+**Owner correction, 2026-11-17:** Task 7.2 is a permission/access check. List and
+traverse all declared served directories, open every served regular file and read
+at most one byte per file as UID/GID 1000 without supplementary groups. Preserve
+read-only mount and symlink-containment checks. Do not hash media or read files
+in full in this step; Task 7.3 owns complete content verification. The bounded-read
+change is implemented locally; the operator reported all 36 helper regression
+tests passing in 6.101 seconds, followed by all 36 tests on the NAS in 0.887 seconds.
+The live bounded-read audit is accepted with the specific owner-approved access
+exception below, after cleanup and independent report collection. The first
+full-read run was stopped and its mount cleanup confirmed; it does not establish
+acceptance and must not be restarted.
+
 Task 7 applies this policy after sorting and before final acceptance/freeze. The
 skeleton's ownership does not repair permissions inside copied trees.
+
+The owner may approve a specific access exception without changing retention.
+Record it privately against the exact completed report/entry and preserve the
+original failure and exit statuses. Such an exception does not authorize deletion
+or waive content/metadata reconciliation. The 2026-11-17 run has one explicit
+thumbnail-entry access exception; all other selected entries must still pass.
 
 | Tier | Required access and metadata policy |
 |---|---|
@@ -705,6 +736,15 @@ archive the completed evidence to `00_meta` and retain its independent copy unti
 next normal sync protects those new archive files.
 
 ## migration-runbook
+
+**Current owner-selected sequence, 2026-11-17:** complete 7.2, 7.3 and 7.4 using
+A alone. C is entirely deferred; its absence no longer blocks A acceptance.
+Later C work inventories the source, copies additional keepers and verifies
+every addition plus affected existing entries against preserved source/baseline
+evidence. It does not repeat a full hash pass over unchanged A payloads. This
+supersedes earlier C-before-final-acceptance wording in the historical decisions
+below. Source release still requires the applicable per-drive recovery gates.
+The operator executes commands; the assistant prepares and explains each batch.
 
 Manual/operational, after Task 13's tooling passes and before production consumers
 start. Set up the [evidence workspace](#migration-evidence), freeze original source
@@ -778,7 +818,7 @@ and metadata transformations are retired requirements. The unchanged helper
 already accepts an explicit inventory list and requires the ledger to bind exactly
 that list. Use A now; do not weaken metadata checks on A to accommodate B.
 
-1. **Preserve completed inventories; inventory C later.** A/B inventories are
+1. **Preserve completed inventories; inventory C only when resumed.** A/B inventories are
    accepted and must not be restarted. After A sorting and prepared inspection,
    use the helper's `inventory` command for C, recording disk ID, root and tool
    versions. Publish `driveC.jsonl` only after a complete successful scan;
@@ -816,7 +856,7 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
    rsync's size/time/metadata criteria without rereading all regular-file contents.
    → verify: copy succeeded, metadata-only check has no unresolved updates, and
    staging remains explicitly content-unverified. Do not run a full staging hash.
-3. **Plan and copy C additions after A sorting.** B's comparison and no-delta-copy
+3. **Deferred: plan and copy C additions when explicitly resumed.** B's comparison and no-delta-copy
    decision are complete. Compare accepted C content with retained A coverage
    and current destination mappings, using BLAKE3 plus size. A content match only
    to omitted historical content needs C's own retention decision; it cannot be skipped
@@ -851,10 +891,12 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
    keeper mapping/copy receipt or explicit disposition; no copy failures or unresolved metadata-check
    updates remain. Task 6 can finish on these criteria without claiming the NAS
    content is verified. Task 7's A sorting can already be underway; its final
-   access/content acceptance still waits for complete Task 6 source accounting.
-4. **Sort A with collision checks, then integrate C.** Begin A sorting
-   after step 2 and complete A map review, while C stays disconnected. Complete
-   step 3's C work after that sorting and before final access/content acceptance.
+   A-only access/content acceptance proceeds independently under the 2026-11-17
+   scope decision. Later C acceptance still requires complete C source accounting.
+4. **Accept sorted A; integrate C only when resumed.** Begin A sorting
+   after step 2 and complete A map review. A sorting is complete; C is now entirely
+   deferred. Apply access/content acceptance to A, and resume step 3 only on a new
+   owner instruction, with later additions checked in their affected scope.
    Maintain the tooling contract's JSONL ledger,
    recording each active migration entry's destination/disposition and expected metadata.
    Record moves as they occur; directory-level logs may aid reconstruction but cannot
@@ -871,9 +913,9 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
    staging directory entries in the ledger and remove only confirmed-empty staging
    children; require `99_tmp` to have no remaining entries before starting the
    expensive content pass. Then run the helper's `verify` command against the
-   active copy-source inputs and matching ledger: A and the C-keeper inputs
-   prepared in step 3, never B. If C contributes no additional keepers, the active
-   input remains A alone. It re-hashes all kept
+   active copy-source input and matching ledger: A alone, never B or deferred C.
+   Later C additions use the scoped acceptance workflow above. The current A audit
+   re-hashes all kept
    files and checks expected metadata/links and complete accounting.
    → verify: `99_tmp` has no unresolved entries of any type, all active input entries have
    checked dispositions, and the complete final audit has zero unexplained differences.
@@ -883,7 +925,7 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
    acceptance: use the ledger to identify the unchanged original, repair the final
    destination and produce fresh successful reports. Do not silently discard a
    failed entry. The served-media `access` check remains a separate identity/RO
-   gate and reads that subset in full; parity checks and required retries also
+   gate and uses only bounded reads under the 2026-11-17 correction; parity checks and required retries also
    perform I/O. One planned full reconciliation does not mean one physical read
    across the entire migration.
 6. **Freeze the accepted dataset.** Stop promotions and all writers to included paths
@@ -894,6 +936,12 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
    Apply the [evidence-location rule](#migration-evidence) throughout Task 8; the NAS
    archive stays unchanged until release is complete.
    → verify: the ledger and final checksums describe the dataset used for parity.
+
+   A later C copy must not silently change a dataset under parity construction.
+   Pause any active freeze/parity sequence before additions, complete their scoped
+   acceptance and refresh affected metadata/evidence, then establish the new frozen
+   state before continuing. If parity already protects the previous state, run the
+   applicable sync and verification before claiming protection for the additions.
 
 ## parity-enablement
 

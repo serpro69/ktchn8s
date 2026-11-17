@@ -71,14 +71,20 @@ for history and the later physical-drive release gate. The helper already scopes
 verification to the explicitly supplied inventory list and requires the ledger's
 input digests to match it exactly; no code/schema change is needed.
 
-The A-only example below illustrates that input contract, not permission to run
-an interim staging audit or to accept the migration before C is handled. After
-A sorting and preparation of C inspection, account for C's retained additions
-and prepare their audit inputs. The current helper requires a disposition for
-every entry in each supplied inventory; it has no selected-entry option. Define
-and verify the C-keeper input selection at that stage without altering the full
-original C inventory or pretending an incomplete ledger is complete. This future
-C work does not bring B back into destination verification.
+**Owner-selected scope, 2026-11-17:** A sorting is complete and C is entirely
+deferred. Use the A-only contract below for Task 7.2 access acceptance, Task 7.3
+full A verification and Task 7.4 evidence/freeze work. This does not establish
+that C has no additional retained content and does not authorize C release.
+
+Later C work inventories C fully, compares retained coverage and copies additional
+keepers. Verify every addition's full content and expected metadata/links, plus
+existing entries affected by the changes; unchanged A payloads need no full
+rehash. Preserve the accepted A baseline and bind the new evidence to the exact
+affected scope. The helper still requires a disposition for every entry in each
+supplied inventory and has no selected-entry or incremental-reuse option. Before
+later C acceptance, define and verify the scoped input/accounting mechanism
+without altering the original full inventory or silently dropping ledger rows.
+This future C work does not bring B back into destination verification.
 
 ```bash
 python3 scripts/nas-migration-audit.py inventory \
@@ -200,6 +206,11 @@ the migration runbook requires those separately.
 
 ## Served-content access
 
+**Task 7.2 correction, 2026-11-17:** `access` now checks permissions with bounded
+reads. Full content hashing remains in `verify` (Task 7.3). The stopped full-read
+run is not accepted. The new helper must pass its focused checks before a fresh
+operator-run audit; the old private launcher remains disabled.
+
 Mount only `server:/mnt/storage/30_media` read-only on an allowed client. Prepare
 an evidence directory writable by UID/GID 1000 outside the mount, with a readable
 copy of the **same ledger generation** used by `verify`. Then run:
@@ -214,12 +225,23 @@ setpriv --reuid=1000 --regid=1000 --clear-groups \
 The command refuses another identity, supplementary groups or a writable mount.
 It derives served paths from the ledger's `30.01_movies`, `30.02_tv`, and
 `30.03_music` subtrees, removes `30_media/`, lists/traverses ancestors and opens
-and hashes entire served files. It checks mount read-only flags along the path.
+each declared served file. Each file probe requests at most one byte; empty files
+return zero. It checks file type/size and detects changes during the probe, but
+does not hash or compare file contents. It checks mount read-only flags along the path.
 Relative served symlinks must resolve within the media mount; escaping, absolute,
 looping or unresolved targets cannot pass. A ledger without served entries is an
 input error, not a vacuous access pass.
 
-Require zero failures in both reports and identical `ledger_sha256` values.
+Access report headers declare `max_file_read_bytes: 1` and
+`content_verified: false`; file results contain `bytes_read`, not `blake3`.
+The helper still validates the ledger and records tool versions, so it reads
+ledger metadata and invokes `b3sum --version`, not payload hashing. A readable
+same-size corrupted file may pass `access`; `verify` must detect that corruption.
+
+Require zero verification failures and zero unapproved access failures, with
+identical `ledger_sha256` values. Bind any owner-approved access exception to the
+exact original report/entry and preserve its failure and exit status. An access
+exception does not waive content or metadata differences in `verify`.
 Unmount the audit client before any further local repair. After repair, run both
 checks again against the updated ledger and unchanged final data. Task 7 uses real
 migrated paths; the synthetic VM check only establishes the helper's behavior.
