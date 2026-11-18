@@ -17,7 +17,8 @@ targeted metadata repair are accepted; no inventory, copy or repair restart is
 needed. B's comparison is closed and B is excluded from active destination
 verification. A sorting and its sealed ledger are complete. On 2026-11-17 the owner
 deferred C in its entirety, confirmed it unmounted/disconnected, and selected
-A-only acceptance in order 7.2, 7.3, 7.4.
+A-only acceptance in order 7.2, 7.3, 7.4. That sequence completed on
+2026-11-18. Included NAS data is frozen through the final Task 8 scrub.
 Assume no C contribution for this acceptance scope; this is an explicit scope
 decision, not a completed C comparison. Later C additions require a complete
 source inventory, explicit mappings and scoped destination verification of every
@@ -97,7 +98,7 @@ commands; the assistant prepares and explains each step without executing it.
   differences in the affected scope. This replaces the earlier combined full rehash.
 
 ## Task 7: Migration — sort into numbered homes
-- **Status:** in-progress
+- **Status:** done
 - **Depends on:** Task 2; Task 6.2; C work is deferred outside the current A-only acceptance
 - **Docs:** [Migration runbook](./implementation.md#migration-runbook)
 - [x] 7.0a Complete owner review of the full A destination map, including collection boundaries and shared subject names.
@@ -108,32 +109,26 @@ commands; the assistant prepares and explains each step without executing it.
 - [x] 7.0c-layout Implement, locally verify and apply the four approved directory/legend additions.
 - [x] 7.0c Complete the first operator batch and its namespace/metadata preflight. Every later move batch still requires its own collision and metadata checks.
 - [x] 7.1 Sort A using the reviewed map, collision stops and recorded dispositions while C remains disconnected; integrate C additions later under 6.3.
-- The owner-approved Education directory-only accounting correction is included in the sealed A ledger; all file/bundle routes remain unchanged.
+- The sealed A ledger includes the approved directory accounting correction.
 - All retained A payloads and source records are moved. Confirmed-empty staging wrappers are removed and affected destination metadata is captured. This establishes sorting completion, not final content/access acceptance; exact evidence stays private.
 - [x] 7.2 Check migrated-media directory listing/traversal and file-open/minimal-read access as UID/GID 1000 through temporary read-only NFS; remove the client. Accepted with one specific owner-approved access exception. Do not hash or read complete media files in this step; full content verification belongs to 7.3.
-- [ ] 7.3 Verify A's final tree against its unchanged source inventory and matching ledger. Exclude B and deferred C. Require complete content/metadata/link/disposition and access acceptance within A's scope, with no unresolved staging entries.
-- [ ] 7.4 Confirm parity inclusion for the accepted scope, archive evidence before the freeze and preserve independent evidence through Task 8. Later C writes require a new accepted dataset state before parity work can proceed on that changed dataset.
+- [x] 7.3 Verify A's final tree against its unchanged source inventory and matching ledger. Exclude B and deferred C. Require complete content/metadata/link/disposition and access acceptance within A's scope, with no unresolved staging entries.
+- [x] 7.4 Confirm parity inclusion for the accepted scope, archive evidence before the freeze and preserve independent evidence through Task 8. Later C writes require a new accepted dataset state before parity work can proceed on that changed dataset.
 - Owner-selected order is 7.2 → 7.3 → 7.4. A-only acceptance does not certify C
   coverage or authorize release of C; its later source accounting remains Task 6.
-- **7.2 accepted, 2026-11-17:** 37,148 entries passed required read access; the
-  owner explicitly waived the sole thumbnail-entry denial. The entry is retained
-  and remains in 7.3. Cleanup and mount removal were confirmed, and the original
-  difference report/receipts were collected and checked independently. No repair
-  or new ledger generation was needed. Do not turn the original nonzero result
-  into a fabricated clean report or generalize the exception.
+- **7.2 accepted on 2026-11-17.** The owner approved one access exception.
+  The entry remained in the full verification scope. The operator confirmed
+  mount removal and preserved the original difference report and receipts.
 - The bounded-read helper passed all 36 operator-run tests on workstation and
   NAS. Independent source review is complete. The earlier full-read permission
   run was cancelled, its cleanup confirmed and its launcher disabled; do not
   restart it or repeat completed tests merely to recover context.
-- **7.3 launched, 2026-11-17:** the operator started the reviewed A-only local-NAS
-  verification batch. Its last supplied state was active/running at startup.
-  Completion, full report and acceptance remain unknown. Inspect this exact job;
-  do not relaunch it to check progress. Keep dataset writers stopped. Unit identity,
-  immutable input pins and controller/NAS evidence paths are recorded privately.
-- Next: obtain the existing 7.3 result; require matching invocation, zero verify/job
-  exits and a complete zero-difference report, then collect/check it independently.
-  Diagnose any failures before planning repairs or another scan. Only after 7.3
-  acceptance proceed to 7.4 parity-inclusion, evidence and freeze work.
+- **7.3 accepted.** The operator independently validated the complete report
+  against the original A inventory and sealed ledger. All retained entries matched.
+- **7.4 accepted.** After the approved discards and directory metadata updates,
+  all retained A entries fall within the configured parity rules. The operator
+  verified the archived evidence and its independent copy. Writers and promotions
+  are frozen through the final Task 8 scrub.
 - Keep backup/library/vault internals intact except for exact approved omissions; preserve all originals. Record obsolete directory wrappers as merges; do not create empty archival shells or add a blanket timestamp-repair pass.
 
 ## Task 8: Parity enablement and drive release
