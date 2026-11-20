@@ -1,0 +1,46 @@
+---
+- name: Check the live mounts, candidate signature, capacity and maintenance units
+  ansible.builtin.script:
+    cmd: >-
+      parity-preflight.sh
+      {% if parity_fresh_two_level | default(false) | bool %}--fresh-two-level{% endif %}
+      {{ parity_devices[parity_index] | quote }} {{ parity_directories[parity_index] | quote }}
+      {% for device, mount_path in data_devices | zip(disk_directories) %}
+      {{ device | quote }} {{ mount_path | quote }}
+      {% endfor %}
+      {% for device, mount_path in parity_devices | zip(parity_directories) if device != parity_devices[parity_index] %}
+      {{ device | quote }} {{ mount_path | quote }}
+      {% endfor %}
+    executable: /bin/bash
+  register: parity_preflight
+  changed_when: false
+
+- name: Require an identified preparation state
+  ansible.builtin.assert:
+    that: parity_preflight.stdout | trim in ['blank', 'ext4']
+
+- name: Format only an explicitly released partition with a positive blank probe
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ parity_devices[parity_index] }}"
+    opts: "-L {{ parity_directories[parity_index] | basename }}"
+    force: false
+  when: parity_preflight.stdout | trim == 'blank'
+
+- name: Persist and mount the released parity filesystem
+  ansible.posix.mount:
+    path: "{{ parity_directories[parity_index] }}"
+    src: "{{ parity_devices[parity_index] }}"
+    fstype: ext4
+    opts: defaults,noatime
+    passno: "2"
+    state: mounted
+    backup: true
+
+- name: Require a fresh parity filesystem before installing the joint configuration
+  ansible.builtin.command:
+    argv: [find, "{{ parity_directories[parity_index] }}", -mindepth, '1', -maxdepth, '1', '!', '(', -name, lost+found, -type, d, ')', -print, -quit]
+  register: fresh_parity_contents
+  changed_when: false
+  failed_when: fresh_parity_contents.rc != 0 or fresh_parity_contents.stdout != ''
+  when: parity_fresh_two_level | default(false) | bool

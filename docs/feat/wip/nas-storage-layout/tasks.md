@@ -18,11 +18,10 @@ needed. B's comparison is closed and B is excluded from active destination
 verification. A sorting and its sealed ledger are complete. On 2026-11-17 the owner
 deferred C in its entirety, confirmed it unmounted/disconnected, and selected
 A-only acceptance in order 7.2, 7.3, 7.4. That sequence completed on
-2026-11-18. Included NAS data is frozen through the final Task 8 scrub.
-Assume no C contribution for this acceptance scope; this is an explicit scope
-decision, not a completed C comparison. Later C additions require a complete
-source inventory, explicit mappings and scoped destination verification of every
-addition and affected existing entry. Exact observations and commands stay private.
+2026-11-18. On 2026-11-20 the owner reviewed the completed C comparison
+and selected zero C additions. A's verified destinations and metadata are
+the accepted dataset for the joint B+C full scrub. The existing freeze
+continues. Exact observations and commands stay private.
 Originals and receipts remain intact through final acceptance and release gates.
 There is no routine staging rehash. The operator executes workstation and NAS/cluster
 commands; the assistant prepares and explains each step without executing it.
@@ -68,15 +67,14 @@ commands; the assistant prepares and explains each step without executing it.
 - [ ] 5.7 Complete live import, hardlink, seeding, promotion/rescan, playback, read-only and NFS acceptance. Keep network smoke checks separate.
 
 ## Task 6: Migration — source comparison and provisional copies
-- **Status:** in-progress
+- **Status:** done
 - **Depends on:** Task 1, Task 3, Task 11, Task 13
 - **Docs:** [Migration runbook](./implementation.md#migration-runbook)
-- [ ] 6.1 Preserve accepted A/B evidence. After A sorting, establish C's inspected read-only source mount and publish its complete inventory.
+- [x] 6.1 Preserve accepted A/B evidence. After A sorting, establish C's inspected read-only source mount and publish its complete inventory.
 - [x] 6.2 Complete and preserve A's provisional copy and metadata-only acceptance. Stored content remains subject to final verification.
-- [ ] 6.3 Compare C with retained A coverage and final mappings; copy additional keepers directly to chosen homes with collision and metadata checks. Prepare and verify C-keeper audit-input selection without changing the original C inventory or silently omitting ledger entries.
-- C is entirely deferred by the owner after workstation read-only setup. No C
-  inventory or comparison has run. The owner subsequently unmounted/disconnected C.
-  This work no longer blocks A-only Task 7 acceptance.
+- [x] 6.3 Compare C with retained A coverage and final mappings, account for every source entry, and verify the scope of any additions. The owner selected zero additional keepers.
+- The owner resumed C on 2026-11-19 after the A-only acceptance, completed
+  its read-only setup on the NAS and started its inventory.
 - B needs no new inventory, comparison, copy, alias ledger or metadata transformation.
 
 ### Execution context
@@ -96,6 +94,24 @@ commands; the assistant prepares and explains each step without executing it.
   mechanism and baseline/change evidence when C resumes; the current helper has no
   incremental mode. Acceptance requires complete C accounting and zero unexplained
   differences in the affected scope. This replaces the earlier combined full rehash.
+- **2026-11-19, operator-reported and receipt reviewed:** A is disconnected.
+  C's recorded disk and ext4 filesystem identities matched on the NAS. The
+  mount completed with device write protection, read-only filesystem and
+  journal replay disabled. The initial status receipt matched the launch and
+  showed partial output. Its first NAS SMART observation is retained privately.
+- **2026-11-20, scan finished.** The operator's completion receipts match the
+  original invocation and show a successful exit and an accepted footer with
+  zero failures. The operator preserved the report and receipts in the
+  independent controller archive. The validator checked the complete
+  generation, source binding, entry count and NAS-to-controller digest.
+  The saved acceptance marker and validation summary agree. Task 6.1 is complete.
+- **2026-11-20, 6.3 comparison complete.** The private controller report
+  accounts for every C entry against A's accepted inventory and amended
+  final mappings. Two regular-file versions have no payload match on A.
+  The owner chose A's existing destinations and metadata and omitted the two
+  versions and C's counterparts to A's omissions. The private decision binds
+  each disposition to the checksummed comparison. Both the copy set and the
+  affected-destination verification set are empty.
 
 ## Task 7: Migration — sort into numbered homes
 - **Status:** done
@@ -132,19 +148,83 @@ commands; the assistant prepares and explains each step without executing it.
 - Keep backup/library/vault internals intact except for exact approved omissions; preserve all originals. Record obsolete directory wrappers as merges; do not create empty archival shells or add a blanket timestamp-repair pass.
 
 ## Task 8: Parity enablement and drive release
-- **Status:** pending
+- **Status:** in-progress
 - **Depends on:** Task 2, Task 7, Task 12
 - **Docs:** [Parity and release](./implementation.md#parity-enablement)
-- [ ] 8.0 Verify firmware/settings and drive health against private baseline records.
-- [ ] 8.1 Check B's physical identity/size and independent recovery coverage using completed comparison evidence and surviving A/final mappings. No B destination ledger is required.
-- [ ] 8.2 Quiesce maintenance; release B only after its gate, configure first parity and record a successful explicit full-sync invocation.
-- [ ] 8.3 Complete a full scrub with zero errors and full coverage before C release.
-- [ ] 8.4 Repeat C's recovery/size gate, add second parity, then complete explicit full sync and full scrub.
+- [x] 8.0 Verify firmware/settings and drive health against private baseline records.
+- [x] 8.1 Check B's physical identity/size and independent recovery coverage using completed comparison evidence and surviving A/final mappings. No B destination ledger is required.
+- [x] 8.2 Finalize C under Task 6. Verify independent recovery for its retained entries, including C-only additions, on storage that survives both wipes. Verify C's identity and size.
+- [x] 8.3 Quiesce maintenance and prepare B and C individually after both release gates pass. Configure both parity levels before starting the job.
+- [ ] 8.4 Run one explicit full sync with B and C configured, then one full scrub. Require successful exits, unchanged included data, complete coverage and zero errors.
 - [ ] 8.5 Release A last after successful two-level protection and recovery checks; record its chosen role.
 - [ ] 8.6 Preserve release/job evidence privately during the freeze, archive it afterward and re-enable maintenance.
 - Failed checks or insufficient independent recovery stop the release sequence.
-- A-only Task 7 acceptance does not release deferred C. Its later inventory,
-  retained-content accounting and scoped verification must precede its release gate.
+- A-only Task 7 acceptance covers A. C's inventory, retained-content accounting
+  and scoped verification precede its release gate.
+
+### Execution context
+
+- **2026-11-20, B/C snapshot reviewed.** The disk identities and four branch
+  mappings match the receipts. The private review records a GPT layout for
+  either candidate matching the largest data partition, and the retained
+  dataset is recoverable from offline A through both wipes. All six drives
+  passed SMART. B's direct firmware reads confirm its update. The operator
+  subsequently verified both vendor file digests and a positive C firmware
+  selector match. C was unmounted normally and remained write-protected.
+  C's firmware update completed. Two direct readbacks confirm the new
+  revision and passing SMART. The operator restored C's EPC setting after
+  activation. PowerBalance and all four EPC timer rows match the pre-update
+  baseline. Task 8.0 is complete.
+- **8.3, maintenance quiescence verified on 2026-11-20.** The operator
+  found no runner or scrub timer files, loaded maintenance units, queued
+  jobs or manual SnapRAID processes. The operator subsequently released B
+  and C individually. Both partition receipts confirm the planned GPT
+  geometry and blank signatures. One Ansible apply mounted both parity
+  filesystems and installed the two-level configuration with zero failures.
+- **2026-11-20, migration closed.** Offline A supplies the independent
+  recovery source for the retained dataset through both planned wipes.
+  Keep A intact through the full scrub.
+- **2026-11-19, owner-selected sequence.** Shut down the NAS normally and
+  disconnect A once fully powered off. Keep A intact as an offline recovery
+  copy. No new A/B source scan or live-detachment check is needed. Finalize C
+  before building parity on B and C together. The assistant must adapt and
+  locally verify the focused play's existing-first-parity-file check for a
+  fresh two-level bootstrap before the operator prepares the second partition.
+  Leave hardware actions open until the operator confirms them.
+- **2026-11-19, operator instruction.** The assistant prepares the code and
+  commands. The operator runs all NAS commands, including read-only inspection
+  and Ansible. Begin with the private drive-health snapshot for 8.0. Review
+  firmware, power settings, SMART changes and the physical branch mapping
+  against the private baselines before proceeding to B's recovery check.
+  C remains disconnected. Live checks and release decisions are outstanding.
+- **2026-11-19, prepared and checked locally.** The read-only snapshot launcher
+  retains a fresh controller log on success or failure. The separate
+  `metal/storage-parity.yml` play takes the released partition's by-id after
+  its gate and reuses the Task 12 configuration. This avoids full storage
+  convergence during the freeze. All 20 synthetic preflight cases passed,
+  including first/second parity, retries and rejected devices. ShellCheck,
+  YAML/Jinja checks for both stages, simulated SSH log capture, and offline
+  systemd timer-file checks passed. Independent source review approved the
+  configuration path after the runtime timer-mask check was added. The
+  first live action was 8.0 in the [runbook](./implementation.md#parity-enablement).
+- **2026-11-19, 8.0 snapshot reviewed.** The operator completed the read-only
+  collection. The four data-branch identities and all six SMART and power
+  readings were checked against the source snapshots and the installation-log
+  baseline. The private review records the counter changes and the firmware
+  difference. The operator selected B for firmware preparation while C is
+  scanning. Use the installed SeaChest tool and the matching vendor package.
+  Check B's live RAID/LVM and mount state before any firmware write, then
+  capture its revision, SMART and power settings after activation. Leave B's
+  source layout intact until both release gates pass. The later operator step
+  creates the GPT partition, and the focused Ansible play formats it as ext4.
+- **2026-11-19, B firmware update confirmed.** The operator deactivated B's
+  logical volumes and stopped its five md devices. The resulting partition
+  tree had no mounts or holders. SeaChest activated and validated the selected
+  firmware. A separate SMART query confirmed B's identity, new revision and
+  passing overall health. PowerBalance matched the baseline. Two current EPC
+  idle timers showed enabled after the update. The operator's subsequent
+  readback confirmed all four current timers disabled, matching the
+  pre-update baseline. Formatting stays under 8.3.
 
 ## Task 9: Legend and documentation
 - **Status:** done
@@ -189,7 +269,7 @@ commands; the assistant prepares and explains each step without executing it.
 Layout/tooling readiness → A copy + map approval → A sorting
 A sorting → A access audit (7.2) → A full verification (7.3) → evidence/freeze (7.4)
 A acceptance + parity-job readiness → applicable recovery/parity/release gates
-Deferred C → later inventory/comparison/additions → scoped verification → C release eligibility
+C inventory/comparison/additions → scoped verification and independent recovery → B+C bootstrap
 Parity acceptance + offline PV work → live media rollout
 All implementation and operational gates → final feature verification
 ```

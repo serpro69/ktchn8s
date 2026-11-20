@@ -1,0 +1,41 @@
+---
+# Operator entry point after the separate source recovery and release checks.
+- name: Configure the released parity partition on the existing NAS
+  hosts: nas
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Require one NAS and well-formed, distinct inventory partition IDs
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length == 1
+          - not ansible_check_mode
+          - data_drives | length > 0
+          - parity_drives | length in [1, 2]
+          - parity_drives | map(attribute='id') | unique | list | length == parity_drives | length
+          - parity_drives | map(attribute='id') | reject('match', '^[A-Za-z0-9_.:+-]+-part[0-9]+$') | list | length == 0
+
+    - name: Require both released IDs in inventory order for a joint bootstrap
+      ansible.builtin.assert:
+        that:
+          - parity_drives | length == 2
+          - released_parity_ids is defined
+          - released_parity_ids == parity_drives | map(attribute='id') | list
+      when: parity_fresh_two_level | default(false) | bool
+
+    - name: Require the last released ID for a single-partition transition
+      ansible.builtin.assert:
+        that:
+          - released_parity_id is defined
+          - released_parity_id == parity_drives[-1].id
+      when: not (parity_fresh_two_level | default(false) | bool)
+
+    - name: Resolve inventory devices and mount points
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: facts.yml
+
+    - name: Prepare the released partition and configure parity
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: parity_transition.yml

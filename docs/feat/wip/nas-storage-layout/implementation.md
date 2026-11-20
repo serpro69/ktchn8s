@@ -945,17 +945,49 @@ that list. Use A now; do not weaken metadata checks on A to accommodate B.
 
 ## parity-enablement
 
+**Current operator sequence, 2026-11-20.** Task 6 is complete. The owner
+selected the accepted A dataset with zero C additions. Keep A offline and
+intact. Batch 42 established the B/C hardware and pre-update power
+baseline. The recorded recovery and capacity checks cover both proposed
+parity disks. Batch 43 confirmed the SN06 selector match and unmounted C.
+Batch 44 installed SN06 and confirmed C's revision and health. Batch 45
+restored C's EPC setting and its readback matches the batch 42 power baseline.
+Batch 46 confirmed the runner and scrub timers were absent and maintenance
+was idle. The operator released B and C and verified both GPT partitions.
+Keep `snapraid_maintenance.sync_enabled` and `snapraid_maintenance.scrub_enabled`
+false in the complete inventory mapping used for the subsequent focused apply.
+After physical release and preparation of each disk, configure both
+levels on the accepted frozen dataset, then run one explicit full sync and
+one full scrub. The focused play accepts both released IDs in inventory
+order with `parity_fresh_two_level`. It mounts both partitions before
+installing the two-level configuration. Ordinary expansion still checks
+the existing first parity file. The earlier single-parity sync/scrub and
+subsequent expansion below describe the superseded staged procedure.
+
 One drive at a time; **drive A last**. Tasks 2, 7, and 12 must be complete. Stop/disable
 maintenance timers and wait for running jobs before each configuration transition.
 Preserve the frozen included dataset. Every record below goes to the controller
 evidence workspace defined in [migration-evidence](#migration-evidence), using the
 NAS spool/journal only as a working copy; never update `00_meta` during this sequence.
 
+**Historical hardware snapshot (8.0, 2026-11-19).** The private controller
+launcher for this migration is `bash nas-migration-37-parity-health.sh` from
+the repository root. It streams `scripts/nas-parity-health.sh` to the NAS and
+opens a fresh private controller log before connecting. It selects the same
+six physical drives as the earlier SMART observations. C was disconnected.
+Match each WWN and serial to its private record, and each mounted data
+partition's major/minor device number to its physical disk. Compare firmware,
+PowerBalance, EPC and SMART overall health, temperatures, power-on hours,
+load cycles and error counters with the earlier snapshots. Review any missing
+field, failed query, adverse trend or mismatch before accepting 8.0.
+Retain partial logs. Any corrective firmware or drive-setting change needs
+its own device-specific procedure and a fresh post-change observation.
+
 0. **Parity-size gate (before ANY wipe):** snapraid requires each parity device to be at
-   least as large as the largest data branch. All drives are same-model 18TB Seagates
-   (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
-   the candidate parity drive vs every `/mnt/data*` device and record the numbers in
-   the controller evidence workspace. Abort the wipe if the candidate is smaller.
+   least as large as the largest data branch. Compare the whole disks in bytes
+   and the capacity of the proposed parity partition with every mounted data
+   partition. Record the sizes and partitioning allowance before releasing the
+   source. Stop if the proposed geometry is unknown or undersized.
 1. **Per-file redundancy gate before B:** use the completed A/B comparison and
    exact five omission decisions together with surviving A evidence/final mappings
    to establish independent recovery for B's retained content, apart from the NAS.
@@ -964,13 +996,32 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    independent copy or failed recovery check still means **do not wipe B**.
    → verify: every retained B entry can be recovered if its NAS data disk fails during
    first parity construction; another path/branch on the same physical disk does not count.
-2. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
-   `wipefs`/`blkdiscard` per the drive's disk-by-id), add its id under `parity_drives` in
-   the sops inventory (`metal/inventory/metal.yml`), run the storage role
-   (`make -C metal storage ANSIBLE_TARGETS=yggdrasil`). The role formats/mounts
-   `/mnt/parity1`, renders the corrected config and deploys the Task 12 unit; it does
-   not start it. Inspect `/etc/snapraid.conf`, excludes, and `snapraid status` here.
-   Run `systemctl restart --no-block snapraid-initial-sync` explicitly. Record this invocation's journal and
+2. After accepting B's recovery and size evidence, stop and disable existing
+   runner/scrub timers and wait for running maintenance, sync or scrub processes
+   to finish. Set both maintenance flags to false in the full inventory mapping
+   as described in [parity job readiness](#parity-job-readiness).
+   The operator releases B by its verified whole-disk by-id and prepares one
+   full-size GPT partition on it. Prepare the exact erase/partition command
+   against the accepted device identity and observed layout at that handoff.
+   Record the new partition's by-id, byte size and parent. Append **its partition
+   by-id** under `parity_drives` in the encrypted inventory without reordering
+   any existing disk. From `metal/`, use the focused play after that release:
+
+   ```bash
+   ansible-playbook -i inventory.sh --limit yggdrasil storage-parity.yml \
+     -e "released_parity_id=$released_partition_id"
+   ```
+
+   Set `released_partition_id` to the exact by-id basename from the release
+   record. The play checks the configured mounts, candidate partition capacity
+   and maintenance state, formats a blank partition, mounts it at
+   `/mnt/parity1` and installs the Task 12 configuration. A retry reuses a
+   matching labeled ext4 partition. Verify the mounted device, available parity
+   space, data/first-parity directives and exclusions in `/etc/snapraid.conf`,
+   along with the installed unit and disabled timers. A first bootstrap may
+   have no content file for `snapraid status` yet.
+   Recheck all data and parity backing mounts after any interruption or reboot
+   and before each sync or scrub. Run `systemctl restart --no-block snapraid-initial-sync` explicitly. Record this invocation's journal and
    `systemctl show` result/exit status; wait for successful completion, not file creation.
    → verify: success for the current dataset/configuration, no active competing job,
    and `snapraid diff` reports no included changes before proceeding.
@@ -978,10 +1029,15 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    errors, and complete block coverage in the output/status. The default scrub unit's
    10%/ten-day policy and an age-filtered percentage pass are not substitutes.
    → verify: first parity can protect the retained snapshot before releasing C.
-4. **Release C and expand:** repeat identity/size and per-file recovery checks. Coverage
+4. **Release C and expand:** C is currently deferred. Stop after the first
+   accepted scrub until the owner resumes C and Task 6 accounts for C's retained
+   entries and verifies additions and affected existing entries. Re-freeze any
+   changed dataset and sync/full-scrub first parity before relying on it.
+   Repeat identity/size and per-file recovery checks. Coverage
    may now come from the unchanged verified first-parity snapshot; any excluded or
    newly changed retained content still needs an independent copy. Wipe C only after
-   that gate, add it as `2-parity`, apply the role, then explicitly run the full-sync
+   that gate, append its released partition as the second inventory entry, run
+   the same focused play with its new by-id, check `2-parity`, then explicitly run the full-sync
    unit again. Keep first parity/content files intact; do not delete them to trigger a
    first-file guard. Full-scrub again with `snapraid scrub -p full`.
    → verify: both configured levels are initialized, this invocation succeeded, no
@@ -992,7 +1048,11 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    spare. Keep a spare unformatted until needed; adding parity repeats expansion/full
    scrub, and adding a data branch requires another sync/full scrub before protection
    of that changed layout is claimed. Preserve an independent copy of migration evidence.
-6. Re-enable maintenance only after recording successful completion. Update
+6. After release, archive the controller evidence to `00_meta/migration/` and
+   preserve the independent copy. Restore the accepted maintenance flags in
+   inventory and re-enable the two installed timers with
+   `systemctl enable --now snapraid-runner.timer snapraid-scrub.timer`.
+   Verify both timers' enabled/active state and next scheduled runs. Update
    `snapraid_maintenance` thresholds in role defaults only if the first weeks show
    false-positive aborts — do not pre-tune.
 
