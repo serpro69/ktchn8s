@@ -347,7 +347,13 @@ passed the operator-run workstation and NAS suites. The live access run is
 accepted with one specific owner-approved thumbnail-entry access exception;
 that retained entry remains in full content/metadata verification.
 
-**Current scope — owner decision, 2026-11-17:** C is deferred in its entirety.
+**Parity sequencing — owner decision, 2026-11-19:** Keep A offline and intact
+after normal NAS shutdown, finalize C, and establish independent recovery for
+both B and C before their release. Build and scrub both parity levels together.
+This supersedes the staged B-only bootstrap and C expansion below. Task 7's
+completed A-only acceptance remains the baseline for verifying C additions.
+
+**A-only acceptance scope — owner decision, 2026-11-17:** C was deferred in its entirety.
 Proceed through Task 7.2's actual-media access audit, Task 7.3's complete A
 destination reconciliation and Task 7.4's parity-inclusion, evidence and freeze
 work using A alone. Assume no C contribution for this acceptance scope; this
