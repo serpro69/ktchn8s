@@ -14,8 +14,17 @@
           - ansible_facts.distribution_release == 'bookworm'
           - storage_case in ['data', 'parity']
 
-    - name: Save the original networking configuration before convergence
-      ansible.builtin.shell: sha256sum /etc/network/interfaces > /root/base-network.sha256
+    - name: Record the data-only guest's network configuration before convergence
+      ansible.builtin.shell: |
+        set -eu
+        netplan get > /root/base-netplan.yaml
+        test -s /root/base-netplan.yaml
+        if test -e /etc/network/interfaces; then
+          sha256sum /etc/network/interfaces
+        else
+          echo absent
+        fi > /root/base-interfaces.sha256
+      when: storage_case == 'data'
       changed_when: true
 
     - name: Partition only blank VM scratch disks by serial
@@ -32,7 +41,17 @@
       loop: "{{ ['data1', 'data2', 'parity1', 'parity2'] if storage_case == 'parity' else ['data1', 'data2'] }}"
       changed_when: true
 
-    - name: Remove cached APT indexes from the disposable image
+    - name: Find cached APT package indexes in the disposable image
+      ansible.builtin.find:
+        paths: /var/lib/apt/lists
+        patterns: '*_Packages*'
+        file_type: file
+      register: fixture_apt_indexes
+
+    - name: Clear package indexes while preserving APT's lock directory
       ansible.builtin.file:
-        path: /var/lib/apt/lists
+        path: "{{ item.path }}"
         state: absent
+      loop: "{{ fixture_apt_indexes.files }}"
+      loop_control:
+        label: "{{ item.path }}"

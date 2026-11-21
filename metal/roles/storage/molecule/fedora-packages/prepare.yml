@@ -1,0 +1,25 @@
+---
+- name: Wait for the fresh Fedora package guest
+  hosts: nas_package_guests
+  gather_facts: false
+  tasks:
+    - name: Wait for Ansible over SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 180
+    - name: Wait for cloud-init to finish
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - name: Identify the base OS and architecture
+      ansible.builtin.setup:
+    - name: Require the Fedora 42 x86_64 guest
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Fedora'
+          - ansible_facts.distribution_major_version == '42'
+          - ansible_facts.architecture == 'x86_64'
+    - name: Require both NAS tools to be absent before the first install
+      ansible.builtin.shell: |
+        set -eu
+        test ! -e /usr/local/bin/snapraid
+        if command -v mergerfs; then exit 1; fi
+      changed_when: false

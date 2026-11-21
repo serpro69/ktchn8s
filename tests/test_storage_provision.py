@@ -2,7 +2,9 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -181,6 +183,94 @@ class InstallerTests(unittest.TestCase):
             for arch in ["x86_64", "aarch64"]:
                 name = rpm.render(**variables, ansible_distribution_major_version=release, ansible_architecture=arch)
                 self.assertRegex(variables["mergerfs_checksums"][name], "^sha256:[a-f0-9]{64}$")
+
+
+class ProvisionVmTests(unittest.TestCase):
+    def test_create_refuses_existing_overlay_without_removing_it(self):
+        spec = importlib.util.spec_from_file_location("storage_vms", ROLE / "molecule/parity-lifecycle/vms.py")
+        driver = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(driver)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(driver.os, "access", return_value=True):
+            state = Path(tmp)
+            disk = state / next(iter(driver.GUESTS)) / "root.qcow2"
+            disk.parent.mkdir()
+            disk.write_bytes(b"retained guest state")
+            with self.assertRaisesRegex(RuntimeError, "Existing scratch disk"):
+                driver.create(state, state / "instance.json")
+            self.assertEqual(disk.read_bytes(), b"retained guest state")
+
+
+@unittest.skipUnless(shutil.which("ansible-playbook"), "requires the repository Ansible toolchain")
+class DiskProbeTransportTests(unittest.TestCase):
+    def test_accepts_separate_diagnostics_but_rejects_incomplete_inventory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            role = root / "roles/storage"
+            (role / "tasks").mkdir(parents=True)
+            (role / "files").mkdir()
+            shutil.copyfile(ROLE / "tasks/probe_disks.yml", role / "tasks/main.yml")
+            # Exercise the real Ansible task without access to a block device.
+            (role / "files/storage-disks.py").write_text(
+                "import json, sys\n"
+                "data, parity = map(json.loads, sys.argv[1:])\n"
+                "print('disk diagnostic', file=sys.stderr)\n"
+                "print(json.dumps([{'device': d['id']} for d in data + parity]))\n"
+            )
+            play = root / "probe.yml"
+            play.write_text(yaml.safe_dump([{
+                "hosts": "localhost", "connection": "local", "gather_facts": False,
+                "vars": {"data_drives": [{"id": "disk-a"}], "parity_drives": [],
+                         "data_devices": ["disk-a"], "parity_devices": []},
+                "roles": ["storage"],
+                "tasks": [{"ansible.builtin.assert": {"that": [
+                    "storage_disk_probe.stderr == 'disk diagnostic'",
+                    "(storage_disk_probe.stdout | from_json)[0].device == 'disk-a'",
+                ]}}],
+            }]))
+            cmd = ["ansible-playbook", "-i", "localhost,", str(play)]
+            env = dict(os.environ, ANSIBLE_ROLES_PATH=str(root / "roles"), ANSIBLE_NOCOLOR="1",
+                       ANSIBLE_LOCAL_TEMP=str(root / "local"), ANSIBLE_REMOTE_TEMP=str(root / "remote"))
+            passed = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
+            failed = subprocess.run(cmd + ["-e", '{"data_devices":["disk-a","disk-b"]}'],
+                                    cwd=root, env=env, capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("Read partition identities", failed.stdout)
+            self.assertIn("disk diagnostic", failed.stdout + failed.stderr)
+
+
+@unittest.skipUnless(shutil.which("ansible-playbook"), "requires the repository Ansible toolchain")
+class FirewallCheckModeTests(unittest.TestCase):
+    def test_ssh_allow_obeys_effective_check_mode(self):
+        policy = yaml.safe_load((ROLE / "tasks/ufw_policy.yml").read_text())
+        tasks = [task for task in policy if task.get("register") in {"storage_ssh_preview", "storage_ssh_apply"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ufw = root / "ufw"
+            ufw.write_text("#!/bin/sh\n"
+                           "if test \"$1\" = --dry-run; then shift; else touch \"$APPLIED\"; fi\n"
+                           'test "$*" = "prepend allow from 10.0.2.2/32 to any port 22 proto tcp comment NAS SSH" || exit 1\n'
+                           "echo 'Rules updated'\n")
+            ufw.chmod(0o700)
+            for cli_check, block_check in [(False, True), (True, False)]:
+                with self.subTest(cli_check=cli_check, block_check=block_check):
+                    applied = root / f"applied-{cli_check}"
+                    play = root / "firewall.yml"
+                    play.write_text(yaml.safe_dump([{
+                        "hosts": "localhost", "connection": "local", "gather_facts": False,
+                        "environment": {"PATH": f"{root}:{os.environ['PATH']}", "APPLIED": str(applied)},
+                        "vars": {"storage_ssh_connection": {"stdout": "10.0.2.2 40000 10.0.2.15 22"},
+                                 "firewall_allowed_networks": ["10.0.2.2/32"]},
+                        "tasks": [{"block": tasks, "check_mode": block_check}],
+                    }]))
+                    args = ["ansible-playbook", "-i", "localhost,", str(play)]
+                    if cli_check:
+                        args.append("--check")
+                    result = subprocess.run(args, cwd=root, capture_output=True, text=True, timeout=30,
+                                            env=dict(os.environ, ANSIBLE_LOCAL_TEMP=str(root / "local"),
+                                                     ANSIBLE_REMOTE_TEMP=str(root / "remote")))
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual(applied.exists(), not block_check)
 
 
 if __name__ == "__main__":

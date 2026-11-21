@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Own one disposable parity QEMU guest; never read production inventory or disks.
+"""Manage the storage role's disposable local QEMU guest.
 
 Requires Linux/x86_64, KVM and the flake's QEMU/OpenSSH/xorriso. Guest SSH
 uses QEMU user networking and binds only to loopback.
@@ -15,8 +15,13 @@ import subprocess
 import time
 
 
-GUESTS = {"parity-server": 23101}
-DISKS = ("data1", "data2", "parity1", "parity2")
+# Molecule supplies the scenario name for both create and destroy.
+if os.environ.get("MOLECULE_SCENARIO_NAME") == "fedora-packages":
+    GUESTS = {"fedora-packages": 23102}
+    DISKS = ()
+else:
+    GUESTS = {"parity-server": 23101}
+    DISKS = ("data1", "data2", "parity1", "parity2")
 
 
 def run(*args: str) -> None:
@@ -63,7 +68,9 @@ def destroy(state: Path, inventory: Path) -> None:
 def create(state: Path, inventory: Path) -> None:
     if not os.access("/dev/kvm", os.R_OK | os.W_OK):
         raise RuntimeError("KVM is required; VM capability checks cannot be skipped")
-    for port in GUESTS.values():
+    for name, port in GUESTS.items():
+        if (state / name / "root.qcow2").exists():
+            raise RuntimeError("Existing scratch disk: run molecule destroy first")
         with socket.socket() as probe:
             # A destroyed guest may leave TCP TIME_WAIT entries. Live listeners
             # still fail this bind; do not use SO_REUSEPORT.
@@ -78,8 +85,6 @@ def create(state: Path, inventory: Path) -> None:
         for index, (name, port) in enumerate(GUESTS.items(), start=1):
             directory = state / name
             directory.mkdir(mode=0o700, exist_ok=True)
-            if (directory / "root.qcow2").exists():
-                raise RuntimeError("Existing scratch disk: run molecule destroy first")
             (directory / "user-data").write_text(
                 "#cloud-config\n"
                 "disable_root: false\nssh_pwauth: false\n"
@@ -98,7 +103,8 @@ def create(state: Path, inventory: Path) -> None:
                 "-display", "none", "-monitor", "none", "-daemonize",
                 "-pidfile", str(directory / "qemu.pid"),
                 "-serial", f"file:{directory}/serial.log",
-                "-drive", f"file={directory}/root.qcow2,if=virtio,format=qcow2",
+                "-drive", f"file={directory}/root.qcow2,if=none,id=osdisk,format=qcow2",
+                "-device", "virtio-blk-pci,drive=osdisk,bootindex=1",
                 "-drive", f"file={directory}/seed.iso,media=cdrom,readonly=on",
                 "-netdev", forward, "-device", f"virtio-net-pci,netdev=net,mac=52:54:00:12:34:{index:02x}",
             ]

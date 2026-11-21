@@ -1,12 +1,12 @@
 ---
 - name: Recheck the complete admission result immediately before formatting or mounting
-  ansible.builtin.script:
-    cmd: storage-disks.py {{ data_drives | to_json | quote }} {{ parity_drives | to_json | quote }}
-    executable: /usr/bin/python3
-  register: storage_current_disks
-  changed_when: false
+  ansible.builtin.import_tasks: probe_disks.yml
   check_mode: false
-  failed_when: storage_current_disks.rc != 0 or (storage_current_disks.stdout | from_json) != storage_branches
+
+- name: Require the same admitted disks and signatures before mutation
+  ansible.builtin.assert:
+    that: (storage_disk_probe.stdout | from_json) == storage_branches
+    fail_msg: Storage admission changed after the initial probe. Check the inventory and mounts before retrying.
 
 - name: Format only admitted and explicitly authorized blank partitions
   community.general.filesystem:
@@ -32,7 +32,7 @@
     label: "{{ item.device }} -> {{ item.mount }}"
 
 - name: Require every inventory partition at its intended mount before creating the pool
-  ansible.builtin.script:
-    cmd: storage-disks.py {{ data_drives | to_json | quote }} {{ parity_drives | to_json | quote }} --mounted
-    executable: /usr/bin/python3
-  changed_when: false
+  ansible.builtin.import_tasks: probe_disks.yml
+  vars:
+    storage_probe_flags: ['--mounted']
+  when: not ansible_check_mode
