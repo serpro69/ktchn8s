@@ -1,46 +1,28 @@
 ---
-- name: Download mergerfs rpm
-  get_url:
-    url: "{{ mergerfs_url_rpm }}"
-    dest: "/tmp/mergerfs-{{ mergerfs_version }}.rpm"
-    mode: "0755"
-
-- name: Copy snapraid .rpm
-  copy:
-    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.rpm
-    dest: /tmp/
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Set fastestmirror=True for dnf
-  lineinfile:
-    path: /etc/dnf/dnf.conf
-    search_string: fastestmirror
-    line: fastestmirror=True
-
-- name: Update all packages # noqa package-latest
-  dnf:
+- name: Update all packages when requested
+  ansible.builtin.dnf:
     name: "*"
     update_cache: true
     state: latest
   when: upgrade_packages
 
-- name: Ensure required packages
-  dnf:
-    name:
-      # hardware monitoring
-      - lm_sensors
-      # nfs
-      - nfs-utils
+- name: Install NAS prerequisites
+  ansible.builtin.dnf:
+    name: [smartmontools, rsync, b3sum, lm_sensors, nfs-utils, logrotate, e2fsprogs, libstdc++]
     state: present
+
+- name: Download the verified mergerfs RPM for this Fedora release
+  ansible.builtin.get_url:
+    url: "{{ mergerfs_url_rpm }}"
+    checksum: "{{ mergerfs_checksums[mergerfs_pkg_rpm] }}"
+    dest: "/var/cache/{{ mergerfs_pkg_rpm }}"
+    mode: '0644'
 
 - name: Install mergerfs
-  dnf:
-    name: /tmp/mergerfs-{{ mergerfs_version }}.rpm
-    state: present
-
-- name: Install snapraid
-  dnf:
-    name: "/tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.rpm"
+  ansible.builtin.dnf:
+    name: "/var/cache/{{ mergerfs_pkg_rpm }}"
+    # Upstream ships an unsigned RPM. Only the checksum-pinned local file
+    # participates in this transaction. Distribution packages use normal GPG checks above.
+    disablerepo: ['*']
+    disable_gpg_check: true
     state: present

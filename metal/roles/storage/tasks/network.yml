@@ -1,4 +1,14 @@
 ---
+- name: Validate the operator's static interface settings
+  ansible.builtin.assert:
+    that:
+      - storage_network.interface in ansible_facts.interfaces
+      - storage_network.address is defined
+      - storage_network.netmask is defined
+      - storage_network.gateway is defined
+      - storage_network.dns_nameservers | length > 0
+    fail_msg: Supply the NAS interface, address, netmask, gateway and DNS servers before managing networking.
+
 - name: Configure static networking on Debian
   template:
     src: interfaces.j2
@@ -10,26 +20,24 @@
   when: ansible_os_family == 'Debian'
   notify: restart networking debian
 
+- name: Resolve the IPv4 prefix for NetworkManager
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - import ipaddress, sys; print(ipaddress.IPv4Network(("0.0.0.0", sys.argv[1])).prefixlen)
+      - "{{ storage_network.netmask }}"
+  changed_when: false
+  register: storage_prefix
+  when: ansible_os_family == 'RedHat'
+
 - name: Configure static networking on RedHat
   template:
-    src: ifcfg-interface.j2
-    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ storage_network.interface }}"
+    src: storage.nmconnection.j2
+    dest: /etc/NetworkManager/system-connections/storage.nmconnection
     owner: root
     group: root
-    mode: "0644"
+    mode: "0600"
     backup: true
   when: ansible_os_family == 'RedHat'
   notify: restart networking redhat
-
-- name: Verify network configuration
-  wait_for:
-    host: "{{ storage_network.gateway }}"
-    port: 22
-    timeout: 10
-  changed_when: false
-  failed_when: false
-  register: network_test
-
-- name: Display network configuration status
-  debug:
-    msg: "Network configuration {{ 'successful' if network_test.failed == false else 'may need verification' }}"

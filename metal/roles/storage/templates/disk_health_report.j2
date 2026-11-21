@@ -17,9 +17,9 @@ Configuration:
                SUMMARY
 =====================================================================
 
-Total Drives Checked: {{ disk_health_report | length }}
-Healthy Drives: {{ disk_health_report | selectattr('overall_health', 'equalto', true) | list | length }}
-Unhealthy Drives: {{ disk_health_report | selectattr('overall_health', 'equalto', false) | list | length }}
+Total Drives Checked: {{ all_health_check_devices | length }}
+Passing reports: {{ disk_health_report | selectattr('overall_health', 'equalto', true) | list | length }}
+Failing reports: {{ disk_health_report | selectattr('overall_health', 'equalto', false) | list | length }}
 
 {% if overheated_drives | length > 0 %}
 WARNING: {{ overheated_drives | length }} drive(s) exceeding temperature threshold
@@ -45,7 +45,7 @@ Drive: {{ drive.device }}
 
 Model: {{ drive.model | default('Unknown') }}
 Serial: {{ drive.serial | default('Unknown') }}
-Tool: {{ drive.tool }}
+Tool: {{ drive.tool }}{% if drive.exit_status is defined %} (exit {{ drive.exit_status }}){% endif %}
 
 Health Status: {{ 'PASSED' if drive.overall_health else 'FAILED' }}
   {% if not drive.overall_health %}*** ATTENTION: Drive is reporting failures ***{% endif %}

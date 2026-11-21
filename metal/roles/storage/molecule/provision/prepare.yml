@@ -1,0 +1,38 @@
+---
+- name: Prepare only blank disposable GPT partitions on the base OS
+  hosts: nas
+  gather_facts: false
+  tasks:
+    - ansible.builtin.wait_for_connection:
+        timeout: 300
+    - ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - ansible.builtin.setup:
+    - ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'parity-server' and ansible_host == '127.0.0.1'
+          - ansible_facts.distribution_release == 'bookworm'
+          - storage_case in ['data', 'parity']
+
+    - name: Save the original networking configuration before convergence
+      ansible.builtin.shell: sha256sum /etc/network/interfaces > /root/base-network.sha256
+      changed_when: true
+
+    - name: Partition only blank VM scratch disks by serial
+      ansible.builtin.shell: |
+        set -eu
+        test "$(lsblk -dnro SERIAL "$disk")" = "$serial"
+        test "$(lsblk -nr -o TYPE "$disk")" = disk
+        printf 'label: gpt\n, , L\n' | sfdisk "$disk"
+        udevadm settle
+        test -b "$disk-part1"
+      environment:
+        serial: "fixture-{{ item }}"
+        disk: "/dev/disk/by-id/virtio-fixture-{{ item }}"
+      loop: "{{ ['data1', 'data2', 'parity1', 'parity2'] if storage_case == 'parity' else ['data1', 'data2'] }}"
+      changed_when: true
+
+    - name: Remove cached APT indexes from the disposable image
+      ansible.builtin.file:
+        path: /var/lib/apt/lists
+        state: absent

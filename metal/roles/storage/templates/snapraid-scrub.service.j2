@@ -5,7 +5,7 @@ Conflicts=snapraid-runner.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/snapraid scrub -p {{ snapraid_maintenance.scrub_percentage }} -o {{ snapraid_maintenance.scrub_older_than_days }}
+ExecStart=/usr/local/bin/snapraid -c /etc/snapraid.conf scrub -p {{ snapraid_maintenance.scrub_percentage }} -o {{ snapraid_maintenance.scrub_older_than_days }}
 User=root
 Group=root
 StandardOutput=append:/var/log/snapraid/snapraid-scrub.log

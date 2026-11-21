@@ -30,8 +30,10 @@
     state: restarted
   listen: restart networking debian
 
-- name: restart networking redhat
-  service:
-    name: NetworkManager
-    state: restarted
+- name: Load managed NetworkManager profile
+  ansible.builtin.command: nmcli connection load /etc/NetworkManager/system-connections/storage.nmconnection
+  listen: restart networking redhat
+
+- name: Activate managed NetworkManager profile
+  ansible.builtin.command: nmcli connection up ktchn8s-storage
   listen: restart networking redhat

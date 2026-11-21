@@ -1,0 +1,11 @@
+---
+- name: Persist drivetemp across reboots
+  copy:
+    content: "drivetemp\n"
+    dest: /etc/modules-load.d/drivetemp.conf
+    mode: "0644"
+
+- name: Load drivetemp if missing from the running kernel
+  command: modprobe drivetemp
+  args:
+    creates: /sys/module/drivetemp

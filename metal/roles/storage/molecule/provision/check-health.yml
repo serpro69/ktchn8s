@@ -1,0 +1,54 @@
+---
+- name: Exercise warning and strict decisions for three synthetic physical disks
+  hosts: nas
+  gather_facts: true
+  tasks:
+    - name: Select synthetic device identities for diagnostic tests
+      ansible.builtin.set_fact:
+        storage_branches: [{parent: /dev/healthy}, {parent: /dev/failing}, {parent: /dev/unreadable}]
+    - name: Install a disposable SMART fixture
+      ansible.builtin.tempfile:
+        state: directory
+      register: smart_fixture
+    - ansible.builtin.copy:
+        dest: "{{ smart_fixture.path }}/smartctl"
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          case "$4" in
+            /dev/healthy) echo '{"smart_status":{"passed":true}}' ;;
+            /dev/failing) echo '{"smart_status":{"passed":false}}'; exit 8 ;;
+            /dev/unreadable) echo unavailable >&2; exit 2 ;;
+            *) exit 99 ;;
+          esac
+    - name: Collect all findings in warning mode
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: disk_health.yml
+        apply:
+          environment:
+            PATH: "{{ smart_fixture.path }}:/usr/sbin:/usr/bin:/sbin:/bin"
+      vars:
+        fail_on_unhealthy_drives: false
+    - ansible.builtin.assert:
+        that:
+          - disk_health_report | length == 3
+          - unhealthy_drives | map(attribute='device') | list == ['/dev/failing', '/dev/unreadable']
+    - name: Require strict mode to stop with both disk identities
+      block:
+        - ansible.builtin.include_role:
+            name: storage
+            tasks_from: disk_health.yml
+            apply:
+              environment:
+                PATH: "{{ smart_fixture.path }}:/usr/sbin:/usr/bin:/sbin:/bin"
+          vars:
+            fail_on_unhealthy_drives: true
+        - ansible.builtin.fail:
+            msg: Strict health validation incorrectly passed.
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - "'Disk health failed' in ansible_failed_result.msg"
+              - "'/dev/failing' in ansible_failed_result.msg"
+              - "'/dev/unreadable' in ansible_failed_result.msg"

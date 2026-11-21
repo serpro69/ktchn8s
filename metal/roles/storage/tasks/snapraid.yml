@@ -151,33 +151,21 @@
     group: root
   when: snapraid_maintenance.content_backup_enabled
 
-- name: Create content file backup script
-  copy:
-    content: |
-      #!/bin/bash
-      # SnapRAID content file backup script
-      BACKUP_DIR="/var/backups/snapraid"
-      BACKUP_COUNT={{ snapraid_maintenance.content_backup_count }}
-      TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-
-      # Backup all content files
-      for content_file in $(grep -E '^content ' /etc/snapraid.conf | awk '{print $2}'); do
-        if [ -f "$content_file" ]; then
-          filename=$(basename "$content_file")
-          cp -p "$content_file" "$BACKUP_DIR/${filename}.${TIMESTAMP}"
-        fi
-      done
-
-      # Keep only last N backups
-      for content_file in $(grep -E '^content ' /etc/snapraid.conf | awk '{print $2}'); do
-        filename=$(basename "$content_file")
-        ls -t "$BACKUP_DIR/${filename}".* 2>/dev/null | tail -n +$((BACKUP_COUNT + 1)) | xargs -r rm -f
-      done
-    dest: /usr/local/bin/snapraid-content-backup.sh
-    mode: "0755"
+- name: Install the content backup program
+  ansible.builtin.copy:
+    src: content-backup.py
+    dest: /usr/local/bin/snapraid-content-backup
     owner: root
     group: root
-  when: snapraid_maintenance.content_backup_enabled
+    mode: '0755'
+
+- name: Keep the installed backup entry point using the configured retention
+  ansible.builtin.copy:
+    dest: /usr/local/bin/snapraid-content-backup.sh
+    mode: '0755'
+    content: |
+      #!/bin/sh
+      exec /usr/local/bin/snapraid-content-backup {{ snapraid_maintenance.content_backup_count | int }}
 
 - name: Create content backup systemd service
   copy:
@@ -196,7 +184,6 @@
     group: root
   notify:
     - reload systemd
-  when: snapraid_maintenance.content_backup_enabled
 
 - name: Create content backup systemd timer
   copy:
@@ -216,11 +203,10 @@
     group: root
   notify:
     - reload systemd
-  when: snapraid_maintenance.content_backup_enabled
 
-- name: Enable content backup timer
+- name: Enforce the content backup timer policy
   systemd:
     name: snapraid-content-backup.timer
     enabled: "{{ snapraid_maintenance.content_backup_enabled }}"
+    state: "{{ 'started' if snapraid_maintenance.content_backup_enabled else 'stopped' }}"
     daemon_reload: true
-  when: snapraid_maintenance.content_backup_enabled

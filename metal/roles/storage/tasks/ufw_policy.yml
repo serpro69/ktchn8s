@@ -1,0 +1,64 @@
+---
+- name: Identify the peer and server port of the working SSH connection
+  ansible.builtin.command: printenv SSH_CONNECTION
+  become: false
+  register: storage_ssh_connection
+  changed_when: false
+
+- name: Require an SSH allowlist covering the controller before applying firewall policy
+  ansible.builtin.command:
+    argv: "{{ ['/usr/bin/python3', '-c', check_peer, storage_ssh_connection.stdout.split()[0]] + firewall_allowed_networks }}"
+  vars:
+    check_peer: |
+      import ipaddress, sys
+      peer = ipaddress.ip_address(sys.argv[1])
+      networks = [ipaddress.ip_network(value, strict=False) for value in sys.argv[2:]]
+      if not any(peer in network for network in networks):
+          sys.exit(f'{peer} must be in firewall_allowed_networks before enabling UFW')
+  changed_when: false
+
+- name: Allow SSH before setting any default-deny policy
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: "{{ storage_ssh_connection.stdout.split()[3] }}"
+    proto: tcp
+    insert: 1
+    comment: "NAS SSH"
+  loop: "{{ firewall_allowed_networks }}"
+
+- name: Allow NFSv4 clients
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: '2049'
+    proto: tcp
+    comment: "NFSv4 2049/tcp"
+  loop: "{{ firewall_allowed_networks }}"
+
+- name: Apply incoming default policy
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Apply outgoing default policy
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Read effective UFW policy
+  ansible.builtin.command: ufw status
+  environment:
+    LC_ALL: C
+  register: storage_ufw_rules
+  changed_when: false
+
+- name: Verify active UFW and the TCP NFS allow rule
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in storage_ufw_rules.stdout_lines"
+      - storage_ufw_rules.stdout is search('(?m)^2049/tcp\s+ALLOW\s+')

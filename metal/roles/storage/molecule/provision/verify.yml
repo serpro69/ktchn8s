@@ -1,0 +1,149 @@
+---
+- name: Verify the reapplied NAS through its real filesystems and services
+  hosts: nas
+  gather_facts: true
+  tasks:
+    - name: Require the loopback-only guest before fixture operations
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'parity-server' and ansible_host == '127.0.0.1'
+          - groups.nas == ['parity-server']
+          - storage_case in ['data', 'parity']
+    - name: Require the requested static configuration or the original DHCP file
+      ansible.builtin.shell: |
+        set -eu
+        {% if storage_case == 'parity' %}
+        grep -Fqx 'iface {{ ansible_facts.default_ipv4.interface }} inet static' /etc/network/interfaces
+        test "{{ ansible_facts.default_ipv4.address }}" = 10.0.2.15
+        test "{{ ansible_facts.default_ipv4.gateway }}" = 10.0.2.2
+        {% else %}
+        sha256sum -c /root/base-network.sha256
+        {% endif %}
+      changed_when: false
+    - name: Verify the independent sentinel bytes and backing partition identities
+      ansible.builtin.shell: |
+        set -eu
+        printf 'storage provisioning sentinel\n' | cmp - /mnt/storage/10_documents/sentinel
+        for branch in data1 data2 {{ 'parity1' if storage_case == 'parity' else '' }}; do
+          dev=/dev/disk/by-id/virtio-fixture-$branch-part1
+          test "$(lsblk -dnro MAJ:MIN "$dev") ext4 /" = "$(findmnt -rn -M "/mnt/$branch" -o MAJ:MIN,FSTYPE,FSROOT)"
+        done
+        test "$(findmnt -rn -M /mnt/storage -o FSTYPE)" = fuse.mergerfs
+        exportfs -s | grep -E '^/mnt/storage[[:space:]]+10\.0\.2\.0/24\('
+        test "$(dpkg-query -W -f='${db:Status-Status}' xz-utils)" = installed
+        test "$(dpkg-query -S /usr/bin/b3sum)" = 'b3sum: /usr/bin/b3sum'
+        test "$(command -v b3sum)" = /usr/bin/b3sum
+        /usr/local/bin/snapraid --version
+        ufw status
+        sha256sum /mnt/storage/10_documents/sentinel
+      register: storage_evidence
+      changed_when: false
+    - ansible.builtin.debug:
+        var: storage_evidence.stdout_lines
+
+    - name: Verify timer states after the zero-change apply
+      ansible.builtin.command: "systemctl show {{ item.timer }} -p ActiveState -p UnitFileState -p LoadState"
+      loop:
+        - {timer: snapraid-runner.timer, enabled: false}
+        - {timer: snapraid-scrub.timer, enabled: false}
+        - {timer: snapraid-content-backup.timer, enabled: true}
+      register: fixture_policy
+      changed_when: false
+      failed_when: >-
+        (storage_case == 'data' and 'LoadState=not-found' not in fixture_policy.stdout_lines) or
+        (storage_case == 'parity' and
+         (('UnitFileState=' ~ ('enabled' if item.enabled else 'disabled')) not in fixture_policy.stdout_lines or
+          ('ActiveState=' ~ ('active' if item.enabled else 'inactive')) not in fixture_policy.stdout_lines))
+
+    - name: Explicitly accept full sync, clean diffs, full scrub and zero errors
+      ansible.builtin.command: /usr/local/sbin/storage-accept-parity
+      when: storage_case == 'parity'
+
+    - name: Record accepted parity and sync identity
+      ansible.builtin.shell: |
+        set -eu
+        sha256sum /mnt/parity1/snapraid.parity > /root/accepted.sha256
+        systemctl show snapraid-initial-sync.service -p ExecMainStartTimestampMonotonic --value > /root/accepted.start
+      when: storage_case == 'parity'
+
+    - name: Set the accepted array maintenance policy
+      ansible.builtin.set_fact:
+        snapraid_maintenance: >-
+          {{ (lookup('file', playbook_dir ~ '/../../defaults/main.yml') | from_yaml).snapraid_maintenance
+             | combine({'sync_enabled': true, 'scrub_enabled': true, 'content_backup_enabled': false,
+                        'sync_time': '2099-01-01 02:00:00', 'scrub_schedule': '2099-01-01 03:00:00'}) }}
+      when: storage_case == 'parity'
+
+- ansible.builtin.import_playbook: ../../../../storage.yml
+  when: storage_case == 'parity'
+
+- name: Verify the accepted array after restoring routine timers
+  hosts: nas
+  gather_facts: false
+  tasks:
+    - name: Require accepted parity, unchanged full-sync invocation and exact timer policy
+      ansible.builtin.shell: |
+        set -eu
+        sha256sum -c /root/accepted.sha256
+        test "$(cat /root/accepted.start)" = "$(systemctl show snapraid-initial-sync.service -p ExecMainStartTimestampMonotonic --value)"
+        for timer in snapraid-runner snapraid-scrub; do
+          systemctl is-enabled "$timer.timer"
+          systemctl is-active "$timer.timer"
+        done
+        test "$(systemctl show snapraid-content-backup.timer -p ActiveState --value)" = inactive
+        test "$(systemctl show snapraid-content-backup.timer -p UnitFileState --value)" = disabled
+        printf 'storage provisioning sentinel\n' | cmp - /mnt/storage/10_documents/sentinel
+      when: storage_case == 'parity'
+      changed_when: false
+
+    - name: Re-enable backups on the running accepted array
+      when: storage_case == 'parity'
+      block:
+        - ansible.builtin.set_fact:
+            snapraid_maintenance: "{{ snapraid_maintenance | combine({'content_backup_enabled': true}) }}"
+        - ansible.builtin.include_role:
+            name: storage
+            tasks_from: snapraid.yml
+        - ansible.builtin.shell: |
+            set -eu
+            systemctl is-enabled snapraid-content-backup.timer
+            systemctl is-active snapraid-content-backup.timer
+            systemctl start snapraid-content-backup.service
+          changed_when: true
+        - name: Require the backup unit to report a missing copy on the disposable guest
+          ansible.builtin.shell: |
+            set -eu
+            test -s /var/snapraid.content
+            mv /var/snapraid.content /root/content-for-backup-test
+            trap 'mv /root/content-for-backup-test /var/snapraid.content' EXIT
+            if systemctl start snapraid-content-backup.service; then exit 1; fi
+            test "$(systemctl show snapraid-content-backup.service -p Result --value)" = exit-code
+          changed_when: true
+
+        - name: Pause the accepted array before adding the second parity partition
+          ansible.builtin.command: systemctl disable --now snapraid-runner.timer snapraid-scrub.timer
+          changed_when: true
+        - ansible.builtin.set_fact:
+            snapraid_maintenance: "{{ snapraid_maintenance | combine({'sync_enabled': false, 'scrub_enabled': false}) }}"
+            parity_drives: "{{ parity_drives + [{'id': 'virtio-fixture-parity2-part1', 'format_blank': true}] }}"
+
+- ansible.builtin.import_playbook: ../../../../storage.yml
+  when: storage_case == 'parity'
+
+- name: Verify full-role expansion before and after explicit acceptance
+  hosts: nas
+  gather_facts: false
+  tasks:
+    - ansible.builtin.shell: |
+        set -eu
+        sha256sum -c /root/accepted.sha256
+        test "$(cat /root/accepted.start)" = "$(systemctl show snapraid-initial-sync.service -p ExecMainStartTimestampMonotonic --value)"
+        test ! -e /mnt/parity2/snapraid.2-parity
+        test -s /var/lib/snapraid-layout.pending
+        /usr/local/sbin/storage-accept-parity
+        test -s /mnt/parity2/snapraid.2-parity
+        test ! -e /var/lib/snapraid-layout.pending
+      when: storage_case == 'parity'
+      changed_when: true
+
+- ansible.builtin.import_playbook: check-health.yml

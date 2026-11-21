@@ -275,7 +275,7 @@ commands; the assistant prepares and explains each step without executing it.
 
 ## Task 14: Storage provisioning on new and existing NAS hosts
 
-- **Status:** pending
+- **Status:** in-progress
 - **Depends on:** Task 11, Task 12
 - **Docs:** [Task 14 implementation and acceptance criteria](./implementation.md#task-14-storage-provisioning), [provision from scratch](../../../guides/how_to_use_nfs_for_persistent_storage.md#provision-from-scratch)
 
@@ -284,7 +284,7 @@ These follow-ups come from the 2026-11-21 review of `metal/storage.yml` at
 acceptance run before starting Task 10. Task 8 records the existing array's
 accepted migration.
 
-- [ ] 14.1 **Disk admission (P1).** Ordinary provisioning in
+- [x] 14.1 **Disk admission (P1).** Ordinary provisioning in
   `metal/roles/storage/tasks/disks.yml` treats any nonzero `blkid` status as permission
   to format and any zero status as grounds to skip formatting. Check device
   identity, parent, current backing mount and signature before mutation. Accept
@@ -332,6 +332,40 @@ accepted migration.
   reapply the same inventory. Require zero changes on the second apply and
   verify the file contents, backing devices, active export and timer states.
   Record both recaps and verification results before closing Task 14.
+
+### Execution context
+
+- 2026-11-21, observed at `cbee3df`. Tasks 11 and 12 are complete. The
+  existing scenarios prepare filesystems or install SnapRAID before convergence.
+  Task 14 exercises the public storage play on disposable guest disks.
+- 2026-11-21, implemented. Ordinary admission validates all identities and
+  checks them again before mutation. Regression fixtures cover a positively
+  identified blank GPT partition, reuse, missing authorization, ambiguous
+  probes, duplicate parents and incorrect backing mounts. Existing mounted
+  legacy arrays can retain running schedules or adopt prior acceptance
+  explicitly. Initial and expanded layouts stay pending through verification.
+- 2026-11-21, verified offline. The three focused Python suites passed 17 tests
+  and the shell fixture passed 34 parity admission cases. The pinned SnapRAID
+  13.0 source built successfully. A synthetic 2 MiB single-filesystem run
+  using its test-only device override passed full sync, both diffs and a full
+  scrub of eight parity blocks with zero errors. All 15 pinned mergerfs
+  artifacts matched the upstream release digests. The public and fixture
+  playbooks passed syntax checks. YAML and shell lint passed.
+- 2026-11-21, review corrections. Focused admission now succeeds before
+  creating a pending marker. The provisioning VM uses sparse 8 GiB disks to
+  exceed the mergerfs creation threshold. The verified upstream Fedora RPM
+  installs in a local-only transaction. Content backups retain every configured
+  copy under its source path in each completed generation.
+- 2026-11-21, verified on clean local candidate `2a16e81`. The focused suites,
+  lint and Ansible syntax checks passed. Molecule resolved the provisioning
+  test sequence. Independent source review found no outstanding code defect
+  and left execution acceptance open.
+- 2026-11-21, unresolved. The operator owns package installation evidence on
+  the target Fedora release. Run the scenario's package-only play twice on a
+  disposable guest and retain the installed versions and zero-change retry.
+- 2026-11-21, unresolved. The operator owns the two clean-checkout VM runs.
+  This workspace has no `/dev/kvm`. Record both first and repeat recaps and
+  the guest verification results here before closing the task.
 
 ## Task 10: Final verification
 

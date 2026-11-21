@@ -2,10 +2,29 @@
 mergerfs_version: 2.41.1
 mergerfs_url_release: https://github.com/trapexit/mergerfs/releases/download/{{ mergerfs_version }}
 mergerfs_pkg_deb: mergerfs_{{ mergerfs_version }}.{{ ansible_distribution | lower }}-{{ ansible_distribution_release }}_amd64.deb
-mergerfs_pkg_rpm: mergerfs-{{ mergerfs_version }}.fc{{ ansible_distribution_release }}.{{ ansible_architecture }}.rpm
+mergerfs_pkg_rpm: mergerfs-{{ mergerfs_version }}-1.fc{{ ansible_distribution_major_version }}.{{ ansible_architecture }}.rpm
 mergerfs_url_deb: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_deb}}"
 mergerfs_url_rpm: "{{ mergerfs_url_release }}/{{ mergerfs_pkg_rpm }}"
 
+# SHA-256 digests from the upstream 2.41.1 release asset manifest.
+mergerfs_checksums:
+  mergerfs-2.41.1-1.fc40.x86_64.rpm: "sha256:235eff4560491db1be59c8c4d8c58206b40145d6aa2e4563e105006789c1a8b6"
+  mergerfs-2.41.1-1.fc41.x86_64.rpm: "sha256:cce4fdb3274eef5150a6472abcea84707645b7561cddebbd370c35e4f2d97e69"
+  mergerfs-2.41.1-1.fc42.x86_64.rpm: "sha256:710875547d133f13ea936f30f0f5e4be4e6ac85c887d65f9e8bf607fc3d57358"
+  mergerfs-2.41.1-1.fc43.x86_64.rpm: "sha256:941790c31fd7fe34c915e86512920fe7f93cd74861cbbbd40dbff0cc5e8de8af"
+  mergerfs_2.41.1.debian-bookworm_amd64.deb: "sha256:5bdc1df054bb27713c9fe195b97cf80f4850efdd287eef45118cc89fcceb2d27"
+  mergerfs_2.41.1.debian-bullseye_amd64.deb: "sha256:c48ece7a36c101ff04cd31ec8bbf05d282a7a9028f279c3e0d7741bd7d6da86e"
+  mergerfs_2.41.1.debian-trixie_amd64.deb: "sha256:23d33a875c97992fd250915fe8afc4aba05fa8be5f90d8558d9579a87ef00f89"
+  mergerfs_2.41.1.ubuntu-jammy_amd64.deb: "sha256:032bcb9bcd0575fcbda444fef29a707d542630b3a7a5e738e560cf73f9bd6045"
+  mergerfs_2.41.1.ubuntu-noble_amd64.deb: "sha256:118a95b62dc1dd16f1bb9529670ef412a78b4a1a0b576ffbd319b41511a5c12d"
+  mergerfs_2.41.1.ubuntu-plucky_amd64.deb: "sha256:bdb5d86da3189ef4d62ff59d2b77888bf2416999339b58ebb7d92451bd1efbfd"
+  mergerfs_2.41.1.ubuntu-questing_amd64.deb: "sha256:6efd6bf6fb3f5bab85a14faab0ae84b679e2471aff7dbc143f49c7dc400a1c3a"
+  mergerfs-2.41.1-1.fc40.aarch64.rpm: "sha256:94ee4c8a6f5e8edaedf18c821630934e4c0f1a7b09e1bcfab8c265c747fdbd04"
+  mergerfs-2.41.1-1.fc41.aarch64.rpm: "sha256:235c0177a614e8dcf0e1cb365877b0794c37e8d1241eb12aeff12c600cf56ce3"
+  mergerfs-2.41.1-1.fc42.aarch64.rpm: "sha256:253179f8aae70908c897dbb4106602b07fb8f64936c485c2177546937408c292"
+  mergerfs-2.41.1-1.fc43.aarch64.rpm: "sha256:6a6acc03dc098e38e2a7f10a5c23d6657f75a4a4d29fb9a68fb590d2d04ebb8b"
+
+snapraid_source_checksum: sha256:f947413876cce959cfe1905eff8a02e2aff8b184f2487acd46a1fa2459d52abf
 snapraid_version: "13.0"
 # Pinned to upstream master tip (2023-03-09); executed as root, so bump SHA + checksum together
 snapraid_runner_commit: 8f78f9f1af8ca5a9b6469a6c142cab2577157331

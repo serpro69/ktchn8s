@@ -78,6 +78,15 @@
 - name: Flush handlers before validation
   meta: flush_handlers
 
+- name: Discard the existing SSH control connection after applying NAS network policy
+  ansible.builtin.meta: reset_connection
+  when: configure_network | bool or manage_firewall | bool
+
+- name: Require a fresh authenticated connection to the NAS
+  ansible.builtin.wait_for_connection:
+    timeout: 60
+  when: configure_network | bool or manage_firewall | bool
+
 # Compatibility for existing callers; prefer storage-validate after cluster creation.
 - name: Run explicitly requested post-install NFS validation
   ansible.builtin.include_role:
