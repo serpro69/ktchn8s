@@ -32,8 +32,8 @@ nas:
             network_interface: ENC[AES256_GCM,data:ql1AaM0g,iv:8NA+Gg1APsFj3I74CoQslwcngPMlllaJ50n8fY8Y0Nc=,tag:2brCfUVjh1EI3GD6+JK7QQ==,type:str]
             snapraid_maintenance:
                 sync_time: ENC[AES256_GCM,data:EQW7Tqg=,iv:sLYHCi/bo8fBn5BJTB6SLADPCDV5agjzIICZFDEQgn4=,tag:mTEFbQD+wYAHVX3Ns5bzVQ==,type:str]
-                sync_enabled: ENC[AES256_GCM,data:p2V9Bew=,iv:+Ut5LMecRCUjt/uikkQBlcrucQa5vQST9wa87rExrvg=,tag:aluKUWCJYHtUg1Wj5o+MvQ==,type:bool]
-                scrub_enabled: ENC[AES256_GCM,data:KHgUfXg=,iv:AGyGycnSoX0Uf3TFHEIN1Cm8G7zL/W09gBUha506KtQ=,tag:aDwGbwSr2fu7Ruqv30+1fA==,type:bool]
+                sync_enabled: ENC[AES256_GCM,data:76CKrA==,iv:OM1oBsUtbvya58NtfQu8nsy4Mf/Btlo56YQd/xY1S38=,tag:rzgLUhxzRSmnA3S4NgZibg==,type:bool]
+                scrub_enabled: ENC[AES256_GCM,data:ArDuow==,iv:4YcR0hKMYq9sLbPR2IMs0rUeC+OT/IXUUvLTsvP2XdE=,tag:87bS13MEMBjP3837b5Anjw==,type:bool]
                 scrub_schedule: ENC[AES256_GCM,data:xaq3qa4LzoF6TDTYf2UO/rro/2wM,iv:OeN1dOd46gru8/L93dkYmWRrN8oP+7XcwjjhssuzIyg=,tag:2n59l/dk070J2nQPR6O2wQ==,type:str]
                 scrub_percentage: ENC[AES256_GCM,data:N1o=,iv:4A6MqjLvnJwxkX8b/5xvQds+fHaD3QLAjonPjf3DupM=,tag:/J4yWfv9eCYvgUQZG+oWgg==,type:float]
                 scrub_older_than_days: ENC[AES256_GCM,data:SHc=,iv:OW6atd3kk6hPvZCcDIwI9uH1DwMTfFsFTV/v66+gQWk=,tag:XsNXmDlP+KUL50mGISUZLQ==,type:float]
@@ -161,8 +161,8 @@ sops:
             RDZxUExvSEVWZVNCYnhnNnhxYk5nTDQK5QLn98L1sWXV6T5jlEbdrfneyGngBkkQ
             kJZiYg/H9ISoLNo6BG46tFfzLyJuzaQqGbaYVXX3N13E54oBZEkDZg==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-11-20T17:36:46Z"
-    mac: ENC[AES256_GCM,data:8pNG2t9Jzc3dcgRYwHOhAeK22urrUV67cEUM2D8TIxBYHm1bvyv0Rznn7F7X09qCjUM7SiSK6Bzt5BHnK+EwndS7zJkJC7xgXqZZXu8egVTx7gJSEIFhNeIAN1C8nS42kxmtdj5DdvSKooRWGrlWRIqbhVGy7sVDoLoVkdPWioQ=,iv:3GzpAS9mxRadJAus7+nNI3v5RnlRGC61EVbZLW1SfXY=,tag:BVN2vY/Bzgdng54ie9l0kA==,type:str]
+    lastmodified: "2026-11-21T07:00:07Z"
+    mac: ENC[AES256_GCM,data:r2l/b7vkdljg6SIM+NnmFgh7cKXjq2ovCTmBMgdvkk7pbHCDijBKHdtbuhJz5TxC8k1p2G2slYYCmXzXfzdwgiQkfmvm4CUW/AUfyoxgsSetBHctSXKV88SteiClc7J7Z14zW0tUMH12vpjvepE7kKfnOFU5NnxV+D2iAsklZ8o=,iv:3bOTNwTHUQeTevD1D5hMvB1rGkBcb7WtIl7UNbqxWok=,tag:pbm2ocfJfBE6bItGoERqFA==,type:str]
     pgp: []
     unencrypted_suffix: _unencrypted
     version: 3.9.3

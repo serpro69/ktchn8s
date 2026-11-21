@@ -19,9 +19,10 @@ verification. A sorting and its sealed ledger are complete. On 2026-11-17 the ow
 deferred C in its entirety, confirmed it unmounted/disconnected, and selected
 A-only acceptance in order 7.2, 7.3, 7.4. That sequence completed on
 2026-11-18. On 2026-11-20 the owner reviewed the completed C comparison
-and selected zero C additions. A's verified destinations and metadata are
-the accepted dataset for the joint B+C full scrub. The existing freeze
-continues. Exact observations and commands stay private.
+and selected zero C additions. The joint B+C full scrub of A's verified
+dataset passed on 2026-11-21. The owner released A as an offline cold spare.
+The operator archived the release evidence and restored routine maintenance.
+Exact observations and commands stay private.
 Originals and receipts remain intact through final acceptance and release gates.
 There is no routine staging rehash. The operator executes workstation and NAS/cluster
 commands; the assistant prepares and explains each step without executing it.
@@ -38,7 +39,7 @@ commands; the assistant prepares and explains each step without executing it.
 - **Depends on:** —
 - **Docs:** [SnapRAID configuration](./implementation.md#snapraid-excludes)
 - [x] Implement root-anchored exclusions and correct multi-parity directives; verify isolated configuration cases.
-- Live configuration, full sync and full scrub remain Task 8.
+- Task 8 records the accepted live configuration, full sync and full scrub.
 
 ## Task 3: Storage test tooling
 - **Status:** done
@@ -144,26 +145,44 @@ commands; the assistant prepares and explains each step without executing it.
 - **7.4 accepted.** After the approved discards and directory metadata updates,
   all retained A entries fall within the configured parity rules. The operator
   verified the archived evidence and its independent copy. Writers and promotions
-  are frozen through the final Task 8 scrub.
+  stayed frozen through the final Task 8 scrub.
 - Keep backup/library/vault internals intact except for exact approved omissions; preserve all originals. Record obsolete directory wrappers as merges; do not create empty archival shells or add a blanket timestamp-repair pass.
 
 ## Task 8: Parity enablement and drive release
-- **Status:** in-progress
+- **Status:** done
 - **Depends on:** Task 2, Task 7, Task 12
 - **Docs:** [Parity and release](./implementation.md#parity-enablement)
 - [x] 8.0 Verify firmware/settings and drive health against private baseline records.
 - [x] 8.1 Check B's physical identity/size and independent recovery coverage using completed comparison evidence and surviving A/final mappings. No B destination ledger is required.
 - [x] 8.2 Finalize C under Task 6. Verify independent recovery for its retained entries, including C-only additions, on storage that survives both wipes. Verify C's identity and size.
 - [x] 8.3 Quiesce maintenance and prepare B and C individually after both release gates pass. Configure both parity levels before starting the job.
-- [ ] 8.4 Run one explicit full sync with B and C configured, then one full scrub. Require successful exits, unchanged included data, complete coverage and zero errors.
-- [ ] 8.5 Release A last after successful two-level protection and recovery checks; record its chosen role.
-- [ ] 8.6 Preserve release/job evidence privately during the freeze, archive it afterward and re-enable maintenance.
+- [x] 8.4 Run one explicit full sync with B and C configured, then one full scrub. Require successful exits, unchanged included data, complete coverage and zero errors.
+- [x] 8.5 Release A last after successful two-level protection and recovery checks; record its chosen role.
+- [x] 8.6 Preserve release/job evidence privately during the freeze, archive it afterward and re-enable maintenance.
 - Failed checks or insufficient independent recovery stop the release sequence.
 - A-only Task 7 acceptance covers A. C's inventory, retained-content accounting
   and scoped verification precede its release gate.
 
 ### Execution context
 
+- **2026-11-21, 8.4 accepted.** The complete controller journal and exit
+  receipts match the joint run. Both parity levels participated in the full
+  sync and scrub. Both diffs found zero changes. The scrub checked all data
+  blocks and reached 100%. Final status confirmed full coverage and zero errors.
+- **2026-11-21, 8.5 accepted.** The accepted per-entry A verification and final
+  inclusion amendment cover all recorded keepers on the protected NAS.
+  There are zero retained exclusions and no retained B or C additions.
+  The owner confirmed there are no additional safety copies on A and
+  released it as an offline cold spare. Keep its files intact until it is
+  needed as a replacement. The current array uses four data disks and B+C parity.
+- **2026-11-21, 8.6 accepted.** The NAS archive under `00_meta/migration/`
+  matched the independent controller copy by SHA-256. The operator restored
+  both inventory flags and verified that the runner and scrub timers were
+  enabled, active and scheduled. The archived timer receipt also passed its
+  checksum check. The operator added an encrypted copy of the closeout archive
+  and receipts to the existing GitHub evidence draft and verified the download
+  byte for byte against the controller ciphertext. Keep the controller copy
+  until a successful normal sync protects the new NAS archive and receipt.
 - **2026-11-20, B/C snapshot reviewed.** The disk identities and four branch
   mappings match the receipts. The private review records a GPT layout for
   either candidate matching the largest data partition, and the retained
@@ -245,7 +264,7 @@ commands; the assistant prepares and explains each step without executing it.
 - **Depends on:** Task 2, Task 3
 - **Docs:** [Parity job readiness](./implementation.md#parity-job-readiness)
 - [x] Implement explicit jobs and verify isolated creation, expansion, interruption/retry, failure propagation and maintenance quiescence.
-- Actual data protection and disk release remain Task 8.
+- Task 8 records the verified two-level protection and drive releases.
 
 ## Task 13: Migration inventory and audit tooling
 - **Status:** done
