@@ -1078,6 +1078,101 @@ without warnings. `make docs` serves a preview and is not a terminating build ch
 If unrelated baseline warnings exist, record them and prove no new warnings; do not
 silently weaken strict mode. Also check local links in the revised Markdown directly.
 
+## Task 14 storage provisioning
+
+Use [Task 14](./tasks.md#task-14-storage-provisioning-on-new-and-existing-nas-hosts)
+for status and dependencies. The production entry point is `metal/storage.yml`.
+The live migration used an existing NAS and a focused parity play. Keep source
+comparisons, discard decisions, firmware changes and disk release under operator
+control. Use synthetic inventories and VM scratch disks for the following work.
+The operator runs the Ansible commands.
+
+### 14.1 Disk admission
+
+Trace `metal/roles/storage/tasks/disks.yml` through `mount_validation.yml`.
+Reuse applicable checks from `metal/roles/storage/files/parity-preflight.sh`.
+An existing ext4 partition on the expected device takes the reuse path. An
+explicitly authorized blank partition takes the format path once. An unreadable
+or ambiguous probe, an unexpected signature, or two inventory entries resolving
+to the same device must stop the play before formatting. Compare the actual
+mounted device to the inventory ID. Include a fixture where the mountpoint
+exists but the wrong device is mounted there.
+
+### 14.2 Package installation
+
+Start with `setup_debian.yml`, `setup_redhat.yml` and `vars/main.yml` in the
+storage role. Debian reuses an exact `/usr/local/bin/snapraid` version. Fresh
+Debian and Fedora installs reach a controller-local package copy, including
+with `parity_drives: []`. Document the data-only prerequisites. The parity
+Molecule fixture's `prepare.yml` already builds SnapRAID 13.0 from checksummed
+source. Choose a reproducible installer or a documented artifact build and
+staging procedure. Verify the installed executable at the path the units use.
+For Fedora, match the pinned mergerfs release's actual RPM name, including
+the package release number. For Debian, exercise first install with fresh APT
+metadata and a retry with `xz-utils` already present.
+
+### 14.3 Parity activation
+
+Trace `snapraid.yml`, `parity_transition.yml` and the initial-sync service.
+The service conflicts with routine sync and scrub services, so a timer firing
+during bootstrap can interrupt it. For first install or expansion, keep both
+timers disabled and idle, check for manual processes and queued jobs, then
+require a successful explicit full sync, clean diffs before and after a full
+scrub, complete coverage and zero errors. Restore the chosen maintenance
+policy after acceptance. Exercise an ordinary repeat apply to an accepted
+array with maintenance enabled and verify that it preserves parity and does
+not launch another bootstrap.
+
+### 14.4 Disk health
+
+In `smartctl_utils.yml`, a nonzero status can accompany a valid SMART report
+that identifies a failing disk. Carry the device identity and outcome through
+to the final decision in `disk_health.yml`. Test a mixed set of healthy,
+unhealthy and unreadable disks. Strict mode must stop and identify every
+affected disk. Warning mode may continue and must report the same findings.
+
+### 14.5 Network and firewall
+
+Exercise two inventories. One uses the NAS's existing network configuration.
+The other opts into network management with a different interface, gateway
+and controller subnet. In `network.yml` and `nfs_firewall.yml`, check that the
+controller is allowed **before** enabling default-deny. After the networking
+handler and firewall changes, verify a fresh SSH connection from controller to
+NAS. The current probe reaches port 22 on the gateway before the handler runs.
+
+### 14.6 Repeat apply and content backups
+
+In `tasks/main.yml`, test that a healthy repeat apply skips sensor detection,
+and that an unloaded `drivetemp` module is loaded even when its config file
+already matches. In `tasks/snapraid.yml`, test enabling the content-backup
+timer on a running host and disabling an already active timer. Verify both
+its active state and whether it will start at boot.
+
+The backup source files on different mounts are all named `snapraid.content`.
+The script currently copies them to the same timestamped destination. Decide
+whether to retain each source separately or one deliberately verified copy
+per generation. Use distinguishable fixture contents to check what can be
+restored, exercise retention across generations, and require the service to
+exit unsuccessfully when a required copy fails.
+
+### 14.7 Full-role acceptance
+
+Reuse the [parity scenario's Molecule/QEMU setup](#molecule-testing)
+on a Linux controller with KVM. Run one guest at a time, recreating it from
+the base image for each case. Give its virtual scratch disks stable device
+IDs and create the blank partitions expected by the install guide. Put the
+guest in the synthetic inventory's `nas` group. Leave filesystem creation,
+package installation and service setup to the production playbook.
+
+Have Molecule converge through `metal/storage.yml` from a clean checkout.
+The existing NFS and parity scenarios cover selected tasks after fixture
+preparation. For each case (data-only and parity-enabled), preserve the
+first recap, write a sentinel file between applies and run Molecule's
+idempotence step with the same inventory. Record a second recap with zero changes,
+matching sentinel checksum, the expected backing devices, the active NFS
+export and the intended timer states. Close Task 14 with this evidence before
+starting Task 10.
+
 ## Deferred / follow-ups (explicit)
 
 - **Probe failures and formatting authorization:** The inherited disk task can

@@ -277,10 +277,10 @@ commands; the assistant prepares and explains each step without executing it.
 
 - **Status:** pending
 - **Depends on:** Task 11, Task 12
-- **Docs:** [Provision from scratch](../../../guides/how_to_use_nfs_for_persistent_storage.md#provision-from-scratch), [known provisioning issues](./implementation.md#deferred-follow-ups-explicit)
+- **Docs:** [Task 14 implementation and acceptance criteria](./implementation.md#task-14-storage-provisioning), [provision from scratch](../../../guides/how_to_use_nfs_for_persistent_storage.md#provision-from-scratch)
 
 These follow-ups come from the 2026-11-21 review of `metal/storage.yml` at
-`717199f` against `master` (`ee52ee4`). Complete the fixes and the disposable-host
+`717199f` against `master` (`ee52ee4`). Complete the fixes and the Molecule VM
 acceptance run before starting Task 10. Task 8 records the existing array's
 accepted migration.
 
@@ -325,8 +325,9 @@ accepted migration.
   and overwrite the same timestamped backup. Define and test which verified
   copy or copies the backup retains.
 - [ ] 14.7 **Full-role acceptance.** After 14.1–14.6, run `metal/storage.yml`
-  from a clean checkout on disposable hosts with the documented base OS,
-  pre-partitioned disks and a synthetic inventory. Cover data-only and
+  from a clean checkout using the existing Molecule/QEMU tooling. Give the
+  guest the documented base OS, pre-partitioned virtual scratch disks and a
+  synthetic NAS inventory. Run fresh VM instances in turn for data-only and
   parity-enabled configurations. In each case, write a sentinel file and
   reapply the same inventory. Require zero changes on the second apply and
   verify the file contents, backing devices, active export and timer states.
