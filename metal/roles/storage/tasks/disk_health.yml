@@ -6,52 +6,28 @@
 # SETUP PHASE: Prepare drive lists and mappings
 # =================================================================
 
-- name: Create drive brand mapping
-  set_fact:
-    drive_brands: "{{ drive_brands | default({}) | combine({item.id: item.brand}) }}"
-  loop: "{{ data_drives + (parity_drives | default([])) }}"
-  when: item.id is defined and item.brand is defined
-
-- name: Build list of all device paths for health checks
-  set_fact:
-    all_health_check_devices: "{{ (data_devices | default([])) + (parity_devices | default([])) }}"
-
-- name: Initialize disk health report
-  set_fact:
+- name: Select physical drives for each health tool
+  ansible.builtin.set_fact:
     disk_health_report: []
+    all_health_check_devices: "{{ storage_branches | map(attribute='parent') | list }}"
+    seagate_device_paths: >-
+      {{ storage_branches | zip(data_drives + parity_drives)
+         | selectattr('1.brand', 'defined') | selectattr('1.brand', 'equalto', 'seagate')
+         | map(attribute='0.parent') | list if prefer_native_utils | bool else [] }}
 
-# =================================================================
-# TOOL SELECTION PHASE: Run brand-specific or universal checks =================================================================
-
-- name: Native utils health checks (brand-specific tools)
-  when: prefer_native_utils | default(false)
-  block:
-    - name: Group Seagate drives when using native utils
-      set_fact:
-        seagate_drives: "{{ (data_drives + (parity_drives | default([]))) | selectattr('brand', 'equalto', 'seagate') | map(attribute='id') | list }}"
-
-    - name: Build Seagate device paths
-      set_fact:
-        seagate_device_paths: "{{ seagate_device_paths | default([]) + ['/dev/disk/by-id/' + item] }}"
-      loop: "{{ seagate_drives | default([]) }}"
-
-    - name: Run Seagate native health checks
-      include_tasks: seachest_utils.yml
-      when:
-        - seagate_drives is defined
-        - seagate_drives | length > 0
-
-- name: Universal smartctl health checks
+- name: Collect universal SMART reports
   include_tasks: smartctl_utils.yml
-  when: not (prefer_native_utils | default(false))
 
-# =================================================================
+- name: Collect additional Seagate diagnostics when requested
+  include_tasks: seachest_utils.yml
+  when: seagate_device_paths | length > 0
+
 # GENERIC POST-CHECK PHASE: Validate, warn, report
 # =================================================================
 
 - name: Display health check summary
   debug:
-    msg: "Health check completed for {{ disk_health_report | length }} drive(s)"
+    msg: "Health check completed for {{ all_health_check_devices | length }} drive(s)"
 
 - name: Check for unhealthy drives
   set_fact:
@@ -60,19 +36,19 @@
 # yamllint disable rule:line-length
 - name: Check for drives exceeding temperature threshold
   set_fact:
-    overheated_drives: "{{ disk_health_report | rejectattr('temperature', 'equalto', -1) | selectattr('temperature', 'defined') | list | json_query('[?to_number(temperature) > `' + (disk_health_thresholds.max_temperature_celsius | string) + '`]') }}" # noqa yaml[line-length]
+    overheated_drives: "{{ disk_health_report | selectattr('temperature', 'gt', disk_health_thresholds.max_temperature_celsius) | list }}"
 
 - name: Check for drives with excessive reallocated sectors
   set_fact:
-    reallocated_sector_warnings: "{{ disk_health_report | json_query('[?to_number(reallocated_sectors) > `' + (disk_health_thresholds.max_reallocated_sectors | string) + '`]') }}" # noqa yaml[line-length]
+    reallocated_sector_warnings: "{{ disk_health_report | selectattr('reallocated_sectors', 'gt', disk_health_thresholds.max_reallocated_sectors) | list }}"
 
 - name: Check for drives with pending sectors
   set_fact:
-    pending_sector_warnings: "{{ disk_health_report | json_query('[?to_number(pending_sectors) > `' + (disk_health_thresholds.max_pending_sectors | string) + '`]') }}" # noqa yaml[line-length]
+    pending_sector_warnings: "{{ disk_health_report | selectattr('pending_sectors', 'gt', disk_health_thresholds.max_pending_sectors) | list }}"
 
 - name: Check for drives with uncorrectable errors
   set_fact:
-    uncorrectable_error_warnings: "{{ disk_health_report | json_query('[?to_number(uncorrectable_errors) > `' + (disk_health_thresholds.max_uncorrectable_errors | string) + '`]') }}" # noqa yaml[line-length]
+    uncorrectable_error_warnings: "{{ disk_health_report | selectattr('uncorrectable_errors', 'gt', disk_health_thresholds.max_uncorrectable_errors) | list }}"
 
 - name: Display warnings for problematic drives
   debug:
@@ -105,9 +81,13 @@
     that:
       - unhealthy_drives | length == 0
       - overheated_drives | length == 0
+      - reallocated_sector_warnings | length == 0
       - pending_sector_warnings | length == 0
       - uncorrectable_error_warnings | length == 0
-    fail_msg: "Unhealthy drives detected! Check /var/log/storage/disk-health-{{ ansible_date_time.date }}.log for details"
+    fail_msg: >-
+      Disk health failed for {{ (unhealthy_drives + overheated_drives + reallocated_sector_warnings +
+      pending_sector_warnings + uncorrectable_error_warnings) | map(attribute='device') | unique | list }}.
+      See /var/log/storage/disk-health-{{ ansible_date_time.date }}.log.
     success_msg: "All drives passed health checks"
   when: fail_on_unhealthy_drives | default(false)
 

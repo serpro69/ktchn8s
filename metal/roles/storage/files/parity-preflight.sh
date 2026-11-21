@@ -4,14 +4,6 @@ set -euo pipefail
 export LC_ALL=C
 stop() { echo "$*" >&2; exit 1; }
 
-joint=false
-if [[ ${1:-} == --fresh-two-level ]]; then joint=true; shift; fi
-candidate=$1
-target=$2
-shift 2
-[[ $target == /mnt/parity1 || $target == /mnt/parity2 ]] || stop "Unexpected parity mount $target"
-[[ $# -ge 2 && $(( $# % 2 )) == 0 ]] || stop "Expected inventory device and mount pairs"
-
 # systemd 252 returns an error for an empty filtered list-unit-files result.
 # Read the system lists successfully before selecting our (possibly absent) units.
 unit_files=$(systemctl list-unit-files --no-legend)
@@ -31,6 +23,31 @@ while read -r unit _ active substate _; do
     esac
     [[ $active == inactive || $active == failed ]] || stop "Wait for $unit ($active/$substate)"
 done <<< "$units"
+
+jobs=$(systemctl list-jobs --no-legend --plain)
+while read -r _ unit _; do
+    case "$unit" in
+        snapraid-runner.timer|snapraid-runner.service|snapraid-scrub.timer|snapraid-scrub.service|snapraid-initial-sync.service) stop "Queued job for $unit" ;;
+    esac
+done <<< "$jobs"
+for pattern in snapraid snapraid-runner; do
+    if pgrep -x "$pattern" >/dev/null; then stop "Active $pattern process"; else rc=$?; fi
+    [[ $rc == 1 ]] || stop "Cannot inspect running processes"
+done
+if pgrep -f '(^|/| )snapraid-runner[.]py( |$)' >/dev/null; then
+    stop "Active snapraid-runner.py process"
+else
+    [[ $? == 1 ]] || stop "Cannot inspect manual runner processes"
+fi
+if [[ ${1:-} == --idle ]]; then exit 0; fi
+
+joint=false
+if [[ ${1:-} == --fresh-two-level ]]; then joint=true; shift; fi
+candidate=$1
+target=$2
+shift 2
+[[ $target == /mnt/parity1 || $target == /mnt/parity2 ]] || stop "Unexpected parity mount $target"
+[[ $# -ge 2 && $(( $# % 2 )) == 0 ]] || stop "Expected inventory device and mount pairs"
 
 [[ $(lsblk -dnro TYPE "$candidate") == part ]] || stop "Released device must be a partition"
 parent=$(lsblk -dnro PKNAME "$candidate")

@@ -103,8 +103,9 @@ def create(state: Path, inventory: Path) -> None:
                 "-netdev", forward, "-device", f"virtio-net-pci,netdev=net,mac=52:54:00:12:34:{index:02x}",
             ]
             for disk in DISKS:
-                run("qemu-img", "create", "-f", "qcow2", str(directory / f"{disk}.qcow2"), "2G")
-                command += ["-drive", f"file={directory}/{disk}.qcow2,if=virtio,format=qcow2"]
+                run("qemu-img", "create", "-f", "qcow2", str(directory / f"{disk}.qcow2"), "8G")
+                command += ["-drive", f"file={directory}/{disk}.qcow2,if=none,id={disk},format=qcow2",
+                            "-device", f"virtio-blk-pci,drive={disk},serial=fixture-{disk}"]
             run(*command)
             instances.append({"instance": name, "address": "127.0.0.1", "port": str(port),
                               "user": "root", "identity_file": str(key)})

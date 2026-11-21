@@ -44,9 +44,117 @@ Provisioning creates the numbered layout, fixed-owner share directories, legend,
 exports and service configuration. It does not migrate existing data, remove
 legacy directories, run lifecycle acceptance, or start parity bootstrap. Normal
 configuration changes can restart NFS; reapplying storage to an existing server
-requires assessment of its active consumers. The inherited formatting path has an
-[open probe-error safeguard](../feat/wip/nas-storage-layout/implementation.md#deferred-follow-ups-explicit);
-review disk identity and formatting intent before applying it to unmounted volumes.
+requires assessment of its active consumers.
+
+### Inventory and installation prerequisites
+
+Give each data or parity branch its own physical disk and identify its partition by ID. Keep
+the inventory order stable. The role checks partition by-id, parent disk,
+partition signature and current mounts across the complete list before creating
+any filesystem. It reuses existing ext4. On a new, empty GPT partition, set
+`format_blank: true` on that specific drive for initial installation. Remove
+that permission after the first install. A probe error stops provisioning.
+
+This synthetic inventory uses documentation-only addresses. Substitute your
+own SSH user, addresses, CIDRs and partition IDs. Add a controller CIDR visible
+from the NAS, including any NAT or jump host, before enabling its firewall.
+
+```yaml
+nas:
+  hosts:
+    nas-example:
+      ansible_user: storage-admin
+      ansible_host: 192.0.2.30
+      homelab_net_cidr: 192.0.2.0/24
+      firewall_allowed_networks: [192.0.2.0/24, 198.51.100.18/32]
+      data_drives:
+        - {id: ata-EXAMPLE_DATA_ONE-part1, format_blank: true}
+        - {id: ata-EXAMPLE_DATA_TWO-part1, format_blank: true}
+      parity_drives: []
+      configure_network: false
+      # To manage a static address, enable configure_network and supply:
+      storage_network:
+        interface: enp2s0
+        address: 192.0.2.30
+        netmask: 255.255.255.0
+        gateway: 192.0.2.1
+        dns_nameservers: [192.0.2.53]
+```
+
+For the project's inventory wrapper, configure `.sops.yaml` in your checkout
+with your own age public recipient and give the controller access to the
+corresponding private identity. Create/edit the encrypted
+`metal/inventory/metal.yml` with SOPS. On a fresh checkout with another
+operator's ciphertext, create a new inventory encrypted to your recipient.
+For example, set the inventory creation rule to your public age recipient:
+
+```yaml
+creation_rules:
+  - path_regex: 'metal/inventory/metal\.yml$'
+    age: age1_REPLACE_WITH_YOUR_PUBLIC_RECIPIENT
+```
+
+From the repository root, encrypt a prepared plaintext inventory outside the
+checkout with `sops encrypt --filename-override metal/inventory/metal.yml /path/to/nas.yml`.
+Save its encrypted output as the inventory for your installation.
+Keep plaintext and the age private key outside Git. A standalone synthetic
+YAML inventory can also be passed directly with `ansible-playbook -i`.
+
+The documented VM base is Debian 12 amd64. Both data-only and parity installs
+need distro repositories, a matching mergerfs 2.41.1 release asset, and access
+to the upstream SnapRAID v13.0 source archive on first install. Fedora RPMs use
+the distribution major version and package release `-1`. The role pins the
+asset SHA-256, builds SnapRAID from checksummed source when needed, and verifies
+`/usr/local/bin/snapraid --version`. Build packages remain installed. Debian
+keeps `xz-utils` for local DEB installs and checks the installed owner of
+`/usr/bin/b3sum`. The NAS requires kernel support for NFS, FUSE and drivetemp.
+See the [mergerfs release assets](https://github.com/trapexit/mergerfs/releases/tag/2.41.1)
+and [Debian b3sum package](https://packages.debian.org/bookworm/b3sum).
+
+### Initial parity or expansion
+
+For a legacy array with a previously recorded successful full sync and scrub
+(such as Task 8), a one-time ordinary apply with
+`-e storage_adopt_accepted_parity=true` records its existing mounted layout.
+Use this when adopting a paused array or before changing its legacy timer
+policy. Already enabled, running legacy timers can continue on an unchanged
+layout. The adoption option requires matching mounted filesystems, configuration
+and nonempty parity/content files. A pending transition still requires explicit
+acceptance. Omit the option for later applies.
+
+1. Freeze writes to included data and serialize provisioning and parity
+   operations. For an expansion, stop and disable the runner and scrub timers
+   on the existing layout and wait for running services and manual jobs to
+   finish. Set both `sync_enabled` and `scrub_enabled` to false. When supplying
+   `snapraid_maintenance` in inventory, copy the complete role-default mapping
+   and edit it. Retain the chosen policy for restoration.
+2. Append each intended parity partition by ID, preserving existing branch
+   order. Verify capacities and independent recovery of any previously used
+   drive before releasing it. Converge the ordinary storage play. It checks
+   timer and service state, queued jobs and manual processes, records the
+   pending layout, and installs the explicit acceptance command. An existing
+   installation configured through `storage-parity.yml` also needs this
+   paused ordinary apply before using the acceptance command.
+3. With the included dataset frozen, run `sudo /usr/local/sbin/storage-accept-parity`
+   on the NAS in a persistent operator session. It verifies backing mounts,
+   restarts the explicit full-sync service and requires a new successful
+   invocation. It runs a clean diff, a full scrub, another clean diff and status
+   checks for complete coverage and zero errors. Evidence stays in the printed
+   directory under `/var/log/snapraid`. A failure leaves the layout pending.
+   Resolve the cause and repeat the same explicit command. Retain parity
+   and content files across retries.
+4. Restore the chosen maintenance flags only after acceptance and apply the
+   same inventory again. Inspect both `systemctl is-enabled` and
+   `systemctl is-active` for the runner, scrub and content-backup timers.
+   Reapplying an accepted layout preserves its parity files.
+5. Content backups keep the configured number of complete generations under
+   `/var/backups/snapraid`. Each generation retains each source's path
+   (for example `mnt/data1/snapraid.content` and `var/snapraid.content`).
+   The service verifies each copy before publishing or pruning a generation.
+   Choose a complete generation when restoring content metadata.
+
+The disposable Molecule scenario in `metal/roles/storage/molecule/provision/`
+exercises the public play in data-only and parity configurations.
 
 ## Choose the check for the question
 

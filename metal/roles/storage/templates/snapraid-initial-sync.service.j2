@@ -8,7 +8,7 @@ Type=oneshot
 # Retain this invocation's exit status for operator acceptance. Use restart for
 # each new bootstrap/expansion attempt; start on an exited unit is a no-op.
 RemainAfterExit=yes
-ExecStart=/usr/local/bin/snapraid --force-full sync
+ExecStart=/usr/local/bin/snapraid --force-full sync -c /etc/snapraid.conf
 User=root
 Group=root
 StandardOutput=journal

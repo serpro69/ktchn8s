@@ -19,6 +19,13 @@
   ansible.builtin.assert:
     that: parity_preflight.stdout | trim in ['blank', 'ext4']
 
+- name: Mark focused transitions pending until the ordinary role records branch identities
+  ansible.builtin.copy:
+    content: "[]\n"
+    dest: /var/lib/snapraid-layout.pending
+    force: false
+    mode: '0600'
+
 - name: Format only an explicitly released partition with a positive blank probe
   community.general.filesystem:
     fstype: ext4

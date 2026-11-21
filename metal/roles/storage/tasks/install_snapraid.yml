@@ -1,0 +1,82 @@
+---
+- name: Inspect the executable used by the SnapRAID services
+  ansible.builtin.stat:
+    path: /usr/local/bin/snapraid
+    follow: true
+    get_checksum: false
+  register: snapraid_binary
+
+- name: Read installed SnapRAID version
+  ansible.builtin.command: /usr/local/bin/snapraid --version
+  register: snapraid_installed_version
+  changed_when: false
+  check_mode: false
+  when: snapraid_binary.stat.exists
+
+- name: Build from the verified upstream archive when the exact binary is missing
+  when:
+    - not ansible_check_mode
+    - (snapraid_installed_version.stdout | default('')).split()[:2] != ['snapraid', 'v' ~ snapraid_version]
+  block:
+    - name: Install build tools from distribution repositories
+      ansible.builtin.package:
+        name: "{{ ['build-essential', 'autoconf', 'automake'] if ansible_os_family == 'Debian' else ['gcc', 'make', 'autoconf', 'automake'] }}"
+        state: present
+
+    - name: Create a private build directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: storage-snapraid-
+      register: snapraid_build
+
+    - name: Download pinned SnapRAID sources
+      ansible.builtin.get_url:
+        url: "https://codeload.github.com/amadvance/snapraid/tar.gz/refs/tags/v{{ snapraid_version }}"
+        checksum: "{{ snapraid_source_checksum }}"
+        dest: "{{ snapraid_build.path }}/source.tar.gz"
+        mode: '0600'
+
+    - name: Extract verified sources
+      ansible.builtin.unarchive:
+        src: "{{ snapraid_build.path }}/source.tar.gz"
+        remote_src: true
+        dest: "{{ snapraid_build.path }}"
+
+    - name: Build the pinned version
+      ansible.builtin.shell: |
+        set -eu
+        printf '%s\n' {{ snapraid_version | quote }} > .version
+        autoreconf -fi
+        ./configure --sysconfdir=/etc
+        make -j2
+      args:
+        chdir: "{{ snapraid_build.path }}/snapraid-{{ snapraid_version }}"
+
+    - name: Verify the built version before replacement
+      ansible.builtin.command: "{{ snapraid_build.path }}/snapraid-{{ snapraid_version }}/snapraid --version"
+      register: built_snapraid
+      changed_when: false
+      failed_when: built_snapraid.rc != 0 or built_snapraid.stdout.split()[:2] != ['snapraid', 'v' ~ snapraid_version]
+
+    - name: Install the verified executable atomically
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ snapraid_build.path }}/snapraid-{{ snapraid_version }}/snapraid"
+        dest: /usr/local/bin/snapraid
+        owner: root
+        group: root
+        mode: '0755'
+  always:
+    - name: Remove only this run's temporary build tree
+      ansible.builtin.file:
+        path: "{{ snapraid_build.path }}"
+        state: absent
+      when: snapraid_build.path is defined
+
+- name: Verify installed SnapRAID at the service path
+  ansible.builtin.command: /usr/local/bin/snapraid --version
+  check_mode: false
+  when: not ansible_check_mode or snapraid_binary.stat.exists
+  register: installed_snapraid
+  changed_when: false
+  failed_when: installed_snapraid.rc != 0 or installed_snapraid.stdout.split()[:2] != ['snapraid', 'v' ~ snapraid_version]

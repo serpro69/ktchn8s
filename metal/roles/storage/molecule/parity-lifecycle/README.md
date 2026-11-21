@@ -14,7 +14,7 @@ come from the 2026-09-24 Debian snapshot. SnapRAID is built from the SHA-256
 pinned upstream v13.0 source archive, with its version checked before testing.
 The production snapraid-runner revision and checksum come from role variables.
 
-The scenario owns one QEMU guest, four sparse 2 GiB scratch disks and its SSH
+The scenario owns one QEMU guest, four sparse 8 GiB scratch disks and its SSH
 key. SSH binds only to localhost port 23101; an occupied port fails creation.
 No host mounts, physical disks, production inventory or kubeconfig are used.
 The two data filesystems, two parity filesystems and root filesystem (third

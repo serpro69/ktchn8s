@@ -1,0 +1,45 @@
+---
+prerun: false
+shared_state: false
+dependency:
+  name: galaxy
+  enabled: false
+driver:
+  name: default
+  safe_files:
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/*/*.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/base.qcow2
+platforms:
+  - name: parity-server
+    groups: [nas]
+provisioner:
+  name: ansible
+  log: true
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..
+  config_options:
+    defaults:
+      host_key_checking: false
+  inventory:
+    group_vars:
+      nas:
+        ansible_python_interpreter: /usr/bin/python3
+        storage_case: "${NAS_PROVISION_CASE:-data}"
+        homelab_net_cidr: 10.0.2.0/24
+        firewall_allowed_networks: [10.0.2.2/32]
+        configure_network: "{{ storage_case == 'parity' }}"
+        storage_network:
+          interface: "{{ ansible_facts.default_ipv4.interface }}"
+          address: 10.0.2.15
+          netmask: 255.255.255.0
+          gateway: 10.0.2.2
+          dns_nameservers: [10.0.2.3]
+        data_drives:
+          - {id: virtio-fixture-data1-part1, format_blank: true}
+          - {id: virtio-fixture-data2-part1, format_blank: true}
+        parity_drives: "{{ [{'id': 'virtio-fixture-parity1-part1', 'format_blank': true}] if storage_case == 'parity' else [] }}"
+verifier:
+  name: ansible
+scenario:
+  test_sequence: [destroy, create, prepare, converge, side_effect, idempotence, verify, destroy]

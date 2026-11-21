@@ -1,40 +1,21 @@
 ---
 # Seagate-specific health checks using seachest utilities
 
-- name: Ensure dependencies
-  package:
-    name:
-      - lsscsi
-
-- name: Check seachest_SMART availability
-  command: which seachest_SMART
-  register: seachest_check
-  failed_when: false
-  changed_when: false
-
-- name: Fail if seachest not available when prefer_native_utils is true
-  fail:
-    msg: "prefer_native_utils=true but seachest_SMART not found for Seagate drives. Please install seachest-utils or set prefer_native_utils=false"
-  when: seachest_check.rc != 0
-
-- name: Convert by-id paths to sg device paths for seachest
-  shell: |
-    set -e
-    set -o pipefail
-    DEVICE="{{ item }}"
-    # Get the real device name
-    REAL_DEV=$(readlink -f "$DEVICE" | sed 's|/dev/||')
-    # Find the corresponding sg device
-    SG_DEV=$(lsscsi -g | grep "$REAL_DEV" | awk '{print $NF}')
-    echo "$SG_DEV"
+- name: Resolve each physical Seagate disk to its SCSI generic device
+  ansible.builtin.shell: |
+    set -eu
+    set -- /sys/class/block/{{ item | basename }}/device/scsi_generic/sg*
+    [ "$#" = 1 ] && [ -c "/dev/${1##*/}" ] || exit 1
+    printf '/dev/%s\n' "${1##*/}"
   loop: "{{ seagate_device_paths }}"
   register: sg_device_conversion
   changed_when: false
-  failed_when: sg_device_conversion.rc != 0
+  failed_when: false
 
 - name: Run seachest SMART health checks
   command: "seachest_SMART -d {{ item.stdout }} --smartAttributes hybrid"
   loop: "{{ sg_device_conversion.results }}"
+  when: item.rc == 0
   register: seachest_results
   failed_when: false
   changed_when: false
@@ -45,7 +26,7 @@
   loop: "{{ seachest_results.results }}"
   loop_control:
     extended: true
-  when: item.rc == 0
+  when: item.rc | default(1) == 0
   vars:
     # Parse the seachest output format (text-based)
     # Extract critical attributes from the output
@@ -60,17 +41,17 @@
     # Extract raw values (these patterns match the output format shown in smart.out)
     # Format: "? 194 Temperature -O---K 30 58 AP 30 (m/M 18/58)"
     # We want the first numeric value after the flags
-    temp_value: "{{ temp_line | regex_search('\\s+(\\d+)\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\2') | first | default(-1) | int }}"
-    reallocated_value: "{{ reallocated_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\d+\\s+(\\d+)', '\\1') | first | default(0) | int }}"
-    pending_value: "{{ pending_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | first | default(0) | int }}"
-    uncorrectable_value: "{{ uncorrectable_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | first | default(0) | int }}"
-    power_hours_value: "{{ power_hours_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | first | default('N/A') }}"
+    temp_value: "{{ temp_line | regex_search('\\s+(\\d+)\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\2') | default([], true) | first | default(-1) | int }}"
+    reallocated_value: "{{ reallocated_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\d+\\s+(\\d+)', '\\1') | default([], true) | first | default(0) | int }}"
+    pending_value: "{{ pending_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | default([], true) | first | default(0) | int }}"
+    uncorrectable_value: "{{ uncorrectable_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | default([], true) | first | default(0) | int }}"
+    power_hours_value: "{{ power_hours_line | regex_search('\\s+\\d+\\s+\\d+\\s+\\w+\\s+(\\d+)', '\\1') | default([], true) | first | default('N/A') }}"
 
     # Overall health - check if no attributes are marked with ! (currently failing)
     has_failures: "{{ output_lines | select('search', '^!') | list | length > 0 }}"
 
     parsed_entry:
-      device: "{{ seagate_device_paths[ansible_loop.index0] }}"
+      device: "{{ item.item.item }}"
       sg_device: "{{ item.item.stdout }}"
       tool: "seachest"
       overall_health: "{{ not has_failures }}"
@@ -81,3 +62,19 @@
       power_on_hours: "{{ power_hours_value }}"
       model: "{{ (output_lines | select('match', '^/dev/sg.*') | first | default('')).split('-')[1] | default('Unknown') }}"
       serial: "{{ (output_lines | select('match', '^/dev/sg.*') | first | default('')).split('-')[2] | default('Unknown') }}"
+
+- name: Include unreadable native diagnostics in warning and strict decisions
+  ansible.builtin.set_fact:
+    disk_health_report: "{{ disk_health_report + [failure] }}"
+  vars:
+    failure:
+      device: "{{ item.item.item }}"
+      tool: seachest
+      overall_health: false
+      temperature: -1
+      reallocated_sectors: 0
+      pending_sectors: 0
+      uncorrectable_errors: 0
+      power_on_hours: unknown
+  loop: "{{ seachest_results.results }}"
+  when: item.rc | default(1) != 0

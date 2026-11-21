@@ -2,31 +2,28 @@
 - name: Set global facts
   include_tasks: facts.yml
 
-- name: Include network configuration
-  include_tasks: network.yml
-  when: configure_network | default(false)
+- name: Require at least one data drive when provisioning parity
+  ansible.builtin.assert:
+    that: data_drives | length > 0 or parity_drives | length == 0
 
-- name: Ensure base packages
-  package:
-    name:
-      # hardware monitoring
-      - smartmontools
-      # data migration and content verification
-      - rsync
-      - b3sum
-    state: present
+- name: Admit the complete drive inventory before changing disks or services
+  when: data_drives | length > 0
+  block:
+    - name: Inspect storage partition identities, signatures and current backing mounts
+      ansible.builtin.script:
+        cmd: storage-disks.py {{ data_drives | to_json | quote }} {{ parity_drives | to_json | quote }}
+        executable: /usr/bin/python3
+      register: storage_disk_probe
+      changed_when: false
+      check_mode: false
 
-- name: Persist drivetemp across reboots
-  copy:
-    content: "drivetemp\n"
-    dest: /etc/modules-load.d/drivetemp.conf
-    mode: "0644"
-  register: drivetemp
+    - name: Retain verified branch and physical disk identities
+      ansible.builtin.set_fact:
+        storage_branches: "{{ storage_disk_probe.stdout | from_json }}"
 
-- name: Load drivetemp module
-  command: modprobe drivetemp
-  changed_when: true
-  when: drivetemp is changed
+    - name: Check parity transition policy before disk or configuration changes
+      ansible.builtin.include_tasks: parity_policy.yml
+      when: parity_drives | length > 0
 
 - include_tasks: setup_redhat.yml # noqa name[missing]
   when: ansible_os_family == 'RedHat'
@@ -34,9 +31,21 @@
 - include_tasks: setup_debian.yml # noqa name[missing]
   when: ansible_os_family == 'Debian'
 
-- name: Detect sensors
-  command: sensors-detect --auto
-  changed_when: true
+- name: Include network configuration
+  include_tasks: network.yml
+  when: configure_network | bool
+
+- name: Install the pinned SnapRAID binary
+  ansible.builtin.include_tasks: install_snapraid.yml
+
+- name: Configure drive temperature monitoring
+  ansible.builtin.include_tasks: drivetemp.yml
+
+- name: Detect sensors once when hardware monitoring is requested
+  shell: sensors-detect --auto && touch /var/lib/storage-sensors-detected
+  args:
+    creates: /var/lib/storage-sensors-detected
+  when: enable_disk_health_checks | bool
 
 - name: Validate disk health
   include_tasks: disk_health.yml

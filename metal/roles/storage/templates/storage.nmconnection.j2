@@ -1,0 +1,15 @@
+[connection]
+id=ktchn8s-storage
+uuid={{ ('ktchn8s-storage-' ~ storage_network.interface) | to_uuid }}
+type=ethernet
+interface-name={{ storage_network.interface }}
+autoconnect=true
+autoconnect-priority=100
+
+[ipv4]
+method=manual
+address1={{ storage_network.address }}/{{ storage_prefix.stdout }},{{ storage_network.gateway }}
+dns={{ storage_network.dns_nameservers | join(';') }};
+
+[ipv6]
+method=auto

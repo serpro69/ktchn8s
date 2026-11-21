@@ -17,6 +17,8 @@ systemctl() {
                 syncing) echo 'snapraid-initial-sync.service loaded activating start Full sync' ;;
                 retry|expand|expand-retry) echo 'snapraid-initial-sync.service loaded active exited Full sync' ;;
             esac ;;
+        'list-jobs --no-legend --plain')
+            if [[ $scenario == queued ]]; then echo '4 snapraid-scrub.service start waiting'; fi ;;
         *) return 1 ;;
     esac
 }
@@ -87,10 +89,15 @@ find() {
         command find "$@"
     fi
 }
-export -f systemctl lsblk blockdev findmnt blkid find
+pgrep() {
+    if [[ $scenario == manual && $* == '-x snapraid' ]]; then return 0; fi
+    if [[ $scenario == probe-failed ]]; then return 2; fi
+    return 1
+}
+export -f pgrep systemctl lsblk blockdev findmnt blkid find
 export scenario
 scenarios=(blank retry mounted expand expand-retry first-parity-missing error ambiguous empty old-label other-fs nested
-          other-mount omitted busy enabled runtime-mask syncing missing undersized fresh-blank fresh-retry fresh-stale-parity
+          other-mount omitted busy queued manual probe-failed enabled runtime-mask syncing missing undersized fresh-blank fresh-retry fresh-stale-parity
           fresh-content fresh-tmp fresh-probe-error fresh-wrong-target fresh-no-first fresh-first fresh-first-retry fresh-first-foreign)
 for scenario in "${scenarios[@]}"; do
     options=()

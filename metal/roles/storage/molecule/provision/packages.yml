@@ -1,0 +1,26 @@
+---
+# Package-only acceptance on disposable OS/version fixtures supplied by the operator.
+- name: Exercise the production installer for each package guest
+  hosts: nas_package_guests
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Require a supported distribution
+      ansible.builtin.assert:
+        that: ansible_facts.distribution in ['Debian', 'Fedora']
+
+    - name: Install distribution packages through the production tasks
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: "{{ 'setup_debian.yml' if ansible_facts.distribution == 'Debian' else 'setup_redhat.yml' }}"
+
+    - name: Install and verify the exact production SnapRAID executable
+      ansible.builtin.include_role:
+        name: storage
+        tasks_from: install_snapraid.yml
+
+    - name: Verify the installed mergerfs binary
+      ansible.builtin.command: mergerfs --version
+      register: installed_mergerfs
+      changed_when: false
+      failed_when: installed_mergerfs.rc != 0 or '2.41.1' not in installed_mergerfs.stdout.split()
