@@ -46,7 +46,7 @@ commands; the assistant prepares and explains each step without executing it.
 - **Depends on:** —
 - **Docs:** [Development tooling](./implementation.md#devshell-b3sum)
 - [x] Add and verify the locked checksum and Molecule tooling.
-- Before fresh/full role convergence, resolve the documented Debian package-cache ordering and checksum-tool package-provenance follow-ups.
+- Task 14.2 covers Debian package-cache ordering and checksum-tool provenance before fresh/full role convergence.
 
 ## Task 4: Prepare the NFS media PV offline
 - **Status:** done
@@ -273,9 +273,69 @@ commands; the assistant prepares and explains each step without executing it.
 - [x] Complete the original helper, unit/scenario checks and live tool/access acceptance.
 - Task 7 owns the approved dispositions and final ledger; its identified special-entry omissions use existing discard support. Task 6.3 owns later C-keeper input selection. Historical tooling acceptance is not migrated-data acceptance.
 
-## Task 10: Final verification
+## Task 14: Storage provisioning on new and existing NAS hosts
+
 - **Status:** pending
-- **Depends on:** Tasks 1–9 and 11–13
+- **Depends on:** Task 11, Task 12
+- **Docs:** [Provision from scratch](../../../guides/how_to_use_nfs_for_persistent_storage.md#provision-from-scratch), [known provisioning issues](./implementation.md#deferred-follow-ups-explicit)
+
+These follow-ups come from the 2026-11-21 review of `metal/storage.yml` at
+`717199f` against `master` (`ee52ee4`). Complete the fixes and the disposable-host
+acceptance run before starting Task 10. Task 8 records the existing array's
+accepted migration.
+
+- [ ] 14.1 **Disk admission (P1).** Ordinary provisioning in
+  `metal/roles/storage/tasks/disks.yml` treats any nonzero `blkid` status as permission
+  to format and any zero status as grounds to skip formatting. Check device
+  identity, parent, current backing mount and signature before mutation. Accept
+  verified existing ext4 and positively identified, explicitly authorized blank
+  partitions. Test a blank GPT partition, a retry, an ambiguous probe and
+  duplicate or conflicting data/parity devices. The focused parity play already
+  has several of these checks.
+- [ ] 14.2 **Package bootstrap (P1).** Supply a reproducible, verified SnapRAID
+  installer for each supported OS, or document how to produce and stage it.
+  The production DEB/RPM inputs are ignored by Git. Even an NFS-only install
+  reaches the OS setup tasks. Fix the Fedora mergerfs asset name against the
+  pinned release and test the supported OS/version combinations. On Debian,
+  refresh the package index before the first package task, verify the source of
+  `b3sum`, and preserve any pre-existing `xz-utils` on install or retry.
+- [ ] 14.3 **Parity activation (P1).** The main role applies the timer flags
+  immediately, and both default to true. Document and verify a reusable
+  first-install/expansion path that keeps maintenance paused through the
+  explicit full sync, unchanged-data checks and full scrub. Check for active
+  manual processes and queued jobs before transition. A repeat apply to an
+  accepted array must preserve its chosen maintenance policy and parity files.
+- [ ] 14.4 **Disk health (P1 when strict checks are enabled).** Include every
+  requested physical disk in the health decision. `smartctl_utils.yml` drops
+  nonzero exit statuses, including a failing SMART result. Test a reported
+  failure and an unreadable device with `fail_on_unhealthy_drives: true`.
+- [ ] 14.5 **Network settings for another homelab (P1).** Make network
+  reconfiguration an explicit operator choice. Provide a sanitized NAS
+  inventory example using the operator's own SOPS recipients, interfaces,
+  gateway, client CIDRs and drive IDs. Remove the personal workstation address
+  from reusable defaults. Verify SSH remains reachable after applying network
+  and firewall policy. The current check suppresses failure and probes the
+  gateway before the networking restart. Exercise firewall validation with the
+  target's default shell, including shells without `pipefail`.
+- [ ] 14.6 **Repeat apply and backups (P2).** Gate hardware detection on actual need
+  and recover when the drivetemp file exists but the module is unloaded.
+  `sensors-detect --auto` runs and reports changed every time. Make the
+  content-backup timer start and stop according to policy, and make its service
+  report copy errors. All configured content files currently share one basename
+  and overwrite the same timestamped backup. Define and test which verified
+  copy or copies the backup retains.
+- [ ] 14.7 **Full-role acceptance.** After 14.1–14.6, run `metal/storage.yml`
+  from a clean checkout on disposable hosts with the documented base OS,
+  pre-partitioned disks and a synthetic inventory. Cover data-only and
+  parity-enabled configurations. In each case, write a sentinel file and
+  reapply the same inventory. Require zero changes on the second apply and
+  verify the file contents, backing devices, active export and timer states.
+  Record both recaps and verification results before closing Task 14.
+
+## Task 10: Final verification
+
+- **Status:** pending
+- **Depends on:** Tasks 1–9, 11–13, and [Task 14](#task-14-storage-provisioning-on-new-and-existing-nas-hosts)
 - [ ] 10.1 Complete the required storage, parity, audit, inventory, network, documentation and live-application checks; retain evidence of actual migration/release acceptance.
 - [ ] 10.2 Finalize public documentation and the private operational record; move the completed feature out of WIP when appropriate.
 - [ ] 10.3 Complete code review of the implementation.
@@ -290,5 +350,6 @@ A sorting → A access audit (7.2) → A full verification (7.3) → evidence/fr
 A acceptance + parity-job readiness → applicable recovery/parity/release gates
 C inventory/comparison/additions → scoped verification and independent recovery → B+C bootstrap
 Parity acceptance + offline PV work → live media rollout
+Storage provisioning fixes (14.1–14.6) → full-role acceptance (14.7) → final verification (10)
 All implementation and operational gates → final feature verification
 ```
