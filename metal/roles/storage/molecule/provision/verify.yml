@@ -9,14 +9,45 @@
           - inventory_hostname == 'parity-server' and ansible_host == '127.0.0.1'
           - groups.nas == ['parity-server']
           - storage_case in ['data', 'parity']
-    - name: Require the requested static configuration or the original DHCP configuration
+    - name: Verify effective static IPv4 on the interface carrying the controller connection
+      when: storage_case == 'parity'
+      block:
+        - name: Read the network profile selected by networkd
+          ansible.builtin.command:
+            argv: [networkctl, --json=short, status, "{{ ansible_facts.default_ipv4.interface }}"]
+          register: fixture_networkd
+          changed_when: false
+
+        - name: Read the merged Netplan configuration
+          ansible.builtin.command: netplan get ethernets
+          register: fixture_ethernets
+          changed_when: false
+
+        - name: Read the permanent global IPv4 addresses on this interface
+          ansible.builtin.command:
+            argv: [ip, -4, -o, address, show, dev, "{{ ansible_facts.default_ipv4.interface }}", scope, global, permanent]
+          register: fixture_static_addresses
+          changed_when: false
+
+        - name: Require static configuration, a permanent address and the requested default gateway
+          vars:
+            network_file: "{{ (fixture_networkd.stdout | from_json).NetworkFile }}"
+            netplan_id: "{{ (network_file | basename)[11:-8] }}"
+            ethernet: "{{ (fixture_ethernets.stdout | from_yaml)[netplan_id] }}"
+          ansible.builtin.assert:
+            that:
+              - network_file is match('^/run/systemd/network/10-netplan-.+\.network$')
+              - not (ethernet.dhcp4 | default(false))
+              - "'10.0.2.15/24' in ethernet.addresses"
+              - "{'to': 'default', 'via': '10.0.2.2'} in ethernet.routes"
+              - "'10.0.2.3' in ethernet.nameservers.addresses"
+              - "'inet 10.0.2.15/24 ' in fixture_static_addresses.stdout"
+              - ansible_facts.default_ipv4.address == '10.0.2.15'
+              - ansible_facts.default_ipv4.gateway == '10.0.2.2'
+
+    - name: Require the original data-only DHCP configuration
       ansible.builtin.shell: |
         set -eu
-        {% if storage_case == 'parity' %}
-        grep -Fqx 'iface {{ ansible_facts.default_ipv4.interface }} inet static' /etc/network/interfaces
-        test "{{ ansible_facts.default_ipv4.address }}" = 10.0.2.15
-        test "{{ ansible_facts.default_ipv4.gateway }}" = 10.0.2.2
-        {% else %}
         current_netplan=$(netplan get)
         test -n "$current_netplan"
         test "$current_netplan" = "$(cat /root/base-netplan.yaml)"
@@ -27,8 +58,8 @@
         fi
         dhcp_address=$(ip -4 -o address show dev {{ ansible_facts.default_ipv4.interface | quote }} scope global dynamic)
         test -n "$dhcp_address"
-        {% endif %}
       changed_when: false
+      when: storage_case == 'data'
     - name: Verify the independent sentinel bytes and backing partition identities
       ansible.builtin.shell: |
         set -eu

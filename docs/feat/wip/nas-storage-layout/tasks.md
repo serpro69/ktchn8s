@@ -445,6 +445,9 @@ accepted migration.
   modes; the expected strict failure was rescued and checked. Molecule
   destroyed the guest and reported one successful scenario. The full
   controller log and revision are in the private evidence archive.
+- 2026-11-21, resumed from a clean `beaa913` on `feat/nas_layout`. The
+  operator authorized the assistant to run the managed parity scenario on
+  this controller with a disposable guest and synthetic scratch disks.
 
 ## Task 10: Final verification
 
