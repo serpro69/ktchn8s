@@ -17,7 +17,9 @@ NAS_PROVISION_CASE=parity molecule test -s provision 2>&1 | tee /tmp/nas-provisi
 
 Require a successful exit from each command. Retain the first converge recap,
 the idempotence recap with `changed=0`, and verify output for each case. The
-data case keeps DHCP. The parity case applies static guest networking and verifies
+data case checks that the merged Netplan configuration and any existing
+ifupdown interfaces file survive both applies, and that the primary interface
+still has a dynamic IPv4 address. The parity case applies static guest networking and verifies
 SSH after the restart. Both exercise UFW under Debian's default shell.
 
 Preparation creates GPT partitions on serial-identified virtual disks and
@@ -37,11 +39,29 @@ If a command is interrupted, run `molecule destroy -s provision` in the same
 environment before using the port for another scenario. Keep private live
 inventory and NAS devices outside this fixture.
 
+## Fedora package acceptance
+
+Run the Fedora check from `metal/roles/storage` inside the dev shell.
+
+```bash
+set -o pipefail
+molecule test -s fedora-packages 2>&1 | tee /tmp/nas-fedora-packages.log
+```
+
+Molecule downloads the checksum-pinned Fedora 42 x86_64 cloud image and boots
+a fresh headless KVM guest on loopback port 23102. It waits for SSH and
+cloud-init, runs the production package play twice on the same boot, checks
+the installed mergerfs RPM and SnapRAID executable, and destroys the guest.
+Retain the first recap, the idempotence recap with `changed=0`, and the
+versions from verify. The serial log is in the scenario's ephemeral directory
+under `vms/fedora-packages/serial.log`. After an interruption, use
+`molecule destroy -s fedora-packages` to clean up this scenario.
+
 ## Package checks on other guest releases
 
-The full-role cases above run on Debian 12 amd64. For package-only acceptance
-on another release, boot a fresh disposable Debian or Fedora guest matching a
-pinned mergerfs asset and give it working distribution repositories. Put only
+The full-role cases above run on Debian 12 amd64. To use the package play
+independently on another release, boot a fresh disposable Debian or Fedora
+guest matching a pinned mergerfs asset and give it working distribution repositories. Put only
 those guests in the `nas_package_guests` group of a synthetic SSH inventory.
 From `metal/`, run the following command twice, retaining the distribution,
 version, architecture and both install recaps:

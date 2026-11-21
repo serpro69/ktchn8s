@@ -1,0 +1,18 @@
+---
+- name: Record installed versions after the zero-change retry
+  hosts: nas_package_guests
+  gather_facts: false
+  tasks:
+    - name: Verify the installed Fedora RPM
+      ansible.builtin.command: rpm -q mergerfs
+      register: mergerfs_rpm
+      changed_when: false
+      failed_when: mergerfs_rpm.rc != 0 or mergerfs_rpm.stdout != 'mergerfs-2.41.1-1.fc42.x86_64'
+    - name: Verify the executable used by the SnapRAID services
+      ansible.builtin.command: /usr/local/bin/snapraid --version
+      register: snapraid_binary
+      changed_when: false
+      failed_when: snapraid_binary.rc != 0 or snapraid_binary.stdout.split()[:2] != ['snapraid', 'v13.0']
+    - name: Report the accepted package versions
+      ansible.builtin.debug:
+        msg: "{{ mergerfs_rpm.stdout }} / {{ snapraid_binary.stdout_lines | first }}"

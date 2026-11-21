@@ -1,0 +1,39 @@
+---
+prerun: false
+shared_state: false
+dependency:
+  name: galaxy
+  enabled: false
+driver:
+  name: default
+  safe_files:
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/ansible.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/*/*.log
+    - ${MOLECULE_EPHEMERAL_DIRECTORY}/vms/base.qcow2
+platforms:
+  - name: fedora-packages
+    groups: [nas_package_guests]
+provisioner:
+  name: ansible
+  log: true
+  inventory:
+    group_vars:
+      all:
+        fixture_image_url: https://dl.fedoraproject.org/pub/archive/fedora/linux/releases/42/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2
+        fixture_image_checksum: sha256:e401a4db2e5e04d1967b6729774faa96da629bcf3ba90b67d8d9cce9906bec0f
+      nas_package_guests:
+        ansible_python_interpreter: /usr/bin/python3
+ansible:
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..
+  cfg:
+    defaults:
+      host_key_checking: false
+  playbooks:
+    create: ../parity-lifecycle/create.yml
+    converge: ../provision/packages.yml
+    destroy: ../parity-lifecycle/destroy.yml
+verifier:
+  name: ansible
+scenario:
+  test_sequence: [destroy, create, prepare, converge, idempotence, verify, destroy]

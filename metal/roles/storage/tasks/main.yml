@@ -9,12 +9,8 @@
 - name: Admit the complete drive inventory before changing disks or services
   when: data_drives | length > 0
   block:
-    - name: Inspect storage partition identities, signatures and current backing mounts
-      ansible.builtin.script:
-        cmd: storage-disks.py {{ data_drives | to_json | quote }} {{ parity_drives | to_json | quote }}
-        executable: /usr/bin/python3
-      register: storage_disk_probe
-      changed_when: false
+    - name: Inspect the complete inventory before changing disks or services
+      ansible.builtin.import_tasks: probe_disks.yml
       check_mode: false
 
     - name: Retain verified branch and physical disk identities

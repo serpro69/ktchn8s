@@ -8,7 +8,7 @@
       ansible.builtin.command:
         argv:
           - python3
-          - "{{ molecule_scenario_directory }}/vms.py"
+          - "{{ playbook_dir }}/vms.py"
           - destroy
           - "{{ lookup('env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/vms"
           - "{{ lookup('env', 'MOLECULE_INSTANCE_CONFIG') }}"

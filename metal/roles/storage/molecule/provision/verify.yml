@@ -9,7 +9,7 @@
           - inventory_hostname == 'parity-server' and ansible_host == '127.0.0.1'
           - groups.nas == ['parity-server']
           - storage_case in ['data', 'parity']
-    - name: Require the requested static configuration or the original DHCP file
+    - name: Require the requested static configuration or the original DHCP configuration
       ansible.builtin.shell: |
         set -eu
         {% if storage_case == 'parity' %}
@@ -17,7 +17,16 @@
         test "{{ ansible_facts.default_ipv4.address }}" = 10.0.2.15
         test "{{ ansible_facts.default_ipv4.gateway }}" = 10.0.2.2
         {% else %}
-        sha256sum -c /root/base-network.sha256
+        current_netplan=$(netplan get)
+        test -n "$current_netplan"
+        test "$current_netplan" = "$(cat /root/base-netplan.yaml)"
+        if grep -qx absent /root/base-interfaces.sha256; then
+          test ! -e /etc/network/interfaces
+        else
+          sha256sum -c /root/base-interfaces.sha256
+        fi
+        dhcp_address=$(ip -4 -o address show dev {{ ansible_facts.default_ipv4.interface | quote }} scope global dynamic)
+        test -n "$dhcp_address"
         {% endif %}
       changed_when: false
     - name: Verify the independent sentinel bytes and backing partition identities

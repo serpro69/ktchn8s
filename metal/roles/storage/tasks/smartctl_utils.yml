@@ -1,10 +1,14 @@
 ---
 - name: Collect a SMART result for every selected whole disk
-  ansible.builtin.script:
-    cmd: smart-report.py {{ all_health_check_devices | map('quote') | join(' ') }}
-    executable: /usr/bin/python3
+  ansible.builtin.command:
+    argv: "{{ ['/usr/bin/python3', '-'] + all_health_check_devices }}"
+    stdin: "{{ lookup('ansible.builtin.file', role_path ~ '/files/smart-report.py') }}"
+    expand_argument_vars: false
   register: storage_smart_results
   changed_when: false
+  failed_when: >-
+    storage_smart_results.rc != 0 or
+    (storage_smart_results.stdout | from_json | map(attribute='device') | list) != all_health_check_devices
 
 - name: Retain successful, failing and unreadable SMART results
   ansible.builtin.set_fact:

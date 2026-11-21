@@ -1,0 +1,12 @@
+---
+- name: Read partition identities, signatures and backing mounts
+  ansible.builtin.command:
+    argv: "{{ ['/usr/bin/python3', '-', data_drives | to_json, parity_drives | to_json] + (storage_probe_flags | default([])) }}"
+    stdin: "{{ lookup('ansible.builtin.file', role_path ~ '/files/storage-disks.py') }}"
+    expand_argument_vars: false
+  register: storage_disk_probe
+  changed_when: false
+  # Validate on the producing task so a failure reports the probe's stdout and stderr.
+  failed_when: >-
+    storage_disk_probe.rc != 0 or
+    (storage_disk_probe.stdout | from_json | map(attribute='device') | list) != data_devices + parity_devices

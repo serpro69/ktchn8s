@@ -23,4 +23,4 @@
       ansible.builtin.command: mergerfs --version
       register: installed_mergerfs
       changed_when: false
-      failed_when: installed_mergerfs.rc != 0 or '2.41.1' not in installed_mergerfs.stdout.split()
+      failed_when: installed_mergerfs.rc != 0 or installed_mergerfs.stdout_lines[:1] != ['mergerfs v2.41.1']

@@ -292,20 +292,22 @@ accepted migration.
   partitions. Test a blank GPT partition, a retry, an ambiguous probe and
   duplicate or conflicting data/parity devices. The focused parity play already
   has several of these checks.
-- [ ] 14.2 **Package bootstrap (P1).** Supply a reproducible, verified SnapRAID
+- [x] 14.2 **Package bootstrap (P1).** Supply a reproducible, verified SnapRAID
   installer for each supported OS, or document how to produce and stage it.
   The production DEB/RPM inputs are ignored by Git. Even an NFS-only install
   reaches the OS setup tasks. Fix the Fedora mergerfs asset name against the
   pinned release and test the supported OS/version combinations. On Debian,
   refresh the package index before the first package task, verify the source of
   `b3sum`, and preserve any pre-existing `xz-utils` on install or retry.
+  The managed Fedora 42 x86_64 package case and Debian 12 amd64 data-only
+  case both passed installation and a zero-change retry.
 - [ ] 14.3 **Parity activation (P1).** The main role applies the timer flags
   immediately, and both default to true. Document and verify a reusable
   first-install/expansion path that keeps maintenance paused through the
   explicit full sync, unchanged-data checks and full scrub. Check for active
   manual processes and queued jobs before transition. A repeat apply to an
   accepted array must preserve its chosen maintenance policy and parity files.
-- [ ] 14.4 **Disk health (P1 when strict checks are enabled).** Include every
+- [x] 14.4 **Disk health (P1 when strict checks are enabled).** Include every
   requested physical disk in the health decision. `smartctl_utils.yml` drops
   nonzero exit statuses, including a failing SMART result. Test a reported
   failure and an unreadable device with `fail_on_unhealthy_drives: true`.
@@ -331,7 +333,8 @@ accepted migration.
   parity-enabled configurations. In each case, write a sentinel file and
   reapply the same inventory. Require zero changes on the second apply and
   verify the file contents, backing devices, active export and timer states.
-  Record both recaps and verification results before closing Task 14.
+  Record both recaps and verification results before closing Task 14. The
+  Debian data-only case passed. The parity-enabled case remains open.
 
 ### Execution context
 
@@ -366,6 +369,82 @@ accepted migration.
 - 2026-11-21, unresolved. The operator owns the two clean-checkout VM runs.
   This workspace has no `/dev/kvm`. Record both first and repeat recaps and
   the guest verification results here before closing the task.
+- 2026-11-21, operator verified KVM access and first-boot SSH on a disposable
+  Fedora 42 x86_64 guest. On a later boot the serial log recorded a failed
+  `sshd.service`; Ansible timed out before installing packages. Neither install
+  recap exists. The operator declined a manual retry. For the outstanding
+  Fedora evidence, the operator can use the
+  [fedora-packages Molecule scenario](../../../../metal/roles/storage/molecule/provision/README.md#fedora-package-acceptance),
+  which owns the guest lifecycle and performs both passes on one boot.
+- 2026-11-21, verified offline. The pinned Molecule resolved the scenario
+  playbooks. Ansible syntax, YAML lint and all 11 focused storage tests passed.
+  Mocked controller checks covered instance inventory, boot order and disk
+  cleanup for the Fedora and both Debian scenarios. Independent source review
+  found no code defect. The Fedora install and zero-change retry remain open.
+- 2026-11-21, first managed Fedora run. The guest booted, SSH and cloud-init
+  passed, the role installed mergerfs and verified SnapRAID 13.0 at the
+  service path. Converge failed when the package play expected a bare version
+  token and received `mergerfs v2.41.1`. Molecule destroyed the guest.
+  The corrected assertion passed an offline replay of the captured result
+  and rejected incorrect versions, empty output and nonzero exit status.
+  The operator's next managed run must reach the zero-change second apply
+  and final version checks to complete Fedora package acceptance.
+- 2026-11-21, Fedora 42 x86_64 package acceptance passed in the managed
+  scenario. First install reported 18 OK and 10 changed. The second apply
+  reported 11 OK and zero changes. Both had zero failed or unreachable
+  hosts. Verify confirmed `mergerfs-2.41.1-1.fc42.x86_64` and SnapRAID
+  13.0 at `/usr/local/bin/snapraid`. Molecule destroyed the guest. The
+  controller's private evidence archive retains the failed and passing logs.
+- 2026-11-21, first Debian data-only run at `dcc65f0e55f9`. Boot, SSH and
+  cloud-init succeeded. Preparation expected `/etc/network/interfaces`, which
+  the pinned image lacks, and stopped before disk partitioning or convergence.
+  Molecule destroyed the guest. The corrected fixture records the merged
+  Netplan configuration and the presence or checksum of the ifupdown file.
+  After both applies it compares those baselines and requires a dynamic IPv4
+  address. The shell checks passed offline for preserved and changed
+  configurations. The operator's data-only run remains open.
+- 2026-11-21, 14.5 follow-up before parity acceptance. The Debian image
+  starts systemd-networkd and lacks ifupdown. The opted-in production path
+  currently writes `/etc/network/interfaces` and restarts `networking`.
+  The assistant owns adapting the static configuration to the image's active
+  backend while preserving existing ifupdown installations. The parity case
+  must verify an applied static address and fresh SSH after the handler.
+- 2026-11-21, Debian data-only retry at `a8163105616e`. Preparation passed
+  and partitioned both scratch disks. The read-only disk probe returned success,
+  but its stdout could not be parsed as JSON. The log did not retain the raw
+  output. Convergence stopped before formatting and Molecule destroyed the VM.
+  Disk admission now captures stdout and stderr separately, checks the complete
+  ordered device list, and compares the second probe with the original before
+  formatting. The corrected tasks passed a local Ansible replay with separate
+  diagnostics and rejected invalid JSON, incomplete or reordered results, a
+  nonzero exit, and changed partition identity. The operator's full data-only
+  converge, zero-change retry and storage verification are still outstanding.
+- 2026-11-21, data-only run at `137d130a8364`. Disk admission passed.
+  Preparation had removed the APT lists directory, so the first package task
+  could not open its lock. Molecule destroyed the guest before package or
+  filesystem changes by the role. The fixture now removes only package indexes
+  and retains APT's lock directory, matching the pinned Debian image.
+  The operator authorized the assistant to run and troubleshoot this disposable
+  Debian data-only scenario on the KVM controller.
+- 2026-11-21, subsequent data-only runs identified two blockers. UFW could
+  not insert at position 1 in an empty ruleset. SSH allows now use UFW's
+  per-family prepend operation before default-deny. A preview detects
+  existing rules, and the applying task respects Ansible check mode. The
+  imported metal play also selected the homelab identity on reconnect.
+  The scenario now binds the SSH-specific host variable to the key Molecule
+  generated for its guest.
+- 2026-11-21, Debian 12 amd64 data-only acceptance passed on the controller
+  from clean candidate `e512ce1d0834`. First apply reported 70 OK and 28
+  changed. The repeat reported 59 OK and zero changed. Both had zero failed
+  or unreachable hosts. Verification confirmed the sentinel's contents,
+  both ext4 backing partitions, the mergerfs pool, the active NFS export,
+  preserved DHCP, active UFW and fresh SSH using the guest key. It also
+  checked the packaged checksum tool, retained `xz-utils`, drivetemp recovery
+  and data-only timer states. The SMART fixture retained all three reports
+  and identified the failing and unreadable disks in warning and strict
+  modes; the expected strict failure was rescued and checked. Molecule
+  destroyed the guest and reported one successful scenario. The full
+  controller log and revision are in the private evidence archive.
 
 ## Task 10: Final verification
 
