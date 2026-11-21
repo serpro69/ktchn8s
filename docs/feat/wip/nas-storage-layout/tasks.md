@@ -448,6 +448,13 @@ accepted migration.
 - 2026-11-21, resumed from a clean `beaa913` on `feat/nas_layout`. The
   operator authorized the assistant to run the managed parity scenario on
   this controller with a disposable guest and synthetic scratch disks.
+- 2026-11-21, parity run at `5ddbced`. First apply reported 113 OK and
+  50 changes. Repeat reported 98 OK and zero changes, both with zero failures
+  or unreachable hosts. Static Netplan, permanent IPv4, gateway, fresh SSH,
+  sentinel, mounts, export and first parity acceptance passed. Restoring
+  maintenance exposed a fixture error: the daily sync setting requires
+  `HH:MM`. Molecule destroyed the VM. The corrected scenario schedules sync
+  twelve hours ahead using the guest clock.
 
 ## Task 10: Final verification
 

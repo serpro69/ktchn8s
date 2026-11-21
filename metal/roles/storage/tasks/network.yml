@@ -43,6 +43,8 @@
 
 - name: Configure the Netplan definition that networkd uses for this interface
   when: ansible_os_family == 'Debian' and storage_ifupdown.rc != 0
+  vars:
+    storage_static_cidr: "{{ storage_network.address ~ '/' ~ storage_prefix.stdout }}"
   block:
     - name: Read the active networkd link configuration
       ansible.builtin.command:
@@ -60,13 +62,29 @@
       ansible.builtin.set_fact:
         storage_netplan_id: "{{ ((storage_networkd.stdout | from_json).NetworkFile | basename)[11:-8] }}"
 
-    - name: Read the effective Ethernet definitions
-      ansible.builtin.command: netplan get ethernets
+    - name: Preview the proposed overlay with the guest's other Netplan files
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          umask 077
+          preview=$(mktemp -d)
+          trap 'rm -rf "$preview"' EXIT
+          for dir in lib/netplan etc/netplan run/netplan; do
+            mkdir -p "$preview/$dir"
+            for src in /"$dir"/*.yaml; do
+              test -f "$src" || continue
+              test "$src" != /etc/netplan/99-ktchn8s-storage.yaml || continue
+              ln -s "$src" "$preview/$dir/"
+            done
+          done
+          cat > "$preview/etc/netplan/99-ktchn8s-storage.yaml"
+          netplan get --root-dir "$preview" ethernets
+        stdin: "{{ lookup('ansible.builtin.template', 'storage-netplan.yaml.j2') }}"
       register: storage_ethernets
       changed_when: false
       check_mode: false
 
-    - name: Require an Ethernet definition specific to the requested interface
+    - name: Require an interface-specific profile with the requested effective IPv4 settings
       vars:
         ethernet: "{{ (storage_ethernets.stdout | from_yaml)[storage_netplan_id] }}"
       ansible.builtin.assert:
@@ -75,7 +93,14 @@
             (ethernet.match is not defined and storage_netplan_id == storage_network.interface) or
             (ethernet.match.name | default('') == storage_network.interface) or
             (ethernet.match.macaddress | default('') | lower == ansible_facts[storage_network.interface].macaddress | lower)
-        fail_msg: Supply a dedicated Netplan Ethernet definition before managing this interface's static IPv4 settings.
+          - not (ethernet.dhcp4 | default(false))
+          - ethernet.addresses | reject('match', '^[0-9A-Fa-f]*:') | list == [storage_static_cidr]
+          - ethernet.gateway4 is not defined
+          - >-
+            ethernet.routes | selectattr('to', 'in', ['default', '0.0.0.0/0'])
+            | rejectattr('via', 'search', ':') | map(attribute='via') | list == [storage_network.gateway]
+          - ethernet.nameservers.addresses == storage_network.dns_nameservers
+        fail_msg: Check the interface match and conflicting static addresses, gateways or DNS entries in the existing Netplan files.
 
     - name: Set static IPv4 on the existing Netplan definition
       ansible.builtin.template:
@@ -84,6 +109,14 @@
         owner: root
         group: root
         mode: '0600'
+      notify: apply netplan
+
+    - name: Reapply a previously written profile if the interface still lacks its permanent address
+      ansible.builtin.command:
+        argv: [ip, -4, -o, address, show, dev, "{{ storage_network.interface }}", scope, global, permanent]
+      register: storage_permanent_addresses
+      changed_when: "('inet ' ~ storage_static_cidr ~ ' ') not in storage_permanent_addresses.stdout"
+      check_mode: false
       notify: apply netplan
 
 - name: Configure static networking on RedHat

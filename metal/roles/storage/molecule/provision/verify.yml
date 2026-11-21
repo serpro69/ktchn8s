@@ -106,12 +106,19 @@
         systemctl show snapraid-initial-sync.service -p ExecMainStartTimestampMonotonic --value > /root/accepted.start
       when: storage_case == 'parity'
 
+    - name: Choose a daily sync time well beyond the verification window
+      ansible.builtin.command:
+        argv: [date, '--date=12 hours', '+%H:%M']
+      register: fixture_sync_time
+      changed_when: false
+      when: storage_case == 'parity'
+
     - name: Set the accepted array maintenance policy
       ansible.builtin.set_fact:
         snapraid_maintenance: >-
           {{ (lookup('file', playbook_dir ~ '/../../defaults/main.yml') | from_yaml).snapraid_maintenance
              | combine({'sync_enabled': true, 'scrub_enabled': true, 'content_backup_enabled': false,
-                        'sync_time': '2099-01-01 02:00:00', 'scrub_schedule': '2099-01-01 03:00:00'}) }}
+                        'sync_time': fixture_sync_time.stdout, 'scrub_schedule': '2099-01-01 03:00:00'}) }}
       when: storage_case == 'parity'
 
 - ansible.builtin.import_playbook: ../../../../storage.yml

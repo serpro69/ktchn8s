@@ -4,7 +4,7 @@ network:
   ethernets:
     {{ storage_netplan_id | to_json }}:
       dhcp4: false
-      addresses: [{{ (storage_network.address ~ '/' ~ storage_prefix.stdout) | to_json }}]
+      addresses: [{{ storage_static_cidr | to_json }}]
       routes:
         - to: default
           via: {{ storage_network.gateway | to_json }}
