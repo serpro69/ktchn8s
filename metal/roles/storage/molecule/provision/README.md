@@ -30,7 +30,7 @@ formats and mounts the partitions and configures the export. The side-effect
 step writes a sentinel and tests module recovery before idempotence. Verify
 checks the sentinel, branch device numbers and filesystem roots, the pool,
 active export, package ownership and timers. In the parity case it also runs
-the explicit sync and full scrub, enables routine timers for a future date,
+the explicit sync and full scrub, enables routine timers scheduled beyond the test window,
 disables the backup timer and reapplies the public play. It checks that the
 original parity bytes and full-sync invocation survive, requires the backup unit
 to fail on a missing source, and exercises a one-to-two parity expansion.
