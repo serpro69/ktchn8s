@@ -275,7 +275,7 @@ commands; the assistant prepares and explains each step without executing it.
 
 ## Task 14: Storage provisioning on new and existing NAS hosts
 
-- **Status:** in-progress
+- **Status:** done
 - **Depends on:** Task 11, Task 12
 - **Docs:** [Task 14 implementation and acceptance criteria](./implementation.md#task-14-storage-provisioning), [provision from scratch](../../../guides/how_to_use_nfs_for_persistent_storage.md#provision-from-scratch)
 
@@ -301,8 +301,7 @@ accepted migration.
   `b3sum`, and preserve any pre-existing `xz-utils` on install or retry.
   The managed Fedora 42 x86_64 package case and Debian 12 amd64 data-only
   case both passed installation and a zero-change retry.
-- [ ] 14.3 **Parity activation (P1).** The main role applies the timer flags
-  immediately, and both default to true. Document and verify a reusable
+- [x] 14.3 **Parity activation (P1).** Document and verify a reusable
   first-install/expansion path that keeps maintenance paused through the
   explicit full sync, unchanged-data checks and full scrub. Check for active
   manual processes and queued jobs before transition. A repeat apply to an
@@ -311,22 +310,20 @@ accepted migration.
   requested physical disk in the health decision. `smartctl_utils.yml` drops
   nonzero exit statuses, including a failing SMART result. Test a reported
   failure and an unreadable device with `fail_on_unhealthy_drives: true`.
-- [ ] 14.5 **Network settings for another homelab (P1).** Make network
+- [x] 14.5 **Network settings for another homelab (P1).** Make network
   reconfiguration an explicit operator choice. Provide a sanitized NAS
   inventory example using the operator's own SOPS recipients, interfaces,
   gateway, client CIDRs and drive IDs. Remove the personal workstation address
   from reusable defaults. Verify SSH remains reachable after applying network
-  and firewall policy. The current check suppresses failure and probes the
-  gateway before the networking restart. Exercise firewall validation with the
-  target's default shell, including shells without `pipefail`.
-- [ ] 14.6 **Repeat apply and backups (P2).** Gate hardware detection on actual need
+  and firewall policy through a fresh authenticated connection to the NAS.
+  Exercise firewall validation with the target's default shell, including
+  shells without `pipefail`.
+- [x] 14.6 **Repeat apply and backups (P2).** Gate hardware detection on actual need
   and recover when the drivetemp file exists but the module is unloaded.
-  `sensors-detect --auto` runs and reports changed every time. Make the
-  content-backup timer start and stop according to policy, and make its service
-  report copy errors. All configured content files currently share one basename
-  and overwrite the same timestamped backup. Define and test which verified
-  copy or copies the backup retains.
-- [ ] 14.7 **Full-role acceptance.** After 14.1–14.6, run `metal/storage.yml`
+  Make the content-backup timer start and stop according to policy, and
+  make its service report copy errors. Define and test which verified
+  copies the backup retains.
+- [x] 14.7 **Full-role acceptance.** After 14.1–14.6, run `metal/storage.yml`
   from a clean checkout using the existing Molecule/QEMU tooling. Give the
   guest the documented base OS, pre-partitioned virtual scratch disks and a
   synthetic NAS inventory. Run fresh VM instances in turn for data-only and
@@ -334,7 +331,7 @@ accepted migration.
   reapply the same inventory. Require zero changes on the second apply and
   verify the file contents, backing devices, active export and timer states.
   Record both recaps and verification results before closing Task 14. The
-  Debian data-only case passed. The parity-enabled case remains open.
+  Debian data-only and parity-enabled cases both passed.
 
 ### Execution context
 
@@ -455,6 +452,25 @@ accepted migration.
   maintenance exposed a fixture error: the daily sync setting requires
   `HH:MM`. Molecule destroyed the VM. The corrected scenario schedules sync
   twelve hours ahead using the guest clock.
+- 2026-11-21, Debian 12 amd64 parity acceptance passed from clean candidate
+  `af1d0dd`. The first apply reported 114 OK and 51 changed. The repeat
+  reported 99 OK and zero changed. Both had zero failures or unreachable
+  hosts. Verification confirmed the switch from DHCP to static IPv4 on the
+  same address, the default gateway, DNS configuration, active UFW and fresh
+  SSH. The sentinel, ext4 branches, mergerfs pool and active NFS export passed.
+  Sync and scrub timers stayed idle through initial acceptance. Full sync,
+  clean diffs and full scrub passed for both one and two parity disks.
+  Restoring maintenance preserved the existing parity bytes and full-sync
+  invocation. The backup timer stopped and started as requested, and its
+  service reported a missing content source. Verify reported 275 OK and zero
+  failed, with one expected rescue in the strict SMART fixture. Molecule
+  destroyed the guest and reported one successful scenario. Checksummed logs
+  for both parity runs are in the private evidence archive.
+- 2026-11-21, offline checks covered active ifupdown template and handler
+  selection, the proposed Netplan overlay on DHCP and repeat inputs, and
+  rejection of conflicting addresses, gateways and shared matches before
+  writing. Independent source review found no remaining code defect after the
+  Netplan merge check and fixture timer correction.
 
 ## Task 10: Final verification
 

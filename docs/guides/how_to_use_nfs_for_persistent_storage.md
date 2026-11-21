@@ -81,6 +81,13 @@ nas:
         dns_nameservers: [192.0.2.53]
 ```
 
+With `configure_network: true`, Debian uses ifupdown on an interface it
+already manages, or the active Netplan Ethernet definition on a networkd
+host. The Netplan definition must identify this interface individually.
+The role checks the merged address, default route and DNS settings before
+installing its overlay. After applying networking and firewall policy, it
+opens a fresh SSH connection using the inventory address and key.
+
 For the project's inventory wrapper, configure `.sops.yaml` in your checkout
 with your own age public recipient and give the controller access to the
 corresponding private identity. Create/edit the encrypted
