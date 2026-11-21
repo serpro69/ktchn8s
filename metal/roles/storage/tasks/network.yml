@@ -9,7 +9,16 @@
       - storage_network.dns_nameservers | length > 0
     fail_msg: Supply the NAS interface, address, netmask, gateway and DNS servers before managing networking.
 
-- name: Configure static networking on Debian
+- name: Check whether ifupdown owns the Debian interface
+  ansible.builtin.command:
+    argv: [ifquery, --state, "{{ storage_network.interface }}"]
+  register: storage_ifupdown
+  changed_when: false
+  failed_when: false  # Netplan-only images have no ifquery.
+  check_mode: false
+  when: ansible_os_family == 'Debian'
+
+- name: Configure static networking with ifupdown
   template:
     src: interfaces.j2
     dest: /etc/network/interfaces
@@ -17,10 +26,10 @@
     group: root
     mode: "0644"
     backup: true
-  when: ansible_os_family == 'Debian'
+  when: ansible_os_family == 'Debian' and storage_ifupdown.rc == 0
   notify: restart networking debian
 
-- name: Resolve the IPv4 prefix for NetworkManager
+- name: Resolve the IPv4 prefix for Netplan or NetworkManager
   ansible.builtin.command:
     argv:
       - /usr/bin/python3
@@ -29,7 +38,53 @@
       - "{{ storage_network.netmask }}"
   changed_when: false
   register: storage_prefix
-  when: ansible_os_family == 'RedHat'
+  check_mode: false
+  when: ansible_os_family == 'RedHat' or (ansible_os_family == 'Debian' and storage_ifupdown.rc != 0)
+
+- name: Configure the Netplan definition that networkd uses for this interface
+  when: ansible_os_family == 'Debian' and storage_ifupdown.rc != 0
+  block:
+    - name: Read the active networkd link configuration
+      ansible.builtin.command:
+        argv: [networkctl, --json=short, status, "{{ storage_network.interface }}"]
+      register: storage_networkd
+      changed_when: false
+      check_mode: false
+
+    - name: Require a Netplan-managed link before writing static configuration
+      ansible.builtin.assert:
+        that: (storage_networkd.stdout | from_json).NetworkFile | default('') is match('^/run/systemd/network/10-netplan-.+\.network$')
+        fail_msg: The requested Debian interface must be managed by ifupdown or Netplan with networkd.
+
+    - name: Identify the active Netplan definition
+      ansible.builtin.set_fact:
+        storage_netplan_id: "{{ ((storage_networkd.stdout | from_json).NetworkFile | basename)[11:-8] }}"
+
+    - name: Read the effective Ethernet definitions
+      ansible.builtin.command: netplan get ethernets
+      register: storage_ethernets
+      changed_when: false
+      check_mode: false
+
+    - name: Require an Ethernet definition specific to the requested interface
+      vars:
+        ethernet: "{{ (storage_ethernets.stdout | from_yaml)[storage_netplan_id] }}"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ethernet.match is not defined and storage_netplan_id == storage_network.interface) or
+            (ethernet.match.name | default('') == storage_network.interface) or
+            (ethernet.match.macaddress | default('') | lower == ansible_facts[storage_network.interface].macaddress | lower)
+        fail_msg: Supply a dedicated Netplan Ethernet definition before managing this interface's static IPv4 settings.
+
+    - name: Set static IPv4 on the existing Netplan definition
+      ansible.builtin.template:
+        src: storage-netplan.yaml.j2
+        dest: /etc/netplan/99-ktchn8s-storage.yaml
+        owner: root
+        group: root
+        mode: '0600'
+      notify: apply netplan
 
 - name: Configure static networking on RedHat
   template:

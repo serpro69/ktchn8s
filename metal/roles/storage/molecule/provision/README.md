@@ -19,8 +19,10 @@ Require a successful exit from each command. Retain the first converge recap,
 the idempotence recap with `changed=0`, and verify output for each case. The
 data case checks that the merged Netplan configuration and any existing
 ifupdown interfaces file survive both applies, and that the primary interface
-still has a dynamic IPv4 address. The parity case applies static guest networking and verifies
-SSH after the restart. Both exercise UFW under Debian's default shell.
+still has a dynamic IPv4 address. The parity case starts with the same DHCP
+lease, applies static networking and reconnects over SSH after Netplan and UFW
+take effect. It checks the active interface's merged Netplan settings, permanent
+IPv4 address and default gateway. Both cases exercise UFW under Debian's default shell.
 
 Preparation creates GPT partitions on serial-identified virtual disks and
 clears the image's APT indexes. The public play installs all NAS packages,

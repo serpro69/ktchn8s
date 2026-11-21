@@ -30,6 +30,9 @@
     state: restarted
   listen: restart networking debian
 
+- name: apply netplan
+  ansible.builtin.command: netplan apply
+
 - name: Load managed NetworkManager profile
   ansible.builtin.command: nmcli connection load /etc/NetworkManager/system-connections/storage.nmconnection
   listen: restart networking redhat

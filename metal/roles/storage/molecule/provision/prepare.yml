@@ -14,6 +14,14 @@
           - ansible_facts.distribution_release == 'bookworm'
           - storage_case in ['data', 'parity']
 
+    - name: Require a DHCP address on the interface that parity provisioning will convert
+      ansible.builtin.command:
+        argv: [ip, -4, -o, address, show, dev, "{{ storage_network.interface }}", scope, global, dynamic]
+      register: fixture_initial_dhcp
+      changed_when: false
+      failed_when: fixture_initial_dhcp.rc != 0 or 'inet 10.0.2.15/24 ' not in fixture_initial_dhcp.stdout
+      when: storage_case == 'parity'
+
     - name: Record the data-only guest's network configuration before convergence
       ansible.builtin.shell: |
         set -eu
