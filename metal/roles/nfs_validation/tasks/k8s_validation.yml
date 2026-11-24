@@ -1,0 +1,49 @@
+---
+# Callers run k8s_prerequisites.yml before creating the shared NAS fixture.
+- name: Create a controller workspace for this probe
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: nfs-readiness-
+  register: nfs_readiness_k8s_workspace
+
+- name: Test two Kubernetes clients as UID 1000
+  vars:
+    nfs_readiness_namespace: "{{ nfs_readiness_k8s_workspace.path | basename | lower | replace('_', '-') }}"
+  block:
+    - name: Require confirmed teardown once Kubernetes provisioning begins
+      ansible.builtin.set_fact:
+        nfs_readiness_k8s_clean: false
+
+    - name: Create a fresh test namespace
+      ansible.builtin.command:
+        argv: [kubectl, create, namespace, "{{ nfs_readiness_namespace }}"]
+      register: nfs_readiness_namespace_created
+      changed_when: true
+
+    - name: Execute and require successful writer and reader pods
+      ansible.builtin.include_tasks: k8s_readiness_pod.yml
+      loop:
+        - name: writer
+          actions: [create, promote, read, readonly]
+          node: "{{ (nfs_readiness_client_nodes | default(['', '']))[0] }}"
+        - name: reader
+          actions: [read, readonly, delete]
+          node: "{{ (nfs_readiness_client_nodes | default(['', '']))[1] }}"
+      loop_control:
+        loop_var: nfs_readiness_pod
+  always:
+    - name: Remove this run's Kubernetes clients before deleting server fixtures
+      ansible.builtin.command:
+        argv: [kubectl, delete, namespace, "{{ nfs_readiness_namespace }}", '--wait=true', '--timeout=120s']
+      when: nfs_readiness_namespace_created is defined and nfs_readiness_namespace_created is succeeded
+      changed_when: true
+
+    - name: Record successful Kubernetes client teardown
+      ansible.builtin.set_fact:
+        nfs_readiness_k8s_clean: true
+      when: nfs_readiness_namespace_created is defined and nfs_readiness_namespace_created is succeeded
+
+    - name: Remove the controller workspace
+      ansible.builtin.file:
+        path: "{{ nfs_readiness_k8s_workspace.path }}"
+        state: absent

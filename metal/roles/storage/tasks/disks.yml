@@ -1,83 +1,38 @@
 ---
-- name: Verify disk devices exist
-  stat:
-    path: "{{ item }}"
-  loop: "{{ data_devices + parity_devices }}"
-  register: disk_check
-  failed_when: not disk_check.stat.exists
+- name: Recheck the complete admission result immediately before formatting or mounting
+  ansible.builtin.import_tasks: probe_disks.yml
+  check_mode: false
 
-- name: Display discovered drives
-  debug:
-    msg:
-      - "Data drives: {{ data_devices }}"
-      - "Parity drives: {{ parity_devices }}"
+- name: Require the same admitted disks and signatures before mutation
+  ansible.builtin.assert:
+    that: (storage_disk_probe.stdout | from_json) == storage_branches
+    fail_msg: Storage admission changed after the initial probe. Check the inventory and mounts before retrying.
 
-- name: Check for existing filesystems on data partitions
-  command: "blkid {{ item }}"
-  loop: "{{ data_devices }}"
-  register: data_filesystem_check
-  changed_when: false
-  failed_when: false
-
-- name: Check for existing filesystems on parity partitions
-  command: "blkid {{ item }}"
-  loop: "{{ parity_devices }}"
-  register: parity_filesystem_check
-  changed_when: false
-  failed_when: false
-  when: parity_devices | length > 0
-
-- name: Format data drives with ext4
-  filesystem:
+- name: Format only admitted and explicitly authorized blank partitions
+  community.general.filesystem:
     fstype: ext4
-    dev: "{{ item }}"
-    opts: -L "data{{ ansible_loop.index }}"
+    dev: "{{ item.device }}"
+    opts: "-L {{ item.mount | basename }}"
     force: false
-  loop: "{{ data_devices }}"
+  loop: "{{ storage_branches | selectattr('state', 'equalto', 'blank') }}"
   loop_control:
-    extended: true
-  # Format only if: no filesystem detected
-  when:
-    - data_filesystem_check.results[ansible_loop.index0].rc != 0
-  register: data_format_result
+    label: "{{ item.device }}"
 
-- name: Format parity drives with ext4
-  filesystem:
-    fstype: ext4
-    dev: "{{ item }}"
-    opts: -L "parity{{ ansible_loop.index }}"
-    force: false
-  loop: "{{ parity_devices }}"
-  loop_control:
-    extended: true
-  # Format only if: no filesystem detected
-  when:
-    - parity_filesystem_check.results[ansible_loop.index0].rc != 0
-  register: parity_format_result
-
-- name: Mount data drives
+- name: Persist and mount the admitted filesystems
   ansible.posix.mount:
-    path: "{{ item.1 }}"
-    src: "{{ item.0 }}"
+    path: "{{ item.mount }}"
+    src: "{{ item.device }}"
     fstype: ext4
     opts: defaults,noatime
     passno: "2"
     state: mounted
     backup: true
-  loop: "{{ data_devices | zip(disk_directories) | list }}"
+  loop: "{{ storage_branches }}"
   loop_control:
-    label: "{{ item.0 }} -> {{ item.1 }}"
+    label: "{{ item.device }} -> {{ item.mount }}"
 
-- name: Mount parity drives
-  mount:
-    path: "{{ item.1 }}"
-    src: "{{ item.0 }}"
-    fstype: ext4
-    opts: defaults,noatime
-    passno: "2"
-    state: mounted
-    backup: true
-  loop: "{{ parity_devices | zip(parity_directories) | list }}"
-  loop_control:
-    label: "{{ item.0 }} -> {{ item.1 }}"
-  when: parity_devices | length > 0
+- name: Require every inventory partition at its intended mount before creating the pool
+  ansible.builtin.import_tasks: probe_disks.yml
+  vars:
+    storage_probe_flags: ['--mounted']
+  when: not ansible_check_mode

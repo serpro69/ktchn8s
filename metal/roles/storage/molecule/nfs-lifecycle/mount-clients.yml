@@ -1,0 +1,19 @@
+---
+- name: Mount only the fixture subtree in the two disposable clients
+  hosts: nfs_clients
+  gather_facts: false
+  tasks:
+    - name: Mount the writable fixture
+      ansible.posix.mount:
+        path: /mnt/readiness
+        src: 10.0.2.2:/mnt/storage/99_tmp/nfs-readiness
+        fstype: nfs4
+        opts: rw,vers=4.2,port=23049,soft,timeo=50,retrans=2
+        state: mounted
+    - name: Mount the read-only fixture
+      ansible.posix.mount:
+        path: /mnt/readiness-ro
+        src: 10.0.2.2:/mnt/storage/99_tmp/nfs-readiness
+        fstype: nfs4
+        opts: ro,vers=4.2,port=23049,soft,timeo=50,retrans=2
+        state: mounted

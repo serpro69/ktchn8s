@@ -9,6 +9,12 @@ copyright: Copyright &copy; 2025 - present, serpro69
 
 repo_url: https://github.com/serpro69/ktchn8s
 
+# Private migration reviews live outside docs/. Exclude the old locations too,
+# so a locally regenerated ignored report cannot enter a published site.
+exclude_docs: |
+  **/nas-storage-layout/reviews/
+  **/nas-storage-layout/*review*.md
+
 plugins:
   - search:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'

@@ -1,0 +1,65 @@
+---
+- name: Prepare only blank disposable GPT partitions on the base OS
+  hosts: nas
+  gather_facts: false
+  tasks:
+    - ansible.builtin.wait_for_connection:
+        timeout: 300
+    - ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+    - ansible.builtin.setup:
+    - ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'parity-server' and ansible_host == '127.0.0.1'
+          - ansible_facts.distribution_release == 'bookworm'
+          - storage_case in ['data', 'parity']
+
+    - name: Require a DHCP address on the interface that parity provisioning will convert
+      ansible.builtin.command:
+        argv: [ip, -4, -o, address, show, dev, "{{ storage_network.interface }}", scope, global, dynamic]
+      register: fixture_initial_dhcp
+      changed_when: false
+      failed_when: fixture_initial_dhcp.rc != 0 or 'inet 10.0.2.15/24 ' not in fixture_initial_dhcp.stdout
+      when: storage_case == 'parity'
+
+    - name: Record the data-only guest's network configuration before convergence
+      ansible.builtin.shell: |
+        set -eu
+        netplan get > /root/base-netplan.yaml
+        test -s /root/base-netplan.yaml
+        if test -e /etc/network/interfaces; then
+          sha256sum /etc/network/interfaces
+        else
+          echo absent
+        fi > /root/base-interfaces.sha256
+      when: storage_case == 'data'
+      changed_when: true
+
+    - name: Partition only blank VM scratch disks by serial
+      ansible.builtin.shell: |
+        set -eu
+        test "$(lsblk -dnro SERIAL "$disk")" = "$serial"
+        test "$(lsblk -nr -o TYPE "$disk")" = disk
+        printf 'label: gpt\n, , L\n' | sfdisk "$disk"
+        udevadm settle
+        test -b "$disk-part1"
+      environment:
+        serial: "fixture-{{ item }}"
+        disk: "/dev/disk/by-id/virtio-fixture-{{ item }}"
+      loop: "{{ ['data1', 'data2', 'parity1', 'parity2'] if storage_case == 'parity' else ['data1', 'data2'] }}"
+      changed_when: true
+
+    - name: Find cached APT package indexes in the disposable image
+      ansible.builtin.find:
+        paths: /var/lib/apt/lists
+        patterns: '*_Packages*'
+        file_type: file
+      register: fixture_apt_indexes
+
+    - name: Clear package indexes while preserving APT's lock directory
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ fixture_apt_indexes.files }}"
+      loop_control:
+        label: "{{ item.path }}"

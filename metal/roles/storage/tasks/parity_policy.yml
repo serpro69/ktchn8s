@@ -1,0 +1,57 @@
+---
+- name: Determine whether this array needs explicit parity acceptance
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - '-'
+      - "{{ storage_branches | to_json }}"
+      - "{{ lookup('template', 'snapraid.conf.j2') }}"
+      - "{{ [snapraid_maintenance.sync_enabled, snapraid_maintenance.scrub_enabled] | to_json }}"
+      - "{{ storage_adopt_accepted_parity | bool | to_json }}"
+    stdin: "{{ lookup('ansible.builtin.file', role_path ~ '/files/parity-policy.py') }}"
+    expand_argument_vars: false
+  register: storage_parity_policy
+  changed_when: false
+  check_mode: false
+  failed_when: storage_parity_policy.rc != 0 or storage_parity_policy.stdout not in ['pending', 'accepted', 'adopt', 'legacy']
+
+- name: Keep automatic jobs disabled throughout a transition
+  ansible.builtin.assert:
+    that:
+      - snapraid_maintenance.sync_enabled is false
+      - snapraid_maintenance.scrub_enabled is false
+    fail_msg: Pause both maintenance flags and complete the parity acceptance procedure in the NFS guide.
+  when: storage_parity_policy.stdout | trim == 'pending'
+
+- name: Require idle timers, services, manual processes and job queue
+  ansible.builtin.script: parity-preflight.sh --idle
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: storage_parity_policy.stdout | trim == 'pending'
+
+- name: Record branch identities before storage changes
+  ansible.builtin.copy:
+    dest: "/var/lib/snapraid-layout.{{ 'accepted' if storage_parity_policy.stdout | trim == 'adopt' else 'pending' }}"
+    content: "{{ storage_layout_record | to_json }}\n"
+    mode: '0600'
+  vars:
+    storage_layout_record:
+      branches: "{{ storage_branches | map(attribute='device') | zip(storage_branches | map(attribute='partition_id'), storage_branches | map(attribute='mount')) | list }}"
+      config_sha256: "{{ lookup('template', 'snapraid.conf.j2') | hash('sha256') }}"
+  when: storage_parity_policy.stdout | trim in ['pending', 'adopt']
+
+- name: Prepare the directory for acceptance checks
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    mode: '0755'
+
+- name: Install the explicit parity acceptance command and idle check
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0755'
+  loop:
+    - {src: accept-parity.sh, dest: /usr/local/sbin/storage-accept-parity}
+    - {src: parity-preflight.sh, dest: /usr/local/libexec/storage-parity-idle}

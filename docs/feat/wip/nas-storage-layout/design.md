@@ -1,7 +1,7 @@
 # NAS Storage Directory Layout — Design
 
-> Status: designed (2026-08-22; revised 2026-10-03 after the [follow-up corrections](./design-review-2026-10-03-follow-up.md#resolution)) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
-> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Implementation and live acceptance remain pending.
+> Status: designed (operational decisions and acceptance evidence are maintained privately) · Implementation: [implementation.md](./implementation.md) · Tasks: [tasks.md](./tasks.md)
+> Key decisions recorded as ADRs [AD-0003 … AD-0007](../../../reference/architecture/decision_records.md) — the ADRs are the durable record; this doc carries the full working detail. Storage/tooling acceptance is complete; migration and application release remain pending. See the task record for current evidence.
 
 ## Problem statement
 
@@ -23,8 +23,9 @@ NFS-mounted PVs, and navigation from memory depend on stable names)?
 
 ### Success criteria
 
-1. **Migration completes and drives are freed** — every source entry has a verified
-   destination or explicit discard decision, `99_tmp` is empty, and source drives pass
+1. **Migration completes and drives are freed** — every entry selected for migration
+   has a verified destination or explicit disposition, completed source comparisons
+   account for sources not copied, `99_tmp` is empty, and source drives pass
    the per-file redundancy and full parity-verification gates before release.
 2. **Zero renames, ever** — no numbered directory is ever renamed after creation;
    extension happens by adding numbers, never reshuffling.
@@ -40,15 +41,18 @@ NFS-mounted PVs, and navigation from memory depend on stable names)?
 ├── 00_meta/          # README (the legend), RETIRED.md, migration manifests & logs
 ├── 10_documents/
 │   ├── inbox/        #   machine-consumed drop dir (scanner / future paperless consume)
-│   ├── 10.01_personal/   # ids, certificates, residence, education/diplomas
-│   ├── 10.02_family/     # baby, household
+│   ├── 10.01_personal/   # ids, residence, personal records
+│   ├── 10.02_family/     # family and household records
 │   ├── 10.03_finance/    # tax, banking, purchases & receipts
 │   ├── 10.04_work/       # contracts, per-employer subdirs
-│   └── 10.05_health/
+│   ├── 10.05_health/
+│   ├── 10.06_education/  # diplomas, certificates and comparable records
+│   └── 10.99_unsorted/   # retained documents awaiting identification
 ├── 20_photos/
-│   ├── 20.01_library/    # preserved archive, YYYY/ inside — Immich external lib, :ro
+│   ├── 20.01_library/    # preserved archive, existing albums retained — Immich external lib, :ro
 │   ├── 20.02_camera/     # triage tier: device dumps — Immich external lib, RW
-│   └── 20.03_home_video/
+│   ├── 20.03_home_video/
+│   └── 20.04_images/     # general images
 ├── 30_media/         # ONE NFS PV for the whole media stack
 │   ├── 30.01_movies/     # preserved, human-curated ┐ *arrs have no root folder here;
 │   ├── 30.02_tv/         #                          │ automation can never delete these
@@ -61,7 +65,8 @@ NFS-mounted PVs, and navigation from memory depend on stable names)?
 ├── 40_library/
 │   ├── 40.01_books/      # by genre/language (Calibre/Kavita-compatible)
 │   ├── 40.02_courses/    # video courses, trainings, language materials
-│   └── 40.03_reference/  # manuals, standalone guides, journals
+│   ├── 40.03_reference/  # manuals, standalone guides, journals
+│   └── 40.99_unsorted/   # retained library items awaiting identification
 ├── 50_topics/        # working-set collections only (see decision rule below)
 │   ├── 50.01_dnd/
 │   └── 50.02_airsoft/
@@ -76,6 +81,19 @@ NFS-mounted PVs, and navigation from memory depend on stable names)?
 ├── 90_inbox/         # the human's inbox: unsorted incoming (parity-protected)
 └── 99_tmp/           # staging/scratch — parity-excluded, restic-excluded
 ```
+
+**Approved layout additions:** `10_documents/10.06_education` holds credentials
+and comparable education records; learning materials stay in Library.
+`10_documents/10.99_unsorted` and `40_library/40.99_unsorted` retain genuinely
+unidentified material without automatic cleanup. `20_photos/20.04_images`
+holds general images separately from the photo archive. Implement the approved
+additions through the storage-role declaration and generated legend before
+creating them. Source-specific approvals and current execution state belong in
+the private migration review, not in this public design.
+
+Preserve existing photo album/event/device organization and keep companion clips
+with their albums. Separately identified standalone home-video collections use
+`20_photos/20.03_home_video`.
 
 ## Grammar rules (the invariants)
 
@@ -105,6 +123,15 @@ NFS-mounted PVs, and navigation from memory depend on stable names)?
    (including its nested `downloads/`), `20.02_camera` (numbered/parity exception — see
    rule 2), Immich uploads (Ceph). Human promotion is manual: `mv` within a NAS share,
    or a verified copy before deleting a Ceph source (see [the flows below](#two-tier-media-photos)).
+
+### Shared subject names
+
+Use the same lowercase `snake_case` category name wherever the same subject
+occurs across books, courses, reference material and audiobooks. Preserve
+meaningful distinctions and original author/title/album names. This does not
+require identical hierarchy depths or empty categories for symmetry. Existing
+numbered paths remain immutable. Exact source-derived naming rules and their
+approvals belong to the private destination map.
 
 ### The `50_topics` decision rule (working-set test)
 
@@ -277,7 +304,7 @@ that the replacement starts with the retained config PVC and new media mounts.
   [per-tier policy](./implementation.md#migrated-content-access) governs these checks;
   successful scratch-file writes alone do not establish migrated-library access.
 - **Blast radius per subtree:** no pod mounts the NAS root; the torrent-exposed subtree is
-  exactly `30_media`. Documents/photos are unreachable from the media stack.
+  exactly `30_media`. Documents and photos are unreachable from the media stack.
 - Pre-existing `hostPath: /dev/dri` and PSA posture of the Jellyfin chart are tracked in
   `docs/info/todo.md` — unchanged by this feature.
 
@@ -292,7 +319,7 @@ that the replacement starts with the retained config PVC and new media mounts.
    operation as well as recovery after a controlled restart. Owner: the operator.
 2. **Disk loss during the migration window (no parity yet).** Impact: loss of the NAS
    copy only once every retained file has a verified independent surviving copy.
-   Unique B/C deltas must be copied to a surviving device before their source is wiped;
+   Unique retained C additions must be copied to a surviving device before C is wiped;
    simply retaining A does not establish this. Stop the release sequence on failure,
    re-copy from that recorded device, and re-verify before continuing.
    Detection: SMART/dmesg. Owner: the operator, during the runbook.
@@ -311,6 +338,40 @@ that the replacement starts with the retained config PVC and new media mounts.
 
 ## Migration plan
 
+**Permission-check correction, 2026-11-17:** Task 7.2 lists/traverses declared
+served directories and opens each served file with at most a one-byte read as
+UID/GID 1000 over read-only NFS. It does not hash or read complete media files.
+Task 7.3 performs the complete content verification. The original full-read
+access job was stopped and is not accepted. The helper's bounded-read change
+passed the operator-run workstation and NAS suites. The live access run is
+accepted with one specific owner-approved thumbnail-entry access exception;
+that retained entry remains in full content/metadata verification.
+
+**Parity sequencing — owner decision, 2026-11-19:** Keep A offline and intact
+after normal NAS shutdown, finalize C, and establish independent recovery for
+both B and C before their release. Build and scrub both parity levels together.
+This supersedes the staged B-only bootstrap and C expansion below. Task 7's
+completed A-only acceptance remains the baseline for verifying C additions.
+
+**A-only acceptance scope — owner decision, 2026-11-17:** C was deferred in its entirety.
+Proceed through Task 7.2's actual-media access audit, Task 7.3's complete A
+destination reconciliation and Task 7.4's parity-inclusion, evidence and freeze
+work using A alone. Assume no C contribution for this acceptance scope; this
+does not establish that C has no unique retained content. This supersedes the
+earlier requirement below to wait for C before Task 7 acceptance.
+
+When C is explicitly resumed, inventory it fully and compare with retained A
+coverage and final mappings. Copy additional keepers to approved destinations,
+then verify every addition's full content and expected metadata/links. Include
+existing entries affected by directory merges, hardlinks or access repairs;
+unchanged A payloads do not require another full hash pass. Preserve the accepted
+A baseline and record the exact affected scope. This is complete checking of a
+selected scope, not sampling. The assistant must prepare and verify scoped
+audit-input selection before later C acceptance; the current helper has no
+incremental mode. Later additions change the accepted dataset and must be
+reconciled before parity work proceeds on that changed state. Source originals
+and per-drive release gates remain required; C's own accounting remains deferred.
+
 Ordering rule: **before each wipe, prove recoverability for every retained file on that
 device.** Before verified parity exists this requires a checksummed copy on another
 independent device in addition to the NAS copy. A second path on the same disk is not
@@ -322,28 +383,95 @@ unmounts that audit client before the freeze; real application playback follows 
 Task 5. Original source entries stay unchanged, while separately tracked safety-copy
 areas may receive new files.
 
+**Verification timing — accepted 2026-11-11:** Copy and sort provisionally, then
+perform the comprehensive source-to-final checksum reconciliation. Omit the full
+intermediate staging inventory/hash and separate delta readback; rsync completion
+and metadata-only checks establish copy progress, not accepted destination bytes.
+Keep all originals intact until final reconciliation and the later release gates.
+This saves a staging-sized NAS read at the cost of finding content problems later;
+the ledger must make repair from the unchanged originals possible. Source inventories
+still establish the expected bytes. The separate served-media access audit reads
+media, and parity sync/scrubs and failure retries still require their own I/O.
+The owner also approved starting A's copy with C disconnected on 2026-11-11;
+C still needs its complete inventory and reconciliation before its source release.
+The 2026-11-17 scope decision permits A-only Task 7 acceptance first.
+
+**C after A sorting — accepted 2026-11-13:** Sort A's staged content first,
+recording its source identities and destinations/dispositions. The saved inventories
+remain valid evidence of the unchanged originals. Then inspect/inventory C and
+compare its contents with retained A coverage and the current mappings. A match
+only to historical content omitted from the migrated collection is not retained coverage;
+settle C's own disposition. Copy additional C keepers directly to their chosen
+final homes, with collision checks and copy/metadata receipts. Account for C's
+paths, directories, symlinks and special entries as well as unique regular-file
+bytes. The original requirement to wait for C before Task 7 acceptance is
+superseded by the 2026-11-17 A-only decision above. No intermediate staging rehash
+is introduced; C's later accounting and scoped verification still precede its
+own release gate.
+
+**B excluded from active migration — owner correction, 2026-11-13:** A/B
+comparison is finished, A was copied, and no B additions were retained. B is
+not an active destination-audit source. Keep its original inventory, comparison,
+omission decisions and receipts as historical/restoration evidence and for its
+later physical-drive release gate; do not generate B alias-ledger rows, compare
+the destination to B metadata or manufacture B-to-A transformations. The active
+destination ledger uses A, with C-keeper audit inputs prepared only after C's
+later inspection/comparison. Metadata acceptance follows the copied source plus
+deliberate recorded changes. This supersedes earlier blanket A/B/C audit and
+per-source alias requirements without weakening checks on the actual NAS copy.
+
+**Preserve content while sorting — clarified 2026-11-13:** Organize all source
+content; cleanup is not a migration goal. Only explicitly approved source omissions are excluded. Preserve other hidden files, temporary
+collections and older backup material unless the owner makes a further explicit
+decision. An unclear destination is a mapping question, not a reason to discard.
+Complete and review the destination map for all of A's staged content before
+preparing the first move batch. Decide each mixed collection's splits and final
+homes in that map; do not move it to a broad category for another sorting pass.
+Execute the completed map in manageable batches. C's later contributions retain
+their separate comparison and direct-to-final placement stage.
+
+**Directory wrappers — owner decision, 2026-11-13:** Record original directory
+identities and metadata in inventories and the ledger, and merge obsolete
+organizing wrappers into final containers. Do not create empty archival folders
+only to preserve their old timestamps. Shared final directories need compatible
+expected metadata and explicit transformations; keep existing layout-parent
+ownership/modes and intact backup restoration metadata. This does not authorize
+payload omission or another broad timestamp-repair pass. See the
+private review at `.nas-audit-evidence/reviews/destination-map-review.md` for
+source-specific paths, coverage evidence and execution prerequisites.
+
 1. **Skeleton via IaC** — the tree is created by the storage role (replacing the current
    `storage_dirs` list); `00_meta/README.md` is templated from the same variable, so code
    and legend cannot drift. → verify: layout tasks alone are idempotent, dirs present.
-2. **Source inventory and copy** — freeze the original A/B/C entries; use Task 13's
-   helper to inventory all entries and hash regular files on each source, including A.
-   Copy A into `99_tmp/driveA/`, hash the NAS copy locally, and compare. Every command
-   must complete successfully; partial manifests do not authorize release.
-3. **Cross-drive comparison** — use hash-sets to discover content missing from the NAS
-   regardless of backup-generation paths. Preserve source/path identity separately:
-   equal hashes do not authorize dropping a distinct required pathname. Copy unique
-   B/C content into source-specific delta directories and checksum those copies.
+2. **Source inventory and copy** — preserve the completed A/B inventories and
+   unchanged originals. A's provisional copy into `99_tmp/driveA/data/` is complete;
+   do not repeat those jobs. Keep its private outer staging directory, preserved
+   metadata and successful copy/metadata-check evidence. Do not hash staging as a routine step; its content
+   remains unverified until the final audit. Every command must complete successfully;
+   partial manifests or failed copies do not authorize progress or release.
+3. **Cross-drive comparison** — B's comparison and omission decisions are complete.
+   When deferred C work is explicitly resumed, inspect/inventory C and compare it with retained A coverage
+   and destination mappings regardless of backup-generation paths; this is
+   expected coverage, not proof of NAS presence. Preserve
+   source/path identity separately: equal hashes do not authorize dropping a distinct
+   required pathname. Additional C keepers go directly to chosen final homes after
+   collision checks. Retain
+   copy/metadata-check evidence. Reconcile changed retention choices with
+   the copy plan so every keeper has a planned final destination.
    Maintain the authoritative evidence workspace on an independent controller disk
    that survives all planned wipes. Archive it to `00_meta/migration/` before the
-   freeze and after release, with no parity-time writes to that archive. A full final
-   read is an intentional additional pass, not a claim that every dataset is read only once.
-4. **Sort** `99_tmp` → numbered homes per the [mapping table](#migration-mapping); each
+   freeze and after release, with no parity-time writes to that archive. The full final
+   content read replaces the intermediate staging rehash; it does not replace the
+   source scans, served-media access checks or parity verification.
+4. **Sort A before C inspection**, then integrate C keepers as described above:
+   `99_tmp` → numbered homes per the [mapping table](#migration-mapping); each
    move recorded by source identity and final path. Stop on a destination collision;
    retain both versions at distinct leaf paths or record an explicit dedup/discard
    decision. Never overwrite differing content. Local moves occur with clients absent.
-5. **Cruft dies during sorting** — `.@__thumb`, `.streams`, `Thumbs.db`, superseded
-   archive generations; deletions recorded in the log.
-6. **Exit criterion:** no unresolved entries in `99_tmp`; every source entry has a
+5. **Preserve content during sorting** — retain housekeeping and older archive
+   material alongside its collection unless a specific omission is approved.
+   Retain the private omission decisions; do not generalize them into cleanup rules. Resolve unclassified destinations before finishing the mapping.
+6. **Exit criterion:** no unresolved entries in `99_tmp`; every active migration entry has a
    verified destination or a recorded discard; every retained regular file's final hash
    matches its source. Verify symlink targets, expected metadata and the migrated
    media access policy. Task 7 depends on Task 2's final exclusions and Task 13's audit
@@ -387,9 +515,9 @@ areas may receive new files.
    containers — strongly indicated by the existing `data` PVC usage; verified when
    templating Task 5. (Linking containers use exactly ONE such mount each — see mount
    topology principle.)
-4. The NFS PV stack has **never run** (todo.md, NFS branch review). Task 11 must prove
-   export lifecycle and fixed-owner operations with `root_squash`; Task 5 validates
-   the actual application import path. A failing prerequisite blocks media rollout.
+4. The NFS PV stack had **never run** at design time (todo.md, NFS branch review).
+   Task 11 subsequently proved export lifecycle and fixed-owner operations with
+   `root_squash`; Task 5 still owns the actual application import path. A failing prerequisite blocks media rollout.
 5. With `PUID=1000`/`PGID=1000` set, the lscr.io containers write as `1000:1000` and the
    s6 init chown is a no-op on already-`1000:1000` dirs — verified by the write/hardlink
    proofs as the application user in Task 5. (fsGroup is known-inert on NFS; do not
@@ -438,41 +566,33 @@ areas may receive new files.
 | Claim | Verdict | Source |
 |---|---|---|
 | mergerfs non-path-preserving (`mfs`) supports pool-wide hardlinks; `EXDEV` is a path-preserving-policy issue | Confirmed | [mergerfs FAQ](https://trapexit.github.io/mergerfs/latest/faq/why_isnt_it_working/), [mergerfs(1)](https://manpages.debian.org/unstable/mergerfs/mergerfs.1.en.html) |
-| Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; design-review.md finding R2-P0 |
+| Hardlink/rename requires both paths under ONE bind mount (vfsmount) — one PVC is NOT sufficient: separate `subPath` mounts of the same PVC still `EXDEV` (kernel compares vfsmounts, not `st_dev`) | Confirmed — **corrected during design review**; empirically reproduced 2026-08-22 (cross-bind-mount `ln` fails with identical `st_dev`; single-parent-mount `ln` succeeds) | Kernel `do_linkat` semantics; local reproduction; private archived design review |
 | *arrs hardlink-or-silently-copy; upgrades delete old files | Confirmed | *arr/trash-guides community documentation |
 | Immich external libs delete originals when RW; `:ro` is the enforcement; no XMP on `:ro` | Confirmed (corrected during review) | [Immich libraries docs](https://docs.immich.app/features/libraries/), [discussion #24064](https://github.com/immich-app/immich/discussions/24064), [#13771](https://github.com/immich-app/immich/discussions/13771) |
-| NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; live acceptance pending Task 11 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
+| NFS export readiness requires node retention/inode configuration and lifecycle checks beyond a valid subpath; fixed-owner `root_squash` operations remain an acceptance gate | Upstream constraints verified; Task 11 live acceptance completed 2026-11-09 | [mergerfs 2.41.1 NFS guidance](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/), [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/) |
 | `parity` and `1-parity` select the same level; additional protection starts with `2-parity`; a repeated level is rejected | Confirmed against the pinned version | [SnapRAID 13.0 parser](https://github.com/amadvance/snapraid/blob/v13.0/cmdline/state.c) |
-| Explicit full sync supports parity expansion; a full scrub is distinct from the maintenance percentage/age policy | Confirmed; job changes pending Task 12 | [SnapRAID 13.0 manual](https://github.com/amadvance/snapraid/blob/v13.0/snapraid.1) |
+| Explicit full sync supports parity expansion; a full scrub is distinct from the maintenance percentage/age policy | Confirmed; Task 12 disposable job lifecycle completed, real parity release remains Task 8 | [SnapRAID 13.0 manual](https://github.com/amadvance/snapraid/blob/v13.0/snapraid.1) |
 | snapraid records hardlinks; excluded/included shared inodes protected via the included path; `name/` excludes match anywhere, `/name/` at disk root | Confirmed | [SnapRAID manual](https://www.snapraid.it/manual), [exclude-syntax thread](https://sourceforge.net/p/snapraid/discussion/1677233/thread/387da6b3/) |
 
 ## Migration mapping
 
-| Backup source (drive layout) | Destination |
-|---|---|
-| `Backups/bak/*.zip`, `WinBackup`, `home_milleniumfalcon_*`, `manual/`, `dell_xps_15_flashdrive_tools` | `70.01_machines/<host>/` |
-| `Backups/{thunderbird,jetbrains,brave}*` (zips + logs) | `70.02_apps/<app>/` |
-| `Backups/mix3/`, `Mix3_Download_New/` | `70.03_mobile/mix3/` (DCIM, GCam, Snapseed, Pictures → `20.02_camera/mix3/`) |
-| `Backups/aegis*`, `keep/`, `bookmarks*`, `session_buddy*`, `noscript*` | `70.04_exports/` |
-| `Backups/Projects(code)`, `bak/IdeaProjects.zip` | `70.05_code/` |
-| `Books/**` (fiction, non-fiction, esoterics, психология…) | `40.01_books/<genre>/` |
-| `Books/_Audiobook/**` | `30.04_audiobooks/` |
-| `Books/Dungeons & Dragons 5`, `Hobbies/D&D` | `50.01_dnd/` |
-| `Documents/01_personal` | `10.01_personal/` |
-| `Documents/03_baby` | `10.02_family/` |
-| `Documents/08_finance`, `01_personal/20_purchases` | `10.03_finance/` |
-| `Documents/02_work`, `01_personal/60_work` | `10.04_work/` |
-| `Documents/temp` | triage → `10.0x` |
-| `Education/**` (IT, Lingos, Video, guitar, Statistics) | `40.02_courses/` (books inside → `40.01`) |
-| `Education/Torrents`, `Education/Temp` | triage in `99_tmp`; keepers → `40.0x`, rest deleted |
-| `Hobbies/Airsoft` | `50.02_airsoft/` |
-| `Hobbies/**` (other) | working-set test → `50.0x` or medium dirs |
-| `Media/1. Music`, `1.1 Music` | `30.03_music/` |
-| `Media/2. Movies` | `30.01_movies/` |
-| `Media/3. TV Series` | `30.02_tv/` |
-| `Media/5. Images/5.1 Photos` | `20.01_library/` |
-| `Media/5. Images/5.2 Images` | triage → `20.01` or delete |
-| `Media/6. Misc/HomeVideo` | `20.03_home_video/` |
-| `Media/7. Temp` | triage in `99_tmp` |
-| `cryptomator/` | `80_vault/` |
-| `.@__thumb`, `.streams`, `Thumbs.db` | **delete** (QNAP/Windows cruft) |
+The complete source-specific map and review decisions are private under
+`.nas-audit-evidence/`. Keep exact source filenames, device identities, inventory
+details and operational receipts out of tracked documentation.
+
+| Content family | Destination family |
+| --- | --- |
+| Personal, family, financial, work, health and education records | `10_documents/` |
+| Photos, standalone home videos and general images | `20_photos/` |
+| Movies, TV, music and audiobooks | `30_media/` |
+| Books, courses and reference material | `40_library/` |
+| Approved intact working sets | `50_topics/` |
+| Standalone installers and tools | `60_software/` |
+| Machine, application, mobile, export and code backups | `70_backups/` |
+| Opaque encrypted vaults | `80_vault/` |
+
+Keep managed libraries and approved backup/working-set trees intact except for
+exact owner-approved omissions recorded privately. Preserve
+supporting files with their collection and retain loose source records under
+their reviewed backup homes. Resolve mixed collections before moving them;
+genuinely unidentified retained items use the approved holding categories.

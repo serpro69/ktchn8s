@@ -1,6 +1,11 @@
 # ansible
 .ansible/
 galaxy/
+/.nas-audit-evidence/
+# Private migration operator batches and legacy review locations.
+/nas-migration-*
+/docs/**/nas-storage-layout/reviews/
+/docs/**/nas-storage-layout/*review*.md
 
 # python
 .venv

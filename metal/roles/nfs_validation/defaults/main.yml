@@ -1,0 +1,3 @@
+---
+# The standalone validation play gathers OS facts; convergence may already set this.
+nfs_server_service: "{{ 'nfs-kernel-server' if ansible_os_family == 'Debian' else 'nfs-server' }}"

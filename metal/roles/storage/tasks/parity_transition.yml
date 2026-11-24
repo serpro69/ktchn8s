@@ -1,0 +1,24 @@
+---
+- name: Require maintenance to remain disabled on subsequent applies
+  ansible.builtin.assert:
+    that:
+      - snapraid_maintenance.sync_enabled is false
+      - snapraid_maintenance.scrub_enabled is false
+      - maintenance_fields | difference(snapraid_maintenance.keys()) | length == 0
+  vars:
+    maintenance_fields: "{{ (lookup('file', role_path ~ '/defaults/main.yml') | from_yaml).snapraid_maintenance.keys() | list }}"
+
+- name: Verify the installed SnapRAID before changing the partition
+  ansible.builtin.command: /usr/local/bin/snapraid --version
+  register: parity_snapraid_version
+  changed_when: false
+  failed_when: parity_snapraid_version.stdout.split()[:2] != ['snapraid', 'v' ~ snapraid_version] or parity_snapraid_version.rc != 0
+
+- name: Prepare the released partitions in inventory order
+  ansible.builtin.include_tasks: parity_partition.yml
+  loop: "{{ range(0, parity_devices | length) | list if (parity_fresh_two_level | default(false) | bool) else [parity_devices | length - 1] }}"
+  loop_control:
+    loop_var: parity_index
+
+- name: Install the existing configuration and explicit sync unit
+  ansible.builtin.include_tasks: snapraid.yml

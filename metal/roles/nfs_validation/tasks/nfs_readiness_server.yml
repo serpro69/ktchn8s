@@ -1,0 +1,22 @@
+---
+- name: Verify the running NFS and mergerfs contract
+  ansible.builtin.include_tasks: nfs_readiness_runtime.yml
+
+- name: Refuse to replace an existing readiness fixture
+  ansible.builtin.stat:
+    path: /mnt/storage/99_tmp/nfs-readiness
+  register: nfs_readiness_existing
+
+- name: Require an unused fixture path
+  ansible.builtin.assert:
+    that: not nfs_readiness_existing.stat.exists
+    fail_msg: Inspect and remove the previous readiness fixture before retrying.
+
+- name: Create the scoped readiness fixture
+  ansible.builtin.file:
+    path: /mnt/storage/99_tmp/nfs-readiness
+    state: directory
+    owner: '1000'
+    group: '1000'
+    mode: '0775'
+  register: nfs_readiness_created

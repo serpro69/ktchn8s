@@ -10,6 +10,59 @@ ArgoCD owns everything under `system/`, `platform/`, `apps/` after bootstrap —
 changes are applied by committing to git and syncing, never `kubectl apply`. All tooling
 runs inside `nix develop`.
 
+## molecule-testing
+
+Use Molecule for repeatable storage-role integration tests where service state,
+mounts and reruns matter. Task 3 supplies the controller tooling; Tasks 11 and 12
+own the scenarios under `metal/roles/storage/molecule/`. The Task 11
+`nfs-lifecycle` scenario uses QEMU/KVM and a checksum-pinned Debian guest image;
+its `metal/roles/storage/molecule/nfs-lifecycle/README.md` documents prerequisites
+and commands. Task 12's independent `parity-lifecycle` scenario uses one systemd
+guest with four scratch disks; its sibling `README.md` documents the same lifecycle
+commands and the parity failure/retry checks.
+
+| Scenario / owner | Environment and acceptance |
+|---|---|
+| `nfs-lifecycle` / Task 11 | Disposable Linux NFS server and two clients; real mergerfs/FUSE and NFS mounts. Verify UID/GID 1000 operations, read-only rejection, idle/reopen and controlled remount/recovery, promotion links/bytes and server memory observation. Include Task 1's layout, legend and retirement-log preservation as regression checks. |
+| `parity-lifecycle` / Task 12 | Disposable Linux host with real systemd and separate scratch filesystems for data and parity. Verify configuration-only convergence, disabled maintenance, first sync, second-parity expansion, interruption/retry and failed-unit exit propagation using SnapRAID 13.0. |
+| Access fixture / Task 13 | Extend the `nfs-lifecycle` verifier with the audit helper's foreign-owned `0700` fixture and recorded permission repair. Run the reader as UID/GID 1000 with no extra groups over a read-only NFS mount. Keep Python unit tests separate. |
+
+Use disposable VMs for these kernel/service tests. At scenario implementation time,
+choose and document an available VM backend, pin its dependencies and guest image,
+and prove the required systemd/FUSE/NFS or scratch-disk capabilities before testing
+the role. Missing capabilities mean the scenario is blocked, not passed or silently
+skipped. Neither a template render nor a mocked service is lifecycle evidence.
+
+Each scenario owns its inventory, variables, guest disks and cleanup. Never use the
+production inventory, NAS disks, or production kubeconfig. Invoke the actual role
+tasks/handlers/templates; if isolation needs a focused task include, share it with
+the production role rather than copying its implementation into the test. Keep
+controller provisioning separate from guest configuration.
+
+Configure the scenario explicitly for create/prepare, converge, idempotence, verify,
+cleanup and destroy, with failure/recovery phases where needed. The
+[Molecule role guide](https://docs.ansible.com/projects/molecule/getting-started-roles/)
+and [workflow reference](https://docs.ansible.com/projects/molecule/workflow/) describe
+these actions. Require zero changes on the second configuration converge; run
+intentional writes, remounts and parity jobs in the verification/failure phases.
+Do not hide storage changes with blanket idempotence skips. Exclude unrelated
+hardware discovery such as the existing always-changing `sensors-detect` task from
+the focused configuration entry point. Preserve logs before cleanup, exercise
+cleanup after failure, and prove a fresh test can recreate its environment.
+
+Run from the repository root with
+`nix develop --command bash -c 'cd metal/roles/storage && molecule test -s nfs-lifecycle'`
+or the same command with `-s parity-lifecycle`. Record scenario/tool revisions and
+results with the owning task. Pure config parsing (Task 2), Helm rendering (Tasks
+4–5), and audit-helper unit tests (Task 13) retain their direct checks; they do not
+need a separate Molecule wrapper.
+
+Molecule results establish behavior on the disposable environment. Task 1.5 and
+Task 11's live NAS/Kubernetes acceptance remain required, as do actual application,
+migrated-data and parity-release checks in Tasks 5–8. While the NAS is offline,
+complete repository/scenario work and explicitly defer live subtasks without
+marking those acceptance gates complete.
+
 ## tree-skeleton
 
 Replace the flat `storage_dirs` list with the designed tree.
@@ -41,8 +94,24 @@ Replace the flat `storage_dirs` list with the designed tree.
    manually on the NAS after confirming they are empty.
    → verify: `find /mnt/storage -maxdepth 1` shows only the new tree + lost+found.
 
-Note: do not remove `Temp` blindly — `tasks/k8s_validation.yml` and NFS validation tasks
-may reference it; grep the role first and repoint those to `99_tmp` if so.
+Mount validation excludes skipped command results from JSON parsing in check mode.
+Skipped probes remain unverified; a successful preview does not replace actual
+disk and mount checks. Debian setup reads `/usr/local/bin/snapraid`'s version even
+in check mode: an exact pinned version skips archive installation and dependency
+cleanup, a missing/different version still requires the archive, and a failed
+probe aborts. This establishes version presence, not provenance or byte integrity.
+
+The inventory wrapper requests YAML directly from SOPS and removes temporary
+plaintext on normal exits and handled HUP/INT/TERM, with no guarantee after SIGKILL.
+Run `bash tests/test_inventory.sh` in the existing dev shell for real Ansible
+parsing/selection checks with synthetic SOPS output; no production keys are used.
+Real decryption and host operations remain operator-executed checks.
+
+Validation fixtures use `99_tmp`; routine role execution never deletes legacy
+content. Task 1's two live applications and confirmed-empty cleanup passed on
+2026-11-09, including pool/all-branch absence checks. See the
+private acceptance evidence under `.nas-audit-evidence/reviews/`
+and [remaining provisioning follow-ups](#deferred-follow-ups-explicit).
 
 ## snapraid-excludes
 
@@ -74,12 +143,38 @@ The role skips `snapraid.yml` entirely while `parity_drives` is empty. Inspect t
 `/etc/snapraid.conf` and run `snapraid status` only in Task 8 after adding the first
 parity device; Task 2 completes with offline validation, not that later live check.
 
+The regression suite in `tests/test_snapraid_config.py` renders the actual template
+with strict Jinja undefined handling and runs SnapRAID `status`/`diff` against temporary
+directories. Supply a [SnapRAID 13.0](https://github.com/amadvance/snapraid/releases/tag/v13.0)
+binary; the locked Nix package set currently provides 12.4, which the test rejects:
+
+```bash
+nix develop --command env SNAPRAID_BIN=/path/to/snapraid-13.0/snapraid \
+  python3 -B -m unittest discover -s tests -p test_snapraid_config.py -v
+```
+
+The fixture relocates data, parity and content paths without changing exclusion
+patterns. `--test-skip-device` allows these parser/scan checks on one temporary
+filesystem; this does not prove parity storage or lifecycle behavior. No sync runs.
+Checks cover exact parity paths, root-only exclusions, preserved backup paths,
+unchanged cruft-file exclusions and rejection of duplicate first parity. The existing
+slashless cruft patterns match files, not whole directory trees; this task preserves
+that behavior. Task 12 owns the separate-filesystem lifecycle tests.
+
 ## nfs-export-readiness
 
 Task 11 is synthetic NFS validation, independent of the media applications. Create
 `99_tmp/nfs-readiness/{downloads,library}` and expose that one fixture subtree to its
 test clients. All creates, links, renames and RO probes stay there; clean up clients
 and fixtures before NAS-local migration/sorting begins.
+
+First implement and run the `nfs-lifecycle` Molecule scenario described in
+[molecule-testing](#molecule-testing), using the Task 3 tooling. Seed operator
+retirement entries, legacy content and restrictive descendants before convergence
+to verify Task 1's preservation contract. The server/client lifecycle checks below
+must pass in this disposable environment before applying them to the NAS.
+The Kubernetes pod probe remains a separate live-cluster check; a VM client does
+not establish Kubernetes integration. Record offline and live results separately.
 
 1. In `metal/roles/storage/tasks/mergerfs.yml`, add `noforget` and
    `inodecalc=path-hash` while retaining `category.create=mfs`, remove legacy `use_ino`,
@@ -95,12 +190,15 @@ and fixtures before NAS-local migration/sorting begins.
    creation, link, rename, read and deletion; errors block rollout and require a
    design decision, not an automatic switch to `no_root_squash` or privileged clients.
    → verify: successful operations as the real writer identity, plus RO rejection.
-3. Extend `tasks/nfs_validation.yml` and `tasks/k8s_validation.yml` to perform the
+3. Extend the validation role's `tasks/nfs_validation.yml` and `tasks/k8s_validation.yml` to perform the
    lifecycle checks on `99_tmp`, report failures, and clean up fixtures. Correct the
    test pod's existing trailing `&&` before relying on its shell script. Require an
    available kubeconfig and an actually successful pod, not the optional-test skip.
-   From the repository root, run `make -C metal storage ANSIBLE_TARGETS=yggdrasil
-   ANSIBLE_ARGS='-e validate_nfs=true'` when the cluster and NAS are available.
+   For the basic post-install probes, run `make -C metal storage-validate
+   ANSIBLE_TARGETS=nas-host KUBECONFIG=/absolute/path/cluster.yaml` when the cluster
+   and NAS are available. The legacy `validate_nfs=true` route still runs the same
+   probes after storage convergence.
+   Full Task 11.6 acceptance uses the focused entry point below.
    → verify: NFS and Kubernetes validation both execute and pass; a deliberately
    unwritable fixture is reported as failed, not skipped.
 4. Simulate promotion inside the fixture: link a downloads file into its library,
@@ -113,6 +211,120 @@ and fixtures before NAS-local migration/sorting begins.
 
 References: [mergerfs 2.41.1 NFS](https://trapexit.github.io/mergerfs/2.41.1/remote_filesystems/)
 and [inode calculation](https://trapexit.github.io/mergerfs/2.41.1/config/inodecalc/).
+
+Task 11's offline implementation uses the actual mergerfs/NFS role tasks and a
+shared `metal/roles/nfs_validation/files/nfs-readiness.sh` probe in both VM and live validation. Configuration
+convergence no longer hides scratch writes inside `mount_validation.yml`; writes
+belong to explicit verification. Both rpcbind units are stopped, disabled and
+masked: stopping only the service allowed socket activation to break idempotence.
+Live validation preserves its fixture if local or Kubernetes client teardown fails.
+
+The verified guest stack is Debian 12 build `20260923-2610`, kernel
+`6.1.0-53-amd64`, mergerfs `2.41.1~debian-bookworm`, NFS utils
+`1:2.6.2-4+deb12u1`, Python package `3.11.2-1+b1` and systemd
+`252.39-1~deb12u2`. Guest packages use the 2026-09-24 Debian snapshot; the image and
+mergerfs release asset have checked-in checksums. QEMU 10.1.2 comes from the
+existing Nix lock. The small lifecycle fixture observed roughly 3.6 MiB mergerfs
+RSS; this is an observation, not a capacity bound for the NAS working set.
+
+Run fast regressions with `nix develop -c python3 -B -m unittest discover -s tests
+-p test_nfs_readiness.py -v` (payload tests require controller UID/GID 1000).
+The scenario README documents the full pass and deliberate-failure commands.
+NFS can temporarily cache a link count of one after `ln`; the probe requires two
+within 65 seconds and independently proves backing inode identity. It does not
+disable caching or relax `root_squash` to make tests pass. A permission-denied
+fixture is an expected negative test; unexpected permission or stale-handle errors
+remain acceptance failures. Task 11.6 supplied the separate live NAS/Kubernetes
+acceptance recorded below.
+
+### Guided live acceptance entry point
+
+Task 11.6 acceptance is recorded privately under `.nas-audit-evidence/reviews/`.
+The `storage-validate` target covers basic NAS self-client and Pod probes
+without storage convergence; `validate_nfs=true` remains a compatibility route. Full two-client remount/recovery acceptance uses the focused entry points:
+
+| Playbook | Purpose |
+| --- | --- |
+| `metal/storage-client-setup.yml` | Prepare the two selected Fedora clients with nfs-utils and required dependencies, then report helper/package versions. |
+| `metal/storage-acceptance.yml` | Run the complete synthetic client/server lifecycle and required Kubernetes probes without storage-role convergence. |
+
+Both require one NAS selected through `--limit` and two distinct inventory names
+in `nfs_lifecycle_clients`. Full acceptance also requires an absolute controller
+`KUBECONFIG` and `nfs_lifecycle_maintenance=true`: the operator declares that
+unrelated clients and local writers stay stopped throughout recovery. An empty
+consumer snapshot does not prove that condition. Use the existing dev shell and
+review each applicable operator batch before execution.
+
+The helper gate runs before fixture creation or Kubernetes queries. Client boot
+IDs must match the selected Kubernetes nodes. The lifecycle then exercises denied
+and allowed UID1000 operations, idle/reopen, RO rejection and backing links;
+unmounts clients normally; cycles NFS and the pool through its accepted fstab;
+and verifies options, links and both clients again. Successful node-pinned Pods
+and their final log markers are mandatory. The mutable BusyBox tag remains a
+reproducibility limit even though the resolved image ID is recorded. Default
+scheduling is preserved for basic validation when no explicit node list is set.
+
+Teardown observes independent-client and kubelet fixture-mount absence before
+removing the owned fixture, with mounted-root guards and final pool/all-branch
+absence checks. A failed server transition stops for assessment: there is no
+force/lazy fallback or automatic rollback. Unreachable hosts or an interrupted
+controller can prevent cleanup; retain the reported paths and resolve that state
+before a retry or deletion.
+
+Client preparation is a separate targeted package transaction. It disables weak
+and implicit module dependencies, downgrades and solver erasing; it does not
+change repositories or disable signature checks. Required dependencies and package
+scriptlets may still change the client. Dnf5 can label an upgrade as Installed,
+so its summary is not proof of zero dependency updates. Ordinary failures retain
+available per-client results; unreachable/interrupted execution may not. Missing
+libdnf5 or unavailable repositories fail for assessment, without an automatic
+fallback to broad provisioning or an OS upgrade.
+
+### Workflow cleanup after completed acceptance
+
+Reconciled on 2026-11-09 against handoff HEAD
+`b3e25da50ce81db785c655cf2593f0278bf7f376` on `feat/nas_layout`, with a clean
+starting worktree. Tasks 1–4, 9 and 11–13 retain their recorded completion;
+Tasks 5–8 and 10 remain pending. No homelab commands or migration were executed
+for this cleanup. The user-owned kubeconfig-access restriction is preserved.
+
+The [public NFS guide](../../../guides/how_to_use_nfs_for_persistent_storage.md)
+now describes the from-scratch order and separate public Make targets. Storage
+convergence still precedes cluster creation, with `validate_nfs: false` by
+default. Optional `storage-validate` runs the same self-client and Pod probes in
+`metal/roles/nfs_validation/` after installation. It requires mounted pool/branches
+before fixture creation and cleanup, and checks controller prerequisites before
+scratch writes. Its default scheduling supports one cluster
+node; it does not claim the full two-independent-client lifecycle.
+
+`storage-acceptance` uses that role's explicit maintenance entry point. Its
+client-kernel binding, fixed-owner operations, idle/reopen, backing checks,
+normal recovery and observed teardown are preserved. Shared helpers remain
+separate because they are reused at multiple lifecycle stages. The disposable
+Molecule scenario continues to exercise the same relocated probe and runtime
+checks, and explicitly loads the layout variables from their storage-role owner.
+
+Existing-client repair and executable checks now live under the prerequisites
+role, invoked through focused task entry points. Fresh node provisioning still
+owns normal `nfs-utils` installation. The targeted repair's stricter transaction
+policy remains separate from the broad provisioning role's package upgrades;
+sharing those policies would change behavior unnecessarily.
+
+Migration-tool verification retains its standalone play, confined harness,
+report paths and cleanup protections. Its Make target does not introduce it into
+provisioning or basic validation. A new empty NAS can omit migration-tool checks.
+The existing media PV/PVC mismatch is documented, not released by this cleanup.
+
+Local routing/admission checks, relocated probe tests, offline syntax/template
+checks and independent review verify this refactor's repository scope. They are
+not new live acceptance evidence. Owner: operator for any later live validation
+after relevant configuration changes; next action is to choose the appropriate
+public entry point after its prerequisites, and acceptance requires that complete
+run and cleanup. No repeat of the already accepted run is required merely to
+re-establish context. Migration remains stopped pending owner authorization and
+source/recovery-copy reconciliation. Existing deferred follow-ups below remain open.
+The private cleanup verification/review record under `.nas-audit-evidence/reviews/`
+details local coverage and code-review verdicts.
 
 ## parity-job-readiness
 
@@ -140,32 +352,109 @@ Task 12 prepares bootstrap/expansion before source disks are released. Update
    alone: a timer could start another unit and terminate the active bootstrap job.
    → verify: a role rerun leaves maintenance stopped until the operator re-enables it.
 
+Implement these checks in `metal/roles/storage/molecule/parity-lifecycle/` using
+the Task 3 tooling and [scenario contract](#molecule-testing). Converge the real
+configuration and handlers without starting a sync; the verifier starts jobs
+explicitly and checks each unit invocation's exit status and journal. Use distinct
+guest filesystems, not several directories on one filesystem. Inject a failing
+SnapRAID invocation only within the disposable guest, restore the real executable,
+and require a successful retry. Adding second parity must rerun the configuration
+path and preserve existing parity/content files. This scenario must run independently
+of the NFS scenario so Task 12 does not acquire a dependency on Task 11.
+
 Task 8 records the unit invocation, completion result/exit status and logs, then runs
 an explicit full scrub. These changes do not make existence of a parity file or a
 previous successful invocation sufficient evidence for a newly added parity level.
 
+The configuration path now always deploys the static full-sync unit when SnapRAID
+is configured. It never starts or enables that unit. Both maintenance timers are
+deployed even when disabled; their tasks and config-change handlers enforce the
+declared `sync_enabled` and `scrub_enabled` flags. During bootstrap/expansion,
+set **both flags to `false` in the complete `snapraid_maintenance` mapping** used
+for every role application. Preserve the other default fields: Ansible replaces
+this mapping rather than merging a partial inventory dictionary with defaults.
+Manually stopping/disabling timers alone does not override inventory policy.
+Stop the timers before changing configuration and wait for any running runner
+or scrub job to finish; the role does not terminate those jobs for you.
+
+After the Task 8 safety gates, start explicitly with
+`systemctl restart --no-block snapraid-initial-sync.service`. Follow
+`journalctl -fu snapraid-initial-sync.service`, and record this invocation's
+`InvocationID`, `ExecMainStartTimestamp`, `ExecMainExitTimestamp`, `Result`,
+`ExecMainCode` and `ExecMainStatus` via `systemctl show`. While the oneshot runs
+its state is `activating`; successful completion is `active (exited)`,
+`Result=success`, `ExecMainCode=1` and `ExecMainStatus=0`, with `MainPID=0`.
+`RemainAfterExit=yes` retains the result: the disposable systemd 252 guest otherwise
+garbage-collected the inactive unit's exit metadata immediately after completion.
+Always use **restart**, including after adding a parity level: `start` on a completed
+active unit does nothing. Require a new invocation ID/start timestamp. Do not restart
+an invocation that is still running. Preserve its journal and timestamps before
+another invocation; stopped/failed jobs need explicit retry and full scrub.
+Re-enable both maintenance flags only after parity acceptance.
+
+Run `molecule test -s parity-lifecycle` from `metal/roles/storage` inside
+`nix develop`. The scenario builds checksum-pinned SnapRAID 13.0 and verifies
+configuration idempotence, first sync, expansion, interruption, exact nonzero
+exit propagation and recovery with real systemd and separate filesystems.
+No live NAS work is included; the fixture README describes evidence and cleanup.
+
 ## devshell-b3sum
 
-Add `b3sum` to the `packages` list in the `devShells.default` `mkShell` block of
-`flake.nix` (~line 31).
-→ verify: `nix develop -c b3sum --version`.
+Task 3 provides `b3sum` and Molecule through the `packages` list in the
+`devShells.default` `mkShell` block of `flake.nix`, using the existing `flake.lock`.
+No global pip installation is needed. Scenario-specific VM backend dependencies
+belong to Tasks 11–12 and must be reproducible too.
+
+Local CLI verification (2026-10-04, x86_64-linux), with nixpkgs revision
+`23d72dabcb3b12469f57b37170fcbc1789bd7457`:
+
+- `nix develop -c b3sum --version`: `b3sum 1.8.2`.
+- `nix develop -c molecule --version`: Molecule `25.11.1`, Python `3.13.11`,
+  Ansible Core `2.19.4`; bundled `molecule-plugins` version `23.5.3`.
+- `nix develop -c molecule test --help` and `nix develop -c molecule list --help`:
+  both succeed and expose `-s, --scenario-name`. The test command also exposes
+  `--driver-name` and `--destroy`.
+
+The installed Molecule metadata requires Python >=3.10 and Ansible Core >=2.15;
+its Nix runtime satisfies both. All three executables resolve to `/nix/store`.
+The pre-existing virtualenv still exposes Python `3.12.10` via `python3`, and its
+stale pip launcher still warns on shell entry (see [environment repair](#deferred-follow-ups-explicit)).
+Molecule and Ansible use their Nix-packaged Python `3.13.11` independently.
+
+These checks establish CLI availability only. No VM backend, scenario or NAS
+acceptance ran; Tasks 11–12 own those separate checks. Listed driver plugins do
+not establish that their backend executables or required collections are installed.
 
 ## migration-audit-tooling
 
+The helper's [CLI, JSONL schema and ledger guide](../../../guides/nas_migration_audit.md)
+documents the implemented operator workflow and its acceptance limits. Use
+`--identity mergerfs` for local pool inventories/reconciliation so hardlink checks
+use backing identities rather than the configured path-hash inode numbers.
+
 Task 13 creates `scripts/nas-migration-audit.py` and
 `tests/test_nas_migration_audit.py` before Task 6. Use Python's standard library and
-the Task 3 `b3sum` executable. Before Task 13's NAS fixture, verify Python 3 and install
-`b3sum` once there (`apt install b3sum` on Debian, or a verified upstream binary);
-record both versions with the fixture results. The helper reads datasets and writes
-evidence only. Copying, moving, permission changes, discards and disk operations remain
-explicit operator actions.
+the Task 3 `b3sum` executable. Provide Python 3 and `b3sum` in the disposable NFS
+fixture and record both versions with the results. The NAS storage role declares
+`rsync` and `b3sum` in its base package list with `state: present` (owner policy,
+2026-11-11): manual host package setup must also have an Ansible declaration.
+Existing installations are not explicitly upgraded by this task. Python 3 remains
+an Ansible-host prerequisite. Before migration, compare actual Python/b3sum versions
+with the accepted fixture; differing versions require applicable unit/access checks.
+The recorded NAS preparation and Task 13.4 checks are complete; a later tool
+change needs its own comparison and applicable revalidation. On the live migration
+host, use a targeted package operation to fill a missing dependency rather than
+rerunning storage convergence just to install it. The helper's deployment and
+execution remain operator-owned outside the storage role: it reads datasets and
+writes evidence only. Copying, moving, permission changes, discards and disk
+operations remain explicit operator actions.
 
 | Subcommand | Inputs and result |
 |---|---|
 | `inventory` | Root, source/disk ID and output path → versioned JSONL inventory of all entry types; BLAKE3 for regular files, literal symlink targets, numeric UID/GID/mode, mtime and ACL/xattr evidence. Do not compare non-restorable ctime or read-sensitive atime. Record source hardlink groups where the filesystem exposes reliable identities. |
-| `compare` | Source and copy inventories; select path comparison for A's copy or content comparison for B/C discovery → missing/mismatched entries and candidate equal-content matches, preserving every source identity. It never decides that a duplicate may be discarded. |
-| `verify` | A/B/C inventories, disposition ledger and final NAS root → complete source-to-destination/content/expected-metadata reconciliation. |
-| `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
+| `compare` | Two completed inventories; content comparison supports source-to-source delta planning. Path comparison remains available for troubleshooting an independently inventoried copy, but is not a routine staging gate. Candidate matches preserve source identities and never authorize discard or establish NAS presence. |
+| `verify` | Explicit active copy-source inventories, matching disposition ledger and final NAS root → complete accounting/content/expected-metadata checks within those inputs. A is the current source; B is excluded. Prepare C-keeper inputs in the later C phase. |
+| `access` | Disposition ledger and a read-only mount of `30_media` → directory-list/traversal and actual file-open/read results for every declared served path, executed as UID/GID 1000 with no extra groups. Each file probe requests at most one byte and checks type/size; it performs no content hashing. Derive paths from the ledger's three served subtrees and remove the `30_media/` prefix for this mount; reject paths escaping it and unresolved link targets. |
 
 The inventory and ledger use escaped JSON strings that round-trip filesystem names,
 including spaces, newlines and Cyrillic. Never follow symlinks during inventory or
@@ -190,14 +479,89 @@ Verification/access reports record the same ledger digest; any ledger or destina
 change invalidates previous acceptance and requires the relevant checks again.
 Stream inventories/reports and hash locally to avoid reading NAS data over the network.
 
+**Acceptance scope, owner decision 2026-11-17:** the current Task 7 audit uses A
+alone; C is entirely deferred and B remains excluded. Later C acceptance uses
+its complete inventory and a scoped check of every copied addition plus affected
+existing entries, with the accepted A baseline preserved. The helper has no
+incremental/reuse switch. Before that later work, the assistant must prepare and
+verify source-bound audit-input selection and affected-entry accounting, including
+shared directory metadata, destination collisions, hardlinks and served-media
+access. Do not silently omit ledger rows or claim that C's source hashes prove
+its destination copies. Unchanged A payloads need no new full hash pass under
+this accepted workflow; affected entries require fresh successful evidence.
+
 → verify: `python3 -m unittest discover -s tests -p 'test_nas_migration_audit.py'`
 covers the command exit/output contract, partial scans/retries, failed hashes, unusual
 names, symlinks/root escapes, special files, missing/duplicate ledger rows, merges/collisions,
 equal-content distinct destinations and approved metadata transformations. The access
-fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix;
-run that identity-sensitive check on the NAS/Task 11 test environment if necessary.
+fixture must fail on a foreign-owned 0700 tree, then pass after the declared fix.
+Extend Task 11's `nfs-lifecycle` Molecule verifier for this identity-sensitive check,
+using actual UID/GID 1000 reads over a read-only NFS mount. A root-only local run
+does not satisfy it. This tests the helper's policy enforcement; Task 7 still audits
+the real migrated library and Task 5 still checks application playback.
 Task 13 depends on Tasks 3 and 11, uses their tool/fixture environment, and cleans up
 its clients afterward. It completes only when its checks pass, before Task 6 starts.
+
+Task 13's repository checks passed on 2026-10-04: 31 helper tests on both controller
+Python 3.12.10/b3sum 1.8.2 and guest Python 3.11.2/b3sum 1.2.0, all 44 local storage
+tests, and the extended NFS Molecule scenario including failure cleanup/recreation.
+The [task record](./tasks.md#task-13-migration-inventory-and-audit-tooling) contains
+the tested helper digest and evidence locations. Python 3.11 is the tested minimum.
+NAS setup/version comparison in 13.4 subsequently passed on 2026-11-09;
+neither result accepts actual migrated content. Reproduce the scenario with an explicit evidence location:
+
+```bash
+nix develop -c bash -c 'cd metal/roles/storage && MOLECULE_EPHEMERAL_DIRECTORY=/tmp/ktchn8s-audit-nfs-final molecule test -s nfs-lifecycle'
+```
+
+Copy existing evidence elsewhere before reusing that directory. The helper uses
+SQLite for bounded-memory joins and successful directory-listing records, while
+opening every declared served file and requesting at most one byte per probe.
+Access reports explicitly state `content_verified: false`; full content checking
+remains `verify`. It checks directory search
+permission separately from listing and preserves kernel traversal semantics when
+resolving served symlinks; lexical `..` simplification alone is insufficient.
+
+### Guided live audit acceptance
+
+Task 13.4 acceptance on the NAS tool stack is recorded privately under
+`.nas-audit-evidence/reviews/`.
+`metal/storage-audit-acceptance.yml` is the standalone, operator-run entry point.
+It ensures the ACL fixture utility and runs the unchanged audit unit suite on the
+NAS, rejecting zero tests, skips and failures. A temporary self-NFS RO mount then
+uses the same NAS tool stack as UID/GID1000 with no supplementary groups.
+
+A foreign-owned0700 synthetic subtree with an ACL and two hardlinked files must
+fail reads before its declared repair, then pass reconciliation and both file
+reads afterward. Unit, access and verification records must agree on tool/helper
+identities and ledger digest. The core helper enforces RO mount and reader identity;
+these synthetic checks do not accept actual migrated-library content.
+
+`scripts/nas-audit-fixture.py` is the live-only harness; the completed Molecule
+fixture is unchanged. Source data and ledger state remain protected inside a unique
+`/var/tmp/nas-audit-*` workspace. Data is exposed only under a root-owned guard at
+`99_tmp/<workspace-name>/dataset`. Native descriptors and recorded device/inode
+identities constrain privileged changes to this run's objects. Cleanup seals and
+revalidates the namespace before nonrecursive removal; final empty-guard removal
+uses UID1000's existing scratch-parent rights. Replacements or unexpected content
+are preserved and fail the run. The accepted one-second mergerfs caches are given
+two seconds to expire before checking native metadata repairs.
+
+Reader outputs are separate from root-owned evidence. Capture seals and validates
+them, and transfers preserve relative paths so reader filenames cannot overwrite
+protected reports. Reports persist under private, Git-ignored
+`.nas-audit-evidence/run-*` on the controller; `nas_audit_evidence_root` can select
+another private controller directory outside the NAS. Retain the printed location.
+Successful teardown requires all eight protected records, normal client unmount,
+and fixture absence on the pool and every branch. A failed claim, transfer,
+permission check, interruption or unreachable host can leave protected state for
+assessment; do not blindly delete or rerun it.
+
+Local tests and syntax checks do not establish NAS acceptance. The successful
+operator run supplied that evidence; no fresh VM run was claimed in the agent
+environment without KVM, and no VM source change remains. Tasks 5–8 and 10 are
+still pending. No real migration has started, and source-label/recovery-copy
+reconciliation remains a prerequisite to resuming Task 6.
 
 ## nfs-media-share
 
@@ -217,6 +581,29 @@ it performs no cluster deletion or sync.
 Task 5 consumes the prepared chart and owns one release containing both the PV and
 application changes, after Task 8 and the export checks. Keep Task 4 off the deployed
 Git revision until that release. Task 5 owns stale-resource cleanup and live acceptance.
+
+Task 4 offline verification (2026-10-04) passed with Helm `3.19.1` and the cached
+`csi-driver-nfs 4.13.0` dependency, on work branch `feat/nas_layout`. Repeat from the
+repository root inside the dev shell:
+
+```bash
+nix develop -c helm lint --strict system/csi-driver-nfs
+nix develop -c helm template csi-driver-nfs system/csi-driver-nfs \
+  --namespace csi-driver-nfs --show-only templates/pv-nfs.yaml
+```
+
+The PV must have name `pv-nfs-media`, capacity `4Ti`, reclaim policy `Retain`, CSI
+handle `10.10.10.30/mnt/storage/30_media` and share `/mnt/storage/30_media`. The full
+render produced ten YAML resources; a parsed comparison against the pre-change
+values confirmed that only these four PV fields changed. `ReadWriteMany`, the
+class-less static binding and all mount options were also checked.
+
+`kubeconform` was absent from the dev-shell PATH, so API schema validation did not
+run. Its upstream install command is
+`go install github.com/yannh/kubeconform/cmd/kubeconform@latest` (run tooling inside
+`nix develop`); Helm rendering and YAML parsing do not replace that check. No NAS
+or cluster access was used. These results establish the offline PV contract only;
+binding, export readiness and application behavior retain their separate live gates.
 
 ## jellyfin-remount
 
@@ -290,8 +677,26 @@ Verify in this order, rendering before sync and running runtime checks afterward
 
 ## migrated-content-access
 
+**Owner correction, 2026-11-17:** Task 7.2 is a permission/access check. List and
+traverse all declared served directories, open every served regular file and read
+at most one byte per file as UID/GID 1000 without supplementary groups. Preserve
+read-only mount and symlink-containment checks. Do not hash media or read files
+in full in this step; Task 7.3 owns complete content verification. The bounded-read
+change is implemented locally; the operator reported all 36 helper regression
+tests passing in 6.101 seconds, followed by all 36 tests on the NAS in 0.887 seconds.
+The live bounded-read audit is accepted with the specific owner-approved access
+exception below, after cleanup and independent report collection. The first
+full-read run was stopped and its mount cleanup confirmed; it does not establish
+acceptance and must not be restarted.
+
 Task 7 applies this policy after sorting and before final acceptance/freeze. The
 skeleton's ownership does not repair permissions inside copied trees.
+
+The owner may approve a specific access exception without changing retention.
+Record it privately against the exact completed report/entry and preserve the
+original failure and exit statuses. Such an exception does not authorize deletion
+or waive content/metadata reconciliation. The 2026-11-17 run has one explicit
+thumbnail-entry access exception; all other selected entries must still pass.
 
 | Tier | Required access and metadata policy |
 |---|---|
@@ -332,49 +737,197 @@ next normal sync protects those new archive files.
 
 ## migration-runbook
 
+**Current owner-selected sequence, 2026-11-17:** complete 7.2, 7.3 and 7.4 using
+A alone. C is entirely deferred; its absence no longer blocks A acceptance.
+Later C work inventories the source, copies additional keepers and verifies
+every addition plus affected existing entries against preserved source/baseline
+evidence. It does not repeat a full hash pass over unchanged A payloads. This
+supersedes earlier C-before-final-acceptance wording in the historical decisions
+below. Source release still requires the applicable per-drive recovery gates.
+The operator executes commands; the assistant prepares and explains each batch.
+
 Manual/operational, after Task 13's tooling passes and before production consumers
 start. Set up the [evidence workspace](#migration-evidence), freeze original source
 entries, and stop on any enumeration, read, hash, copy, or reconciliation failure.
 
-1. **Inventory A/B/C before copying.** Use the helper's `inventory` command on each
-   attached source, recording disk ID, root and tool versions in the run evidence.
-   Publish `driveA.jsonl`, `driveB.jsonl`, `driveC.jsonl` only after complete successful
-   scans; each records hashes, entry types and metadata per the tooling contract.
-   Check the NAS tool versions against the Task 13 fixture record; setup happened
-   before those tests. This remains migration tooling outside the storage role.
-   → verify: all scans complete with zero errors and entry counts reconcile; special
-   files need an explicit archive/restore or discard decision before release.
-2. **Copy A and reconcile.** Run on the NAS with permission to preserve source metadata:
-   use `rsync -aHAX --info=progress2 /mnt/driveA/
-   /mnt/storage/99_tmp/driveA/`, checking success; never use `--delete`. Inventory that
-   copy locally on the NAS into `nas-copy.jsonl` outside the staging tree. Run the
-   helper's path comparison against A's inventory.
-   → verify: no missing/mismatched entries, including symlinks and empty directories.
-3. **Discover B/C deltas.** Use the helper's content comparison to find content missing
-   from the NAS; copy it into `99_tmp/driveB_delta/` and `driveC_delta/`, preserving relative
-   paths, and hash every new copy. Keep source identities even for equal content:
+**Owner-approved timing change, 2026-11-11:** Task 6 prepares source comparisons,
+copies and provisional disposition mappings; Task 7 accepts the sorted destination
+with the full content/metadata audit. Do not create a full `nas-copy.jsonl` staging
+inventory or separately hash each staged delta as routine migration steps. Copy
+success and a metadata-only check do not certify stored content. Original entries
+stay unchanged and available for repair until final acceptance and the existing
+per-drive release gates. The owner separately approved copying A while C stays
+disconnected on 2026-11-11. C's inventory/comparison still gates completion of
+Task 6 and final reconciliation/release, but no longer blocks A's copy.
+
+**Owner-approved C sequencing, 2026-11-13:** After A's provisional copy is accepted
+and the complete A map is reviewed, sort A with C still disconnected.
+Retain the original inventories and record source-to-final mappings as content
+moves. Then prepare C's inspection, inventory it once, and perform step 3's C
+comparison against retained A coverage. Additional keepers from C may be copied
+directly to their chosen final homes. Thus step 4's A sorting precedes step 3's
+C work; all source accounting and C contributions must finish before final access
+and content acceptance in steps 4–5. Task 6 remains open during early sorting.
+Before preparing each new operator batch, explain its purpose and place in this
+sequence to the owner. No attachment or sorting command is implied by this plan.
+
+**Sorting scope, clarified 2026-11-13:** Preserve content and choose destinations;
+do not combine organization with optional cleanup. Apply only exact omissions
+explicitly approved in the private record, including subsequent owner decisions;
+keep all other hidden, temporary and older-backup content. Active-source omissions
+remain explicit discard rows in the ledger, with a reason and null destination.
+The unchanged auditor supports this disposition; its accounting result does not
+prove physical deletion. The operator must record removal/absence separately,
+preserve original source entries and account for affected parent metadata.
+Historical B-only omissions do not become active A ledger entries.
+Use the existing inventories to propose
+collection-level mappings, resolve ambiguous homes with the owner, and expand
+the agreed mappings into the per-entry ledger before execution. Complete and
+review the map for all of A's staged content before preparing the first move
+batch, including required subfolder splits and remaining wrapper/housekeeping
+entries. An individual destination approval records a planning decision; it
+does not start an early move. Once the whole map is settled, execute it in
+manageable batches directly to the intended final homes.
+The owner approved keeping complete residence, job-application and travel packs
+intact under their purpose while sorting loose documents by subject. Unidentified
+documents have an explicit retained holding destination in the approved
+`10_documents/10.99_unsorted`; their later identification does not block completing
+the migration map. This is a deliberate destination choice, not an instruction
+to park other mixed collections for an unplanned second sorting pass.
+For the new education-records category, distinguish credentials from learning
+material: diplomas/certificates and comparable records go to Documents; courses,
+textbooks, study notes and practice work stay in the Library. Keep a learning
+bundle's supporting material together rather than splitting it solely by format.
+
+**Directory accounting — owner decision, 2026-11-13:** Merge obsolete organizing
+directory entries into the relevant final containers; retain their original
+metadata and identities in the saved inventories and per-entry ledger. Do not
+create empty archival shells. These directory-only mappings never route child
+payloads implicitly. Declare compatible expected metadata for shared parents and
+all differences from each source; preserve current layout ownership/modes and
+intact backup metadata. Settle exact final container times after sorting, before
+acceptance, without another blanket timestamp-repair pass. This policy does not
+discard file content or change the intact-backup decisions. Exact decisions and
+evidence are in the private `.nas-audit-evidence/reviews/destination-map-review.md`.
+
+**Active audit scope — owner correction, 2026-11-13:** B comparison is finished,
+no B additions were retained, and A is the staged copy. Exclude B from the active
+destination ledger and `verify` inventory list. Preserve its originals and
+completed evidence for history and physical-drive release; B alias accounting
+and metadata transformations are retired requirements. The unchanged helper
+already accepts an explicit inventory list and requires the ledger to bind exactly
+that list. Use A now; do not weaken metadata checks on A to accommodate B.
+
+1. **Preserve completed inventories; inventory C only when resumed.** A/B inventories are
+   accepted and must not be restarted. After A sorting and prepared inspection,
+   use the helper's `inventory` command for C, recording disk ID, root and tool
+   versions. Publish `driveC.jsonl` only after a complete successful scan;
+   it records hashes, entry types and metadata per the tooling contract.
+   Check the NAS tool versions against the Task 13 fixture record; NAS tool setup
+   and any retesting for different versions must finish before these scans.
+   This remains migration tooling outside the storage role.
+   → verify: the source's scan completed with zero errors and entry counts reconcile
+   before copying from it. A's accepted inventory and preflight permit step 2 while
+   C remains disconnected. Task 6 still requires C's complete evidence; B's
+   comparison is already closed. Special files need an explicit archive/restore or discard decision
+   before release.
+2. **A provisional copy — completed, retain this execution contract.** Do not rerun
+   the copy or mtime repair. The original NAS operation preserved source metadata
+   using a private operator batch whose actual source binding and invocation are
+   retained with the receipts. The reusable copy contract is rsync from the
+   validated read-only source mount to `/mnt/storage/99_tmp/driveA/data/`
+   with `-aHAX --numeric-ids --modify-window=-1`, progress/stats and a per-file log.
+   Check its retained unit's completion; never use `--delete`. The
+   outer `driveA` directory is a fresh root-owned mode-0700 guard; the `data` child
+   receives A's original root metadata (observed mode 0777). Keep other clients
+   and local writers out of staging throughout copy/sorting. Retain the
+   exact source/destination mapping and launch receipt in the independent workspace.
+   Active progress/error/per-file logs are on the NAS spool. After successful
+   completion, capture the invocation/exit status and publish completed logs and
+   receipts to the independent workspace with transfer-hash checks before any
+   reboot or unit cleanup. A missing retained unit leaves the outcome unverified;
+   log endings alone cannot establish successful completion. Follow with an rsync
+   dry-run using `-aAX`, numeric IDs, nanosecond timestamp comparison and itemized
+   changes, without `--checksum`, `--delete` or `-H`. The copy still uses `-H`;
+   omit it only from this metadata check because mergerfs `inodecalc=path-hash`
+   presents different inode numbers for hardlinked names. Task 7's backing-aware
+   helper checks retained hardlink groups. Require successful exit and no unexplained proposed
+   updates; exit 0 alone does not mean a dry-run found no differences. This checks
+   rsync's size/time/metadata criteria without rereading all regular-file contents.
+   → verify: copy succeeded, metadata-only check has no unresolved updates, and
+   staging remains explicitly content-unverified. Do not run a full staging hash.
+3. **Deferred: plan and copy C additions when explicitly resumed.** B's comparison and no-delta-copy
+   decision are complete. Compare accepted C content with retained A coverage
+   and current destination mappings, using BLAKE3 plus size. A content match only
+   to omitted historical content needs C's own retention decision; it cannot be skipped
+   as already retained. These are comparisons of source evidence, not of the
+   actual NAS copy.
+   Use grouped content sets for duplicate-heavy inventories; enumerating every
+   pair of equal-content paths can produce excessive output. Keep each original
+   inventory/source identity rather than inventing a physical combined source.
+   Copy additional C keepers
+   directly to selected final destinations, recording each original path and
+   expected metadata. Check each destination before copying: differing content
+   must receive a distinct leaf path or an explicit disposition, never a silent
+   overwrite. Existing directory merges also need explicit metadata expectations;
+   do not reset a shared parent's metadata as a copy side effect. Retain successful
+   copy and metadata-only dry-run evidence as in step 2, scoped to the selected
+   entries and recorded metadata transformations. No separate staged-delta hashing
+   is required.
+   Keep source identities even for equal content:
    a file needed at a second final path must be copied/linked there or explicitly
    deduplicated by the operator. Equality of hashes alone is not a discard decision.
-   → verify: every B/C entry has staged content or a recorded proposed disposition.
-4. **Sort with collision checks.** Maintain the tooling contract's JSONL ledger,
-   recording each source entry's destination/disposition and expected metadata.
+   If a planned retained copy is later discarded or its destination changes, update
+   the mapping and copy any newly required content before final acceptance. Account
+   for directories, symlinks and special entries as well as regular-file bytes.
+   Prepare the destination-audit inputs for selected C keepers at this stage.
+   The current helper requires every entry of each supplied inventory and has no
+   selected-entry option. Assistant must define and verify a selection mechanism
+   tied to the unchanged full C inventory before C integration/final acceptance;
+   do not silently drop ledger rows or rewrite the original report. This work is
+   deferred until C's retained additions are known; it does not reopen B or require
+   a new payload scan merely to construct audit inputs.
+   → verify: every C entry has a recorded retained-coverage decision, additional
+   keeper mapping/copy receipt or explicit disposition; no copy failures or unresolved metadata-check
+   updates remain. Task 6 can finish on these criteria without claiming the NAS
+   content is verified. Task 7's A sorting can already be underway; its final
+   A-only access/content acceptance proceeds independently under the 2026-11-17
+   scope decision. Later C acceptance still requires complete C source accounting.
+4. **Accept sorted A; integrate C only when resumed.** Begin A sorting
+   after step 2 and complete A map review. A sorting is complete; C is now entirely
+   deferred. Apply access/content acceptance to A, and resume step 3 only on a new
+   owner instruction, with later additions checked in their affected scope.
+   Maintain the tooling contract's JSONL ledger,
+   recording each active migration entry's destination/disposition and expected metadata.
    Record moves as they occur; directory-level logs may aid reconstruction but cannot
    replace each entry's final mapping. Before each move, check the destination. If
    differing content collides, stop and choose distinct unnumbered leaf paths or an
    explicit discard; never overwrite. Equal-content deduplication records the retained
-   destination for every source entry. Log cruft deletion deliberately.
+   destination for every active source entry. Preserve content; the five B-only
+   housekeeping omissions remain in historical comparison evidence, not active ledger rows.
    Apply the [migrated access policy](#migrated-content-access), record repairs, and
    run its temporary RO access probe. Task 13 already tests the collision/error cases.
    → verify: all media access failures are resolved, transformations are explicit,
    and the audit mount is removed before further local changes or the freeze.
-5. **Reconcile everything after sorting.** Run the helper's `verify` command against
-   all three source inventories, the ledger and the final tree. It re-hashes all kept
-   files and checks expected metadata/links and complete accounting. Remove
-   empty staging directories only after their entries are reconciled.
-   → verify: `99_tmp` has no unresolved entries of any type, all source entries have
+5. **Perform the full content reconciliation after sorting.** First account for
+   staging directory entries in the ledger and remove only confirmed-empty staging
+   children; require `99_tmp` to have no remaining entries before starting the
+   expensive content pass. Then run the helper's `verify` command against the
+   active copy-source input and matching ledger: A alone, never B or deferred C.
+   Later C additions use the scoped acceptance workflow above. The current A audit
+   re-hashes all kept
+   files and checks expected metadata/links and complete accounting.
+   → verify: `99_tmp` has no unresolved entries of any type, all active input entries have
    checked dispositions, and the complete final audit has zero unexplained differences.
    Sampling is optional additional inspection, never the release gate. Store the
    helper revision, invocations, final access results and completed reports as evidence.
+   This is the planned full destination-content acceptance pass. A mismatch blocks
+   acceptance: use the ledger to identify the unchanged original, repair the final
+   destination and produce fresh successful reports. Do not silently discard a
+   failed entry. The served-media `access` check remains a separate identity/RO
+   gate and uses only bounded reads under the 2026-11-17 correction; parity checks and required retries also
+   perform I/O. One planned full reconciliation does not mean one physical read
+   across the entire migration.
 6. **Freeze the accepted dataset.** Stop promotions and all writers to included paths
    until Task 8's final full scrub. Cross-check retained destinations against the
    final exclusions rendered in Task 2 (an explicit Task 7 prerequisite). An excluded
@@ -384,7 +937,32 @@ entries, and stop on any enumeration, read, hash, copy, or reconciliation failur
    archive stays unchanged until release is complete.
    → verify: the ledger and final checksums describe the dataset used for parity.
 
+   A later C copy must not silently change a dataset under parity construction.
+   Pause any active freeze/parity sequence before additions, complete their scoped
+   acceptance and refresh affected metadata/evidence, then establish the new frozen
+   state before continuing. If parity already protects the previous state, run the
+   applicable sync and verification before claiming protection for the additions.
+
 ## parity-enablement
+
+**Current operator sequence, 2026-11-20.** Task 6 is complete. The owner
+selected the accepted A dataset with zero C additions. Keep A offline and
+intact. Batch 42 established the B/C hardware and pre-update power
+baseline. The recorded recovery and capacity checks cover both proposed
+parity disks. Batch 43 confirmed the SN06 selector match and unmounted C.
+Batch 44 installed SN06 and confirmed C's revision and health. Batch 45
+restored C's EPC setting and its readback matches the batch 42 power baseline.
+Batch 46 confirmed the runner and scrub timers were absent and maintenance
+was idle. The operator released B and C and verified both GPT partitions.
+Keep `snapraid_maintenance.sync_enabled` and `snapraid_maintenance.scrub_enabled`
+false in the complete inventory mapping used for the subsequent focused apply.
+After physical release and preparation of each disk, configure both
+levels on the accepted frozen dataset, then run one explicit full sync and
+one full scrub. The focused play accepts both released IDs in inventory
+order with `parity_fresh_two_level`. It mounts both partitions before
+installing the two-level configuration. Ordinary expansion still checks
+the existing first parity file. The earlier single-parity sync/scrub and
+subsequent expansion below describe the superseded staged procedure.
 
 One drive at a time; **drive A last**. Tasks 2, 7, and 12 must be complete. Stop/disable
 maintenance timers and wait for running jobs before each configuration transition.
@@ -392,25 +970,58 @@ Preserve the frozen included dataset. Every record below goes to the controller
 evidence workspace defined in [migration-evidence](#migration-evidence), using the
 NAS spool/journal only as a working copy; never update `00_meta` during this sequence.
 
+**Historical hardware snapshot (8.0, 2026-11-19).** The private controller
+launcher for this migration is `bash nas-migration-37-parity-health.sh` from
+the repository root. It streams `scripts/nas-parity-health.sh` to the NAS and
+opens a fresh private controller log before connecting. It selects the same
+six physical drives as the earlier SMART observations. C was disconnected.
+Match each WWN and serial to its private record, and each mounted data
+partition's major/minor device number to its physical disk. Compare firmware,
+PowerBalance, EPC and SMART overall health, temperatures, power-on hours,
+load cycles and error counters with the earlier snapshots. Review any missing
+field, failed query, adverse trend or mismatch before accepting 8.0.
+Retain partial logs. Any corrective firmware or drive-setting change needs
+its own device-specific procedure and a fresh post-change observation.
+
 0. **Parity-size gate (before ANY wipe):** snapraid requires each parity device to be at
-   least as large as the largest data branch. All drives are same-model 18TB Seagates
-   (owner-confirmed 2026-08-22), so this holds — still, compare `lsblk -b` byte sizes of
-   the candidate parity drive vs every `/mnt/data*` device and record the numbers in
-   the controller evidence workspace. Abort the wipe if the candidate is smaller.
-1. **Per-file redundancy gate before B:** use the ledger to identify retained content
-   on B without a verified copy on A/C or another independent surviving device, apart
-   from the NAS. Reserve sufficient free space there, copy those deltas into a separate
-   safety-copy directory, and read/hash them back. Record disk IDs, paths, hashes and
-   free space. No spare capacity or any failed verification means **do not wipe B**.
+   least as large as the largest data branch. Compare the whole disks in bytes
+   and the capacity of the proposed parity partition with every mounted data
+   partition. Record the sizes and partitioning allowance before releasing the
+   source. Stop if the proposed geometry is unknown or undersized.
+1. **Per-file redundancy gate before B:** use the completed A/B comparison and
+   exact five omission decisions together with surviving A evidence/final mappings
+   to establish independent recovery for B's retained content, apart from the NAS.
+   No retained B-only delta remains; do not reopen B copying or require a B
+   destination ledger. Record device identities and recovery coverage. A missing
+   independent copy or failed recovery check still means **do not wipe B**.
    → verify: every retained B entry can be recovered if its NAS data disk fails during
    first parity construction; another path/branch on the same physical disk does not count.
-2. Wipe drive B (`make -C metal wipe` targets k8s nodes — for the NAS use manual
-   `wipefs`/`blkdiscard` per the drive's disk-by-id), add its id under `parity_drives` in
-   the sops inventory (`metal/inventory/metal.yml`), run the storage role
-   (`make -C metal storage ANSIBLE_TARGETS=yggdrasil`). The role formats/mounts
-   `/mnt/parity1`, renders the corrected config and deploys the Task 12 unit; it does
-   not start it. Inspect `/etc/snapraid.conf`, excludes, and `snapraid status` here.
-   Start `snapraid-initial-sync` explicitly. Record this invocation's journal and
+2. After accepting B's recovery and size evidence, stop and disable existing
+   runner/scrub timers and wait for running maintenance, sync or scrub processes
+   to finish. Set both maintenance flags to false in the full inventory mapping
+   as described in [parity job readiness](#parity-job-readiness).
+   The operator releases B by its verified whole-disk by-id and prepares one
+   full-size GPT partition on it. Prepare the exact erase/partition command
+   against the accepted device identity and observed layout at that handoff.
+   Record the new partition's by-id, byte size and parent. Append **its partition
+   by-id** under `parity_drives` in the encrypted inventory without reordering
+   any existing disk. From `metal/`, use the focused play after that release:
+
+   ```bash
+   ansible-playbook -i inventory.sh --limit yggdrasil storage-parity.yml \
+     -e "released_parity_id=$released_partition_id"
+   ```
+
+   Set `released_partition_id` to the exact by-id basename from the release
+   record. The play checks the configured mounts, candidate partition capacity
+   and maintenance state, formats a blank partition, mounts it at
+   `/mnt/parity1` and installs the Task 12 configuration. A retry reuses a
+   matching labeled ext4 partition. Verify the mounted device, available parity
+   space, data/first-parity directives and exclusions in `/etc/snapraid.conf`,
+   along with the installed unit and disabled timers. A first bootstrap may
+   have no content file for `snapraid status` yet.
+   Recheck all data and parity backing mounts after any interruption or reboot
+   and before each sync or scrub. Run `systemctl restart --no-block snapraid-initial-sync` explicitly. Record this invocation's journal and
    `systemctl show` result/exit status; wait for successful completion, not file creation.
    → verify: success for the current dataset/configuration, no active competing job,
    and `snapraid diff` reports no included changes before proceeding.
@@ -418,10 +1029,15 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    errors, and complete block coverage in the output/status. The default scrub unit's
    10%/ten-day policy and an age-filtered percentage pass are not substitutes.
    → verify: first parity can protect the retained snapshot before releasing C.
-4. **Release C and expand:** repeat identity/size and per-file recovery checks. Coverage
+4. **Release C and expand:** C is currently deferred. Stop after the first
+   accepted scrub until the owner resumes C and Task 6 accounts for C's retained
+   entries and verifies additions and affected existing entries. Re-freeze any
+   changed dataset and sync/full-scrub first parity before relying on it.
+   Repeat identity/size and per-file recovery checks. Coverage
    may now come from the unchanged verified first-parity snapshot; any excluded or
    newly changed retained content still needs an independent copy. Wipe C only after
-   that gate, add it as `2-parity`, apply the role, then explicitly run the full-sync
+   that gate, append its released partition as the second inventory entry, run
+   the same focused play with its new by-id, check `2-parity`, then explicitly run the full-sync
    unit again. Keep first parity/content files intact; do not delete them to trigger a
    first-file guard. Full-scrub again with `snapraid scrub -p full`.
    → verify: both configured levels are initialized, this invocation succeeded, no
@@ -432,7 +1048,11 @@ NAS spool/journal only as a working copy; never update `00_meta` during this seq
    spare. Keep a spare unformatted until needed; adding parity repeats expansion/full
    scrub, and adding a data branch requires another sync/full scrub before protection
    of that changed layout is claimed. Preserve an independent copy of migration evidence.
-6. Re-enable maintenance only after recording successful completion. Update
+6. After release, archive the controller evidence to `00_meta/migration/` and
+   preserve the independent copy. Restore the accepted maintenance flags in
+   inventory and re-enable the two installed timers with
+   `systemctl enable --now snapraid-runner.timer snapraid-scrub.timer`.
+   Verify both timers' enabled/active state and next scheduled runs. Update
    `snapraid_maintenance` thresholds in role defaults only if the first weeks show
    false-positive aborts — do not pre-tune.
 
@@ -458,7 +1078,137 @@ without warnings. `make docs` serves a preview and is not a terminating build ch
 If unrelated baseline warnings exist, record them and prove no new warnings; do not
 silently weaken strict mode. Also check local links in the revised Markdown directly.
 
+## Task 14 storage provisioning
+
+Use [Task 14](./tasks.md#task-14-storage-provisioning-on-new-and-existing-nas-hosts)
+for status and dependencies. The production entry point is `metal/storage.yml`.
+The live migration used an existing NAS and a focused parity play. Keep source
+comparisons, discard decisions, firmware changes and disk release under operator
+control. Use synthetic inventories and VM scratch disks for the following work.
+The operator runs the Ansible commands.
+
+### 14.1 Disk admission
+
+Trace `metal/roles/storage/tasks/disks.yml` through `mount_validation.yml`.
+Reuse applicable checks from `metal/roles/storage/files/parity-preflight.sh`.
+An existing ext4 partition on the expected device takes the reuse path. An
+explicitly authorized blank partition takes the format path once. An unreadable
+or ambiguous probe, an unexpected signature, or two inventory entries resolving
+to the same device must stop the play before formatting. Compare the actual
+mounted device to the inventory ID. Include a fixture where the mountpoint
+exists but the wrong device is mounted there.
+
+### 14.2 Package installation
+
+Start with `setup_debian.yml`, `setup_redhat.yml` and `vars/main.yml` in the
+storage role. Debian reuses an exact `/usr/local/bin/snapraid` version. Fresh
+Debian and Fedora installs reach a controller-local package copy, including
+with `parity_drives: []`. Document the data-only prerequisites. The parity
+Molecule fixture's `prepare.yml` already builds SnapRAID 13.0 from checksummed
+source. Choose a reproducible installer or a documented artifact build and
+staging procedure. Verify the installed executable at the path the units use.
+For Fedora, match the pinned mergerfs release's actual RPM name, including
+the package release number. For Debian, exercise first install with fresh APT
+metadata and a retry with `xz-utils` already present.
+
+### 14.3 Parity activation
+
+Trace `snapraid.yml`, `parity_transition.yml` and the initial-sync service.
+The service conflicts with routine sync and scrub services, so a timer firing
+during bootstrap can interrupt it. For first install or expansion, keep both
+timers disabled and idle, check for manual processes and queued jobs, then
+require a successful explicit full sync, clean diffs before and after a full
+scrub, complete coverage and zero errors. Restore the chosen maintenance
+policy after acceptance. Exercise an ordinary repeat apply to an accepted
+array with maintenance enabled and verify that it preserves parity and does
+not launch another bootstrap.
+
+### 14.4 Disk health
+
+In `smartctl_utils.yml`, a nonzero status can accompany a valid SMART report
+that identifies a failing disk. Carry the device identity and outcome through
+to the final decision in `disk_health.yml`. Test a mixed set of healthy,
+unhealthy and unreadable disks. Strict mode must stop and identify every
+affected disk. Warning mode may continue and must report the same findings.
+
+### 14.5 Network and firewall
+
+Exercise two inventories. One uses the NAS's existing network configuration.
+The other opts into network management with a different interface, gateway
+and controller subnet. In `network.yml` and `nfs_firewall.yml`, check that the
+controller is allowed **before** enabling default-deny. After the networking
+handler and firewall changes, verify a fresh SSH connection from controller to
+NAS. The current probe reaches port 22 on the gateway before the handler runs.
+
+### 14.6 Repeat apply and content backups
+
+In `tasks/main.yml`, test that a healthy repeat apply skips sensor detection,
+and that an unloaded `drivetemp` module is loaded even when its config file
+already matches. In `tasks/snapraid.yml`, test enabling the content-backup
+timer on a running host and disabling an already active timer. Verify both
+its active state and whether it will start at boot.
+
+The backup source files on different mounts are all named `snapraid.content`.
+The script currently copies them to the same timestamped destination. Decide
+whether to retain each source separately or one deliberately verified copy
+per generation. Use distinguishable fixture contents to check what can be
+restored, exercise retention across generations, and require the service to
+exit unsuccessfully when a required copy fails.
+
+### 14.7 Full-role acceptance
+
+Reuse the [parity scenario's Molecule/QEMU setup](#molecule-testing)
+on a Linux controller with KVM. Run one guest at a time, recreating it from
+the base image for each case. Give its virtual scratch disks stable device
+IDs and create the blank partitions expected by the install guide. Put the
+guest in the synthetic inventory's `nas` group. Leave filesystem creation,
+package installation and service setup to the production playbook.
+
+Have Molecule converge through `metal/storage.yml` from a clean checkout.
+The existing NFS and parity scenarios cover selected tasks after fixture
+preparation. For each case (data-only and parity-enabled), preserve the
+first recap, write a sentinel file between applies and run Molecule's
+idempotence step with the same inventory. Record a second recap with zero changes,
+matching sentinel checksum, the expected backing devices, the active NFS
+export and the intended timer states. Close Task 14 with this evidence before
+starting Task 10.
+
 ## Deferred / follow-ups (explicit)
+
+- **Probe failures and formatting authorization:** The inherited disk task can
+  reach formatting after any nonzero blkid result; force=false does not make
+  that an unconditional data-preservation guarantee. Owner: assistant, before
+  any later apply to unmounted or undetected volumes. Distinguish probe errors,
+  absent signatures and existing filesystems, require explicit per-device
+  formatting intent, and test all three paths while preserving fresh provisioning.
+  The completed layout applications used verified mounted ext4 branches and
+  skipped formatting; they do not accept this broader path.
+- **Temporary package ownership:** The inherited SnapRAID installation cleanup
+  can remove a pre-existing xz-utils package. Owner: assistant, before approving
+  a run that needs installation. Track dependency ownership and test pre-existing
+  versus newly installed dependencies. The exact-version gate skipped this path
+  in the completed live applications.
+- **Inventory failure regression coverage:** Owner: assistant, before Task 10.1.
+  Add persistent invalid-option and decryption-failure cases to
+  `tests/test_inventory.sh`, requiring nonzero status and no temporary plaintext.
+  Earlier transient failure/signal checks passed; the committed fixture currently
+  covers parsing, host selection and successful cleanup.
+- **Export assertion scope:** Runtime checks match policy substrings across the
+  export output and were accepted for the known single root export. Owner:
+  assistant, before broader/custom-export reuse. Parse and validate each intended
+  export independently, with tests rejecting policy fields from another export.
+- **General mount maintenance:** The focused acceptance play does not orchestrate
+  unrelated clients. A general opt-in maintenance workflow was discussed but not
+  accepted as scope. Owner: operator to request it if needed; assistant to design
+  its client quiescence, failure handling and runtime validation before use.
+
+- **Wake-only entry point:** `make wake` currently calls `metal/Makefile`'s
+  bootstrap play with pxe_state=absent; `metal/bootstrap.yml` still includes the
+  PXE role and imports storage.yml. This can do more than wake cluster nodes.
+  Owner: assistant, before recommending this target for wake-only use, split or route
+  it to a dedicated wake-only play using the existing boot role and explicit
+  cluster scope; verify no PXE/storage/provisioning tasks are reached. Deferred
+  because that entry-point repair is outside the current NAS acceptance step.
 
 - **restic policy values** per tier — design names the tiers; concrete
   frequencies/retention are future work (`scripts/backup.py` / backup docs).

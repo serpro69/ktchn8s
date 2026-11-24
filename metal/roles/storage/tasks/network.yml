@@ -1,5 +1,24 @@
 ---
-- name: Configure static networking on Debian
+- name: Validate the operator's static interface settings
+  ansible.builtin.assert:
+    that:
+      - storage_network.interface in ansible_facts.interfaces
+      - storage_network.address is defined
+      - storage_network.netmask is defined
+      - storage_network.gateway is defined
+      - storage_network.dns_nameservers | length > 0
+    fail_msg: Supply the NAS interface, address, netmask, gateway and DNS servers before managing networking.
+
+- name: Check whether ifupdown owns the Debian interface
+  ansible.builtin.command:
+    argv: [ifquery, --state, "{{ storage_network.interface }}"]
+  register: storage_ifupdown
+  changed_when: false
+  failed_when: false  # Netplan-only images have no ifquery.
+  check_mode: false
+  when: ansible_os_family == 'Debian'
+
+- name: Configure static networking with ifupdown
   template:
     src: interfaces.j2
     dest: /etc/network/interfaces
@@ -7,29 +26,106 @@
     group: root
     mode: "0644"
     backup: true
-  when: ansible_os_family == 'Debian'
+  when: ansible_os_family == 'Debian' and storage_ifupdown.rc == 0
   notify: restart networking debian
+
+- name: Resolve the IPv4 prefix for Netplan or NetworkManager
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - import ipaddress, sys; print(ipaddress.IPv4Network(("0.0.0.0", sys.argv[1])).prefixlen)
+      - "{{ storage_network.netmask }}"
+  changed_when: false
+  register: storage_prefix
+  check_mode: false
+  when: ansible_os_family == 'RedHat' or (ansible_os_family == 'Debian' and storage_ifupdown.rc != 0)
+
+- name: Configure the Netplan definition that networkd uses for this interface
+  when: ansible_os_family == 'Debian' and storage_ifupdown.rc != 0
+  vars:
+    storage_static_cidr: "{{ storage_network.address ~ '/' ~ storage_prefix.stdout }}"
+  block:
+    - name: Read the active networkd link configuration
+      ansible.builtin.command:
+        argv: [networkctl, --json=short, status, "{{ storage_network.interface }}"]
+      register: storage_networkd
+      changed_when: false
+      check_mode: false
+
+    - name: Require a Netplan-managed link before writing static configuration
+      ansible.builtin.assert:
+        that: (storage_networkd.stdout | from_json).NetworkFile | default('') is match('^/run/systemd/network/10-netplan-.+\.network$')
+        fail_msg: The requested Debian interface must be managed by ifupdown or Netplan with networkd.
+
+    - name: Identify the active Netplan definition
+      ansible.builtin.set_fact:
+        storage_netplan_id: "{{ ((storage_networkd.stdout | from_json).NetworkFile | basename)[11:-8] }}"
+
+    - name: Preview the proposed overlay with the guest's other Netplan files
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          umask 077
+          preview=$(mktemp -d)
+          trap 'rm -rf "$preview"' EXIT
+          for dir in lib/netplan etc/netplan run/netplan; do
+            mkdir -p "$preview/$dir"
+            for src in /"$dir"/*.yaml; do
+              test -f "$src" || continue
+              test "$src" != /etc/netplan/99-ktchn8s-storage.yaml || continue
+              ln -s "$src" "$preview/$dir/"
+            done
+          done
+          cat > "$preview/etc/netplan/99-ktchn8s-storage.yaml"
+          netplan get --root-dir "$preview" ethernets
+        stdin: "{{ lookup('ansible.builtin.template', 'storage-netplan.yaml.j2') }}"
+      register: storage_ethernets
+      changed_when: false
+      check_mode: false
+
+    - name: Require an interface-specific profile with the requested effective IPv4 settings
+      vars:
+        ethernet: "{{ (storage_ethernets.stdout | from_yaml)[storage_netplan_id] }}"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ethernet.match is not defined and storage_netplan_id == storage_network.interface) or
+            (ethernet.match.name | default('') == storage_network.interface) or
+            (ethernet.match.macaddress | default('') | lower == ansible_facts[storage_network.interface].macaddress | lower)
+          - not (ethernet.dhcp4 | default(false))
+          - ethernet.addresses | reject('match', '^[0-9A-Fa-f]*:') | list == [storage_static_cidr]
+          - ethernet.gateway4 is not defined
+          - >-
+            ethernet.routes | selectattr('to', 'in', ['default', '0.0.0.0/0'])
+            | rejectattr('via', 'search', ':') | map(attribute='via') | list == [storage_network.gateway]
+          - ethernet.nameservers.addresses == storage_network.dns_nameservers
+        fail_msg: Check the interface match and conflicting static addresses, gateways or DNS entries in the existing Netplan files.
+
+    - name: Set static IPv4 on the existing Netplan definition
+      ansible.builtin.template:
+        src: storage-netplan.yaml.j2
+        dest: /etc/netplan/99-ktchn8s-storage.yaml
+        owner: root
+        group: root
+        mode: '0600'
+      notify: apply netplan
+
+    - name: Reapply a previously written profile if the interface still lacks its permanent address
+      ansible.builtin.command:
+        argv: [ip, -4, -o, address, show, dev, "{{ storage_network.interface }}", scope, global, permanent]
+      register: storage_permanent_addresses
+      changed_when: "('inet ' ~ storage_static_cidr ~ ' ') not in storage_permanent_addresses.stdout"
+      check_mode: false
+      notify: apply netplan
 
 - name: Configure static networking on RedHat
   template:
-    src: ifcfg-interface.j2
-    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ storage_network.interface }}"
+    src: storage.nmconnection.j2
+    dest: /etc/NetworkManager/system-connections/storage.nmconnection
     owner: root
     group: root
-    mode: "0644"
+    mode: "0600"
     backup: true
   when: ansible_os_family == 'RedHat'
   notify: restart networking redhat
-
-- name: Verify network configuration
-  wait_for:
-    host: "{{ storage_network.gateway }}"
-    port: 22
-    timeout: 10
-  changed_when: false
-  failed_when: false
-  register: network_test
-
-- name: Display network configuration status
-  debug:
-    msg: "Network configuration {{ 'successful' if network_test.failed == false else 'may need verification' }}"

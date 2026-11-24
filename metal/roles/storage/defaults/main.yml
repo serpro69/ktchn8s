@@ -17,27 +17,23 @@ manage_firewall: true # Set to false to skip firewall configuration
 install_ufw: true # Install UFW if not present (only when manage_firewall=true)
 firewall_allowed_networks: # NB! The default will only allow connections (including SSH) from homelab network
   - "{{ homelab_net_cidr }}"
-  - "192.168.1.100/32" # 'serenity' workstation with reserved static IP on vlan2 (home network)
 
 # Network configuration (optional)
-configure_network: true
-storage_network:
-  interface: "{{ network_interface | default('eth0') }}"
-  address: "{{ ansible_host }}"
-  netmask: "255.255.255.0"
-  gateway: "10.10.10.1"
-  dns_nameservers:
-    - "10.10.10.1"
-    - "1.1.1.1"
+configure_network: false
+# When enabled, inventory supplies interface, address, netmask, gateway and dns_nameservers.
+storage_network: {}
+
+# One-time adoption of an existing independently accepted legacy array.
+storage_adopt_accepted_parity: false
 
 # Snapraid maintenance configuration
 snapraid_maintenance:
   # Daily sync schedule (systemd timer format)
   sync_time: "02:00" # 2 AM daily
-  sync_enabled: true
+  sync_enabled: false
 
   # Monthly scrub configuration
-  scrub_enabled: true
+  scrub_enabled: false
   scrub_schedule: "Sun *-*-1..7 03:00:00" # First Sunday of month at 3 AM
   scrub_percentage: 10
   scrub_older_than_days: 10
@@ -84,5 +80,7 @@ disk_health_thresholds:
   max_pending_sectors: 0
   max_uncorrectable_errors: 0
 
-# Run nfs validations
+# Legacy opt-in: basic NAS + Kubernetes probes after convergence.
+# Requires an existing cluster; prefer the separate storage-validate target.
+# Never enables disruptive lifecycle acceptance or migration-tool checks.
 validate_nfs: false

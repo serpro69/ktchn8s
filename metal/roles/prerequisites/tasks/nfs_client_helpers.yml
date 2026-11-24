@@ -1,0 +1,22 @@
+---
+# -V exits after printing the version; no source or mountpoint is supplied.
+- name: Require runnable NFS helpers before creating any lifecycle fixture
+  ansible.builtin.command:
+    argv: ["/usr/sbin/{{ item.1 }}", -V]
+  delegate_to: "{{ item.0 }}"
+  loop: "{{ nfs_lifecycle_clients | product(['mount.nfs', 'mount.nfs4']) | list }}"
+  loop_control:
+    label: "{{ item.0 }} {{ item.1 }}"
+  register: nfs_client_helper_versions
+  changed_when: false
+
+- name: Report the helper versions without attempting a mount
+  ansible.builtin.debug:
+    msg:
+      client: "{{ item.item.0 }}"
+      helper: "{{ item.item.1 }}"
+      stdout: "{{ item.stdout }}"
+      stderr: "{{ item.stderr }}"
+  loop: "{{ nfs_client_helper_versions.results }}"
+  loop_control:
+    label: "{{ item.item.0 }} {{ item.item.1 }}"

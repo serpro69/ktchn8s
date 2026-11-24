@@ -1,0 +1,91 @@
+---
+- name: Require an active NFS service # noqa command-instead-of-module
+  ansible.builtin.command: "systemctl is-active {{ nfs_server_service }}"
+  changed_when: false
+
+- name: Require NFS connectivity from the controller
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: 2049
+    timeout: 10
+  delegate_to: localhost
+  become: false
+
+- name: Create an isolated local mount workspace
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: nfs-readiness-
+  register: nfs_readiness_workspace
+
+- name: Run fixed-owner operations through the NAS's own NFS export
+  block:
+    - name: Make the workspace traversable by UID 1000
+      ansible.builtin.file:
+        path: "{{ nfs_readiness_workspace.path }}"
+        mode: '0755'
+
+    - name: Install the shared writer probe
+      ansible.builtin.copy:
+        src: nfs-readiness.sh
+        dest: "{{ nfs_readiness_workspace.path }}/probe.sh"
+        mode: '0755'
+
+    - name: Require confirmed teardown once local mounting begins
+      ansible.builtin.set_fact:
+        nfs_readiness_local_clean: false
+
+    - name: Mount only the writable synthetic subtree
+      ansible.posix.mount:
+        path: "{{ nfs_readiness_workspace.path }}/rw"
+        src: "{{ ansible_host }}:/mnt/storage/99_tmp/nfs-readiness"
+        fstype: nfs4
+        opts: rw,vers=4.2,soft,timeo=50,retrans=2
+        state: ephemeral
+
+    - name: Mount the same subtree read-only
+      ansible.posix.mount:
+        path: "{{ nfs_readiness_workspace.path }}/ro"
+        src: "{{ ansible_host }}:/mnt/storage/99_tmp/nfs-readiness"
+        fstype: nfs4
+        opts: ro,vers=4.2,soft,timeo=50,retrans=2
+        state: ephemeral
+
+    - name: Exercise nested create, link, promotion, reopen and delete as UID 1000
+      ansible.builtin.command:
+        argv:
+          - setpriv
+          - --reuid=1000
+          - --regid=1000
+          - --clear-groups
+          - "{{ nfs_readiness_workspace.path }}/probe.sh"
+          - "{{ item }}"
+          - "{{ nfs_readiness_workspace.path }}/rw"
+      loop: [create, promote, read, delete]
+      changed_when: true
+
+    - name: Require read-only filesystem rejection as UID 1000
+      ansible.builtin.command:
+        argv:
+          - setpriv
+          - --reuid=1000
+          - --regid=1000
+          - --clear-groups
+          - "{{ nfs_readiness_workspace.path }}/probe.sh"
+          - readonly
+          - "{{ nfs_readiness_workspace.path }}/ro"
+      changed_when: false
+  always:
+    - name: Unmount local clients normally, including after probe failure
+      ansible.posix.mount:
+        path: "{{ nfs_readiness_workspace.path }}/{{ item }}"
+        state: unmounted
+      loop: [ro, rw]
+
+    - name: Record successful local client teardown
+      ansible.builtin.set_fact:
+        nfs_readiness_local_clean: true
+
+    - name: Remove the unmounted local workspace
+      ansible.builtin.file:
+        path: "{{ nfs_readiness_workspace.path }}"
+        state: absent

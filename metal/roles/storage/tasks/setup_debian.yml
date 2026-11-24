@@ -1,50 +1,39 @@
 ---
-- name: Upgrade packages
-  apt:
+- name: Check whether usable package indexes exist
+  ansible.builtin.find:
+    paths: /var/lib/apt/lists
+    patterns: '*_Packages*'
+    file_type: file
+  register: storage_apt_indexes
+
+- name: Install NAS prerequisites using current APT metadata
+  ansible.builtin.apt:
     update_cache: true
+    cache_valid_time: "{{ 3600 if storage_apt_indexes.matched else 0 }}"
+    name: [smartmontools, rsync, b3sum, lm-sensors, nfs-kernel-server, nfs-common, xz-utils, logrotate, e2fsprogs]
+
+- name: Upgrade packages when requested
+  ansible.builtin.apt:
     upgrade: dist
   when: upgrade_packages
 
-- name: Ensure base packages
-  apt:
-    name:
-      # hardware monitoring
-      - lm-sensors
-      # nfs
-      - nfs-kernel-server
-      - nfs-common
-    state: present
-    update_cache: true
+- name: Verify the packaged checksum tool
+  ansible.builtin.shell: |
+    set -eu
+    tool=$(command -v b3sum)
+    dpkg-query -S "$(readlink -e "$tool")"
+  register: storage_b3sum_owner
+  changed_when: false
+  failed_when: >-
+    storage_b3sum_owner.rc != 0 or storage_b3sum_owner.stdout != 'b3sum: /usr/bin/b3sum'
+
+- name: Download the verified mergerfs DEB for this release
+  ansible.builtin.get_url:
+    url: "{{ mergerfs_url_deb }}"
+    checksum: "{{ mergerfs_checksums[mergerfs_pkg_deb] }}"
+    dest: "/var/cache/{{ mergerfs_pkg_deb }}"
+    mode: '0644'
 
 - name: Install mergerfs
-  apt:
-    deb: "{{ mergerfs_url_deb }}"
-    state: present
-
-- name: Copy snapraid .deb
-  copy:
-    src: files/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
-    dest: /tmp/
-    owner: root
-    group: root
-    mode: "0755"
-  register: snapraid_deb
-
-- name: Ensure apt module dependencies
-  apt:
-    name:
-      # temp 'apt' module dependency for installing .deb
-      - xz-utils
-    state: present
-  when: snapraid_deb is changed
-
-- name: Install snapraid
-  apt:
-    deb: /tmp/snapraid_{{ snapraid_version }}_{{ ansible_distribution_release }}.deb
-    state: present
-
-- name: Clean up temporary packages
-  apt:
-    name:
-      - xz-utils
-    state: absent
+  ansible.builtin.apt:
+    deb: "/var/cache/{{ mergerfs_pkg_deb }}"

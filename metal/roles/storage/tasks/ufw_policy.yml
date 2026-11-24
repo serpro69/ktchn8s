@@ -1,0 +1,79 @@
+---
+- name: Identify the peer and server port of the working SSH connection
+  ansible.builtin.command: printenv SSH_CONNECTION
+  become: false
+  register: storage_ssh_connection
+  changed_when: false
+  check_mode: false
+
+- name: Require an SSH allowlist covering the controller before applying firewall policy
+  ansible.builtin.command:
+    argv: "{{ ['/usr/bin/python3', '-c', check_peer, storage_ssh_connection.stdout.split()[0]] + firewall_allowed_networks }}"
+  vars:
+    check_peer: |
+      import ipaddress, sys
+      peer = ipaddress.ip_address(sys.argv[1])
+      networks = [ipaddress.ip_network(value, strict=False) for value in sys.argv[2:]]
+      if not any(peer in network for network in networks):
+          sys.exit(f'{peer} must be in firewall_allowed_networks before enabling UFW')
+  changed_when: false
+  check_mode: false
+
+- name: Preview SSH allow rules before setting any default-deny policy
+  ansible.builtin.command:
+    argv: [ufw, --dry-run, prepend, allow, from, "{{ item }}", to, any, port, "{{ storage_ssh_connection.stdout.split()[3] }}", proto, tcp, comment, NAS SSH]
+  environment:
+    LC_ALL: C
+  register: storage_ssh_preview
+  changed_when: storage_ssh_preview.stdout is not search('(?m)^Skipping (adding|inserting) existing rule')
+  check_mode: false
+  loop: "{{ firewall_allowed_networks }}"
+
+- name: Apply new SSH rules before enabling default-deny
+  ansible.builtin.command:
+    # Reuse the previewed command without its --dry-run argument.
+    argv: "{{ ['ufw'] + item.cmd[2:] }}"
+  environment:
+    LC_ALL: C
+  loop: "{{ storage_ssh_preview.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.changed
+  register: storage_ssh_apply
+  changed_when: storage_ssh_apply.stdout is not search('(?m)^Skipping (adding|inserting) existing rule')
+
+- name: Allow NFSv4 clients
+  community.general.ufw:
+    rule: allow
+    src: "{{ item }}"
+    port: '2049'
+    proto: tcp
+    comment: "NFSv4 2049/tcp"
+  loop: "{{ firewall_allowed_networks }}"
+
+- name: Apply incoming default policy
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Apply outgoing default policy
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Read effective UFW policy
+  ansible.builtin.command: ufw status
+  environment:
+    LC_ALL: C
+  register: storage_ufw_rules
+  changed_when: false
+
+- name: Verify active UFW and the TCP NFS allow rule
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in storage_ufw_rules.stdout_lines"
+      - storage_ufw_rules.stdout is search('(?m)^2049/tcp\s+ALLOW\s+')

@@ -16,9 +16,26 @@
     path: "/mnt/storage/{{ item }}"
     owner: "{{ nfs_anon_uid }}"
     group: "{{ nfs_anon_gid }}"
-    mode: "0755"
+    mode: "0775"
     state: directory
   loop: "{{ storage_dirs }}"
+
+- name: Render storage layout legend
+  template:
+    src: storage-readme.j2
+    dest: /mnt/storage/00_meta/README.md
+    owner: "{{ nfs_anon_uid }}"
+    group: "{{ nfs_anon_gid }}"
+    mode: "0644"
+
+- name: Initialize storage retirement log without overwriting entries
+  copy:
+    content: ""
+    dest: /mnt/storage/00_meta/RETIRED.md
+    force: false
+    owner: "{{ nfs_anon_uid }}"
+    group: "{{ nfs_anon_gid }}"
+    mode: "0644"
 
 - name: Ensure nfs.conf.d include directory exists
   file:
@@ -40,12 +57,13 @@
     mode: "0644"
   notify: restart nfs server
 
-- name: Disable rpcbind (not needed for NFSv4-only)
-  service:
-    name: rpcbind
+- name: Disable rpcbind and its socket activation for NFSv4-only
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
     state: stopped
     enabled: false
-  failed_when: false
+    masked: true
+  loop: [rpcbind.socket, rpcbind.service]
 
 - name: Enable and start NFS server
   service:
@@ -60,14 +78,17 @@
 - name: Flush handlers before validation
   meta: flush_handlers
 
-- name: Validate NFS exports
-  include_tasks: nfs_validation.yml
-  when: validate_nfs
+- name: Discard the existing SSH control connection after applying NAS network policy
+  ansible.builtin.meta: reset_connection
+  when: configure_network | bool or manage_firewall | bool
 
-- name: Validate NFS-K8S integration
-  include_tasks:
-    file: k8s_validation.yml
-    apply:
-      become: false
-      delegate_to: localhost
-  when: validate_nfs
+- name: Require a fresh authenticated connection to the NAS
+  ansible.builtin.wait_for_connection:
+    timeout: 60
+  when: configure_network | bool or manage_firewall | bool
+
+# Compatibility for existing callers; prefer storage-validate after cluster creation.
+- name: Run explicitly requested post-install NFS validation
+  ansible.builtin.include_role:
+    name: nfs_validation
+  when: validate_nfs | bool

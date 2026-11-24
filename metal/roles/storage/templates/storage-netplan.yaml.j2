@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+network:
+  version: 2
+  ethernets:
+    {{ storage_netplan_id | to_json }}:
+      dhcp4: false
+      addresses: [{{ storage_static_cidr | to_json }}]
+      routes:
+        - to: default
+          via: {{ storage_network.gateway | to_json }}
+      nameservers:
+        addresses: {{ storage_network.dns_nameservers | to_json }}
